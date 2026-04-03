@@ -17,6 +17,8 @@ export default function ClientModal({ client, onClose, onSaved }: Props) {
   const [retainer, setRetainer] = useState('');
   const [cost, setCost] = useState('');
   const [platforms, setPlatforms] = useState<string[]>([]);
+  const [status, setStatus] = useState<'Active' | 'Inactive' | 'Paused'>('Active');
+  const [renewalDate, setRenewalDate] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -26,6 +28,8 @@ export default function ClientModal({ client, onClose, onSaved }: Props) {
       setRetainer(String(client.retainer || ''));
       setCost(String(client.cost || ''));
       setPlatforms(client.platforms || []);
+      setStatus(client.status || 'Active');
+      setRenewalDate(client.renewal_date || '');
     }
   }, [client]);
 
@@ -42,6 +46,8 @@ export default function ClientModal({ client, onClose, onSaved }: Props) {
       retainer: parseFloat(retainer) || 0,
       cost: parseFloat(cost) || 0,
       platforms,
+      status,
+      renewal_date: renewalDate || null,
     };
     if (client?.id) {
       await supabase.from('clients').update(data).eq('id', client.id);
@@ -78,6 +84,20 @@ export default function ClientModal({ client, onClose, onSaved }: Props) {
             <div>
               <label className="form-label">Client Cost ($)</label>
               <input className="form-input" type="number" value={cost} onChange={e => setCost(e.target.value)} placeholder="0" />
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <label className="form-label">Status</label>
+              <select className="form-input" value={status} onChange={e => setStatus(e.target.value as 'Active' | 'Inactive' | 'Paused')}>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+                <option value="Paused">Paused</option>
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Renewal Date</label>
+              <input className="form-input" type="date" value={renewalDate} onChange={e => setRenewalDate(e.target.value)} />
             </div>
           </div>
           <div>

@@ -1,28 +1,41 @@
 'use client';
-import { Client, Post, Pillar, Format } from '@/lib/types';
-import { fn, avg, er, getColor, getPlatformColor } from '@/lib/utils';
+import { Client, Post } from '@/lib/types';
+import { fn, avg, er, getPlatformColor } from '@/lib/utils';
 
 interface Props {
   clients: Client[];
   posts: Post[];
-  pillars: Pillar[];
-  formats: Format[];
   onSelectClient: (id: string) => void;
 }
 
-export default function Overview({ clients, posts, pillars, formats, onSelectClient }: Props) {
-  // Current month filter
+export default function Overview({ clients, posts, onSelectClient }: Props) {
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const monthPosts = posts.filter(p => p.date?.startsWith(currentMonth));
+  const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
 
-  // Aggregate metrics for this month
+  const monthPosts = posts.filter(p => p.date?.startsWith(currentMonth));
+  const prevMonthPosts = posts.filter(p => p.date?.startsWith(prevMonth));
+
+  // Current month metrics
   const totalViews = monthPosts.reduce((s, p) => s + (p.views || 0), 0);
   const totalPostsCount = monthPosts.length;
   const totalFollows = monthPosts.reduce((s, p) => s + (p.follows || 0), 0);
-  const totalSaves = monthPosts.reduce((s, p) => s + (p.saves || 0), 0);
 
-  // Top 3 outlier posts — 1.5x above their CLIENT average views
+  // Previous month metrics
+  const prevViews = prevMonthPosts.reduce((s, p) => s + (p.views || 0), 0);
+  const prevPostsCount = prevMonthPosts.length;
+  const prevFollows = prevMonthPosts.reduce((s, p) => s + (p.follows || 0), 0);
+
+  // Delta helper
+  function delta(current: number, previous: number): { text: string; color: string } {
+    const diff = current - previous;
+    if (diff > 0) return { text: `+${fn(diff)} vs last month`, color: '#10b981' };
+    if (diff < 0) return { text: `${fn(diff)} vs last month`, color: '#ef4444' };
+    return { text: 'No change vs last month', color: '#555' };
+  }
+
+  // Top 3 outlier posts
   const outlierPosts: (Post & { clientName: string; multiple: number })[] = [];
   clients.forEach(client => {
     const cp = monthPosts.filter(p => p.client_id === client.id);
@@ -38,31 +51,21 @@ export default function Overview({ clients, posts, pillars, formats, onSelectCli
   outlierPosts.sort((a, b) => b.multiple - a.multiple);
   const topOutliers = outlierPosts.slice(0, 3);
 
-  // Most active client this month (most posts logged)
-  const clientPostCounts = clients.map(c => ({
-    client: c,
-    count: monthPosts.filter(p => p.client_id === c.id).length,
-  })).sort((a, b) => b.count - a.count);
-  const mostActive = clientPostCounts[0]?.count > 0 ? clientPostCounts[0] : null;
-
-  // Best performing pillar — highest avg follows per post (across all clients)
-  const pillarStats = pillars.map(pl => {
-    const pillarPosts = monthPosts.filter(p => p.pillar === pl.name);
-    const avgFollows = pillarPosts.length > 0 ? avg(pillarPosts.map(p => p.follows)) : 0;
-    return { pillar: pl, avgFollows, postCount: pillarPosts.length };
-  }).filter(ps => ps.postCount > 0).sort((a, b) => b.avgFollows - a.avgFollows);
-  const bestPillar = pillarStats[0] || null;
-
-  // Best performing format — highest avg views (across all clients)
-  const uniqueFormats = Array.from(new Set(monthPosts.map(p => p.format).filter(Boolean)));
-  const formatStats = uniqueFormats.map(f => {
-    const formatPosts = monthPosts.filter(p => p.format === f);
-    const avgViews = formatPosts.length > 0 ? avg(formatPosts.map(p => p.views)) : 0;
-    return { format: f, avgViews, postCount: formatPosts.length };
-  }).sort((a, b) => b.avgViews - a.avgViews);
-  const bestFormat = formatStats[0] || null;
+  // Client cards — views this month vs last month, pick top 3 by absolute change
+  const clientCards = clients.map(c => {
+    const thisMonthViews = monthPosts.filter(p => p.client_id === c.id).reduce((s, p) => s + (p.views || 0), 0);
+    const lastMonthViews = prevMonthPosts.filter(p => p.client_id === c.id).reduce((s, p) => s + (p.views || 0), 0);
+    const diff = thisMonthViews - lastMonthViews;
+    return { client: c, thisMonthViews, lastMonthViews, diff };
+  }).filter(c => c.thisMonthViews > 0 || c.lastMonthViews > 0)
+    .sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff))
+    .slice(0, 3);
 
   const monthLabel = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+  const viewsDelta = delta(totalViews, prevViews);
+  const postsDelta = delta(totalPostsCount, prevPostsCount);
+  const followsDelta = delta(totalFollows, prevFollows);
 
   return (
     <div style={{ padding: '20px 24px', overflowY: 'auto', height: '100%' }}>
@@ -73,17 +76,16 @@ export default function Overview({ clients, posts, pillars, formats, onSelectCli
       </div>
 
       {/* Top metrics */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
         {[
-          { label: 'Total Views', value: fn(totalViews), sub: 'this month' },
-          { label: 'Total Posts', value: String(totalPostsCount), sub: 'across all clients' },
-          { label: 'Total Follows', value: fn(totalFollows), sub: 'gained this month' },
-          { label: 'Total Saves', value: fn(totalSaves), sub: 'this month' },
+          { label: 'Total Views', value: fn(totalViews), delta: viewsDelta },
+          { label: 'Total Posts', value: String(totalPostsCount), delta: postsDelta },
+          { label: 'Total Follows', value: fn(totalFollows), delta: followsDelta },
         ].map(m => (
           <div key={m.label} className="metric-chip">
             <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>{m.label}</div>
             <div style={{ fontSize: 18, fontWeight: 700, color: '#fff', marginBottom: 3 }}>{m.value}</div>
-            <div style={{ fontSize: 11, color: '#444' }}>{m.sub}</div>
+            <div style={{ fontSize: 11, color: m.delta.color }}>{m.delta.text}</div>
           </div>
         ))}
       </div>
@@ -95,7 +97,7 @@ export default function Overview({ clients, posts, pillars, formats, onSelectCli
           <div style={{ color: '#333', fontSize: 12 }}>No outlier posts this month (posts need 1.5x above client average)</div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(topOutliers.length, 3)}, 1fr)`, gap: 12 }}>
-            {topOutliers.map((post, i) => (
+            {topOutliers.map((post) => (
               <div key={post.id} style={{ background: '#111', border: '0.5px solid #1a1a1a', borderRadius: 8, padding: 14 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                   <span className="badge badge-outlier">{post.multiple.toFixed(1)}x</span>
@@ -121,94 +123,38 @@ export default function Overview({ clients, posts, pillars, formats, onSelectCli
         )}
       </div>
 
-      {/* Insights row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 14 }}>
-        {/* Most Active Client */}
-        <div className="card">
-          <div style={{ fontSize: 11, color: '#555', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Most Active Client</div>
-          {mostActive ? (
-            <div style={{ cursor: 'pointer' }} onClick={() => onSelectClient(mostActive.client.id)}>
-              <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{mostActive.client.name}</div>
-              <div style={{ fontSize: 12, color: '#555' }}>{mostActive.count} posts this month</div>
-              <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
-                {(mostActive.client.platforms || []).map(p => (
-                  <span key={p} style={{ fontSize: 9, padding: '2px 5px', borderRadius: 4, border: '0.5px solid #2a2a2a', color: getPlatformColor(p) }}>{p}</span>
-                ))}
+      {/* Client Cards */}
+      {clientCards.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(clientCards.length, 3)}, 1fr)`, gap: 10 }}>
+          {clientCards.map(cc => {
+            const arrow = cc.diff > 0 ? '↑' : cc.diff < 0 ? '↓' : '→';
+            const arrowColor = cc.diff > 0 ? '#10b981' : cc.diff < 0 ? '#ef4444' : '#555';
+            return (
+              <div
+                key={cc.client.id}
+                className="card"
+                style={{ cursor: 'pointer' }}
+                onClick={() => onSelectClient(cc.client.id)}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>{cc.client.name}</div>
+                  <span style={{ fontSize: 18, color: arrowColor, fontWeight: 700 }}>{arrow}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                  <div>
+                    <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>This Month</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>{fn(cc.thisMonthViews)}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>Last Month</div>
+                    <div style={{ fontSize: 14, color: '#555' }}>{fn(cc.lastMonthViews)}</div>
+                  </div>
+                </div>
               </div>
-            </div>
-          ) : (
-            <div style={{ color: '#333', fontSize: 12 }}>No posts this month</div>
-          )}
+            );
+          })}
         </div>
-
-        {/* Best Performing Pillar */}
-        <div className="card">
-          <div style={{ fontSize: 11, color: '#555', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Best Pillar</div>
-          {bestPillar ? (
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{bestPillar.pillar.name}</div>
-              <div style={{ fontSize: 12, color: '#555' }}>{fn(bestPillar.avgFollows)} avg follows/post</div>
-              <div style={{ fontSize: 11, color: '#444', marginTop: 4 }}>{bestPillar.postCount} posts this month</div>
-            </div>
-          ) : (
-            <div style={{ color: '#333', fontSize: 12 }}>No pillar data this month</div>
-          )}
-        </div>
-
-        {/* Best Performing Format */}
-        <div className="card">
-          <div style={{ fontSize: 11, color: '#555', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Best Format</div>
-          {bestFormat ? (
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{bestFormat.format}</div>
-              <div style={{ fontSize: 12, color: '#555' }}>{fn(bestFormat.avgViews)} avg views</div>
-              <div style={{ fontSize: 11, color: '#444', marginTop: 4 }}>{bestFormat.postCount} posts this month</div>
-            </div>
-          ) : (
-            <div style={{ color: '#333', fontSize: 12 }}>No format data this month</div>
-          )}
-        </div>
-      </div>
-
-      {/* Client performance table */}
-      <div className="card">
-        <div style={{ fontSize: 11, color: '#555', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Client Performance — {monthLabel}</div>
-        {clients.length === 0 ? (
-          <div style={{ color: '#333', fontSize: 12 }}>No clients yet. Add your first client from the sidebar.</div>
-        ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Client</th>
-                <th>Posts</th>
-                <th>Views</th>
-                <th>Follows</th>
-                <th>Saves</th>
-                <th>Avg ER%</th>
-              </tr>
-            </thead>
-            <tbody>
-              {clients.map((c, i) => {
-                const cp = monthPosts.filter(p => p.client_id === c.id);
-                const views = cp.reduce((s, p) => s + (p.views || 0), 0);
-                const follows = cp.reduce((s, p) => s + (p.follows || 0), 0);
-                const saves = cp.reduce((s, p) => s + (p.saves || 0), 0);
-                const avgER = cp.length > 0 ? avg(cp.map(p => er(p))) : 0;
-                return (
-                  <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => onSelectClient(c.id)}>
-                    <td style={{ color: '#fff', fontWeight: 600 }}>{c.name}</td>
-                    <td style={{ color: '#555' }}>{cp.length}</td>
-                    <td>{fn(views)}</td>
-                    <td>{fn(follows)}</td>
-                    <td>{fn(saves)}</td>
-                    <td style={{ color: '#555' }}>{avgER.toFixed(1)}%</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+      )}
     </div>
   );
 }

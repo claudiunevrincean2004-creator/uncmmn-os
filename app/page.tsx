@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Client, Post, Goal, Hook, Format, Pillar, DriveFolder, Expense, MonthlyRevenue, MonthlyExpense, MainPage, ClientTab } from '@/lib/types';
+import { Client, Post, Goal, Hook, Format, Pillar, DriveFolder, Expense, MonthlyRevenue, MonthlyExpense, ClientExpense, MainPage, ClientTab } from '@/lib/types';
 
 import Sidebar from '@/components/Sidebar';
 import Overview from '@/components/Overview';
@@ -39,6 +39,7 @@ export default function Home() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [monthlyRevenue, setMonthlyRevenue] = useState<MonthlyRevenue[]>([]);
   const [monthlyExpenses, setMonthlyExpenses] = useState<MonthlyExpense[]>([]);
+  const [clientExpenses, setClientExpenses] = useState<ClientExpense[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Navigation state
@@ -64,6 +65,7 @@ export default function Home() {
       { data: e },
       { data: mr },
       { data: me },
+      { data: ce },
     ] = await Promise.all([
       supabase.from('clients').select('*').order('name'),
       supabase.from('posts').select('*').order('date', { ascending: false }),
@@ -75,6 +77,7 @@ export default function Home() {
       supabase.from('expenses').select('*').order('category'),
       supabase.from('monthly_revenue').select('*').order('month'),
       supabase.from('monthly_expenses').select('*').order('month'),
+      supabase.from('client_expenses').select('*').order('month'),
     ]);
     setClients(c || []);
     setPosts(p || []);
@@ -86,6 +89,7 @@ export default function Home() {
     setExpenses(e || []);
     setMonthlyRevenue(mr || []);
     setMonthlyExpenses(me || []);
+    setClientExpenses(ce || []);
     setLoading(false);
   }, []);
 
@@ -248,8 +252,6 @@ export default function Home() {
             <Overview
               clients={clients}
               posts={posts}
-              pillars={pillars}
-              formats={formats}
               onSelectClient={handleSelectClient}
             />
           )}
@@ -258,6 +260,7 @@ export default function Home() {
               clients={clients}
               monthlyRevenue={monthlyRevenue}
               monthlyExpenses={monthlyExpenses}
+              clientExpenses={clientExpenses}
               onReload={loadData}
             />
           )}

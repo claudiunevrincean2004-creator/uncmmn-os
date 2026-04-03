@@ -1,14 +1,16 @@
 'use client';
 import { useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Client, MonthlyRevenue, MonthlyExpense } from '@/lib/types';
+import { Client, MonthlyRevenue, MonthlyExpense, ClientExpense } from '@/lib/types';
 import { fm, getColor } from '@/lib/utils';
 import ExpenseModal from '@/components/modals/ExpenseModal';
+import ClientExpenseModal from '@/components/modals/ClientExpenseModal';
 
 interface Props {
   clients: Client[];
   monthlyRevenue: MonthlyRevenue[];
   monthlyExpenses: MonthlyExpense[];
+  clientExpenses: ClientExpense[];
   onReload: () => void;
 }
 
@@ -22,11 +24,17 @@ const QUARTERS = [
   { label: 'Q4', months: [9, 10, 11] },
 ];
 
+const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
+  Active: { bg: '#10b98122', text: '#10b981' },
+  Inactive: { bg: '#ef444422', text: '#ef4444' },
+  Paused: { bg: '#f59e0b22', text: '#f59e0b' },
+};
+
 function monthKey(year: number, month: number): string {
   return `${year}-${String(month + 1).padStart(2, '0')}`;
 }
 
-export default function Finance({ clients, monthlyRevenue, monthlyExpenses, onReload }: Props) {
+export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clientExpenses, onReload }: Props) {
   const now = new Date();
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
@@ -35,10 +43,13 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, onRe
   const [editExpense, setEditExpense] = useState<MonthlyExpense | null>(null);
   const [showRevenueEdit, setShowRevenueEdit] = useState<string | null>(null);
   const [revenueInput, setRevenueInput] = useState('');
+  const [showClientExpenseModal, setShowClientExpenseModal] = useState(false);
+  const [clientExpenseTarget, setClientExpenseTarget] = useState<{ clientId: string; clientName: string } | null>(null);
+  const [editClientExpense, setEditClientExpense] = useState<ClientExpense | null>(null);
+  const [expandedClient, setExpandedClient] = useState<string | null>(null);
 
   const mk = monthKey(selectedYear, selectedMonth);
 
-  // Get revenue for a client in a specific month (falls back to client retainer)
   function getClientRevenue(clientId: string, month: string): number {
     const entry = monthlyRevenue.find(r => r.client_id === clientId && r.month === month);
     if (entry) return entry.amount;
@@ -46,22 +57,28 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, onRe
     return client?.retainer || 0;
   }
 
-  // Get expenses for a specific month
   function getMonthExpenses(month: string): MonthlyExpense[] {
     return monthlyExpenses.filter(e => e.month === month);
   }
 
-  // Compute totals for a set of months
+  function getClientExpenses(clientId: string, months: string[]): ClientExpense[] {
+    return clientExpenses.filter(e => e.client_id === clientId && months.includes(e.month));
+  }
+
   function computeTotals(months: string[]) {
     let totalRevenue = 0;
     let totalExpenses = 0;
-    const clientBreakdown: { client: Client; revenue: number }[] = [];
+    const clientBreakdown: { client: Client; revenue: number; expenses: ClientExpense[]; totalClientExpenses: number; netProfit: number; margin: number }[] = [];
 
     clients.forEach(c => {
       let rev = 0;
       months.forEach(m => { rev += getClientRevenue(c.id, m); });
       totalRevenue += rev;
-      clientBreakdown.push({ client: c, revenue: rev });
+      const cExpenses = getClientExpenses(c.id, months);
+      const totalCE = cExpenses.reduce((s, e) => s + (e.amount || 0), 0);
+      const net = rev - totalCE;
+      const mg = rev > 0 ? (net / rev) * 100 : 0;
+      clientBreakdown.push({ client: c, revenue: rev, expenses: cExpenses, totalClientExpenses: totalCE, netProfit: net, margin: mg });
     });
     clientBreakdown.sort((a, b) => b.revenue - a.revenue);
 
@@ -69,10 +86,11 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, onRe
     months.forEach(m => { allExpenses.push(...getMonthExpenses(m)); });
     totalExpenses = allExpenses.reduce((s, e) => s + (e.cost || 0), 0);
 
-    const netProfit = totalRevenue - totalExpenses;
+    const totalClientExp = clientBreakdown.reduce((s, c) => s + c.totalClientExpenses, 0);
+    const grandTotalExpenses = totalExpenses + totalClientExp;
+    const netProfit = totalRevenue - grandTotalExpenses;
     const margin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
-    // Group expenses by category
     const expenseCategories: Record<string, MonthlyExpense[]> = {};
     allExpenses.forEach(e => {
       const cat = e.category || 'Uncategorized';
@@ -80,10 +98,9 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, onRe
       expenseCategories[cat].push(e);
     });
 
-    return { totalRevenue, totalExpenses, netProfit, margin, clientBreakdown, expenseCategories, allExpenses };
+    return { totalRevenue, totalExpenses: grandTotalExpenses, netProfit, margin, clientBreakdown, expenseCategories, allExpenses, operationalExpenses: totalExpenses, totalClientExpenses: totalClientExp };
   }
 
-  // Current view data
   const viewData = useMemo(() => {
     if (viewMode === 'month') {
       return computeTotals([mk]);
@@ -93,16 +110,20 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, onRe
     } else {
       return computeTotals(Array.from({ length: 12 }, (_, i) => monthKey(selectedYear, i)));
     }
-  }, [viewMode, selectedYear, selectedMonth, clients, monthlyRevenue, monthlyExpenses]);
+  }, [viewMode, selectedYear, selectedMonth, clients, monthlyRevenue, monthlyExpenses, clientExpenses]);
 
   const maxRevenue = Math.max(...viewData.clientBreakdown.map(c => c.revenue), 1);
-
-  // Get current quarter label
   const currentQuarter = QUARTERS.find(q => q.months.includes(selectedMonth))!;
 
   async function deleteExpense(id: string) {
     if (!confirm('Delete this expense?')) return;
     await supabase.from('monthly_expenses').delete().eq('id', id);
+    onReload();
+  }
+
+  async function deleteClientExpense(id: string) {
+    if (!confirm('Delete this client expense?')) return;
+    await supabase.from('client_expenses').delete().eq('id', id);
     onReload();
   }
 
@@ -119,7 +140,6 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, onRe
     onReload();
   }
 
-  // Quarterly summary data for annual view
   const quarterlyData = useMemo(() => {
     if (viewMode !== 'annual') return [];
     return QUARTERS.map(q => {
@@ -127,13 +147,38 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, onRe
       const data = computeTotals(months);
       return { ...q, ...data };
     });
-  }, [viewMode, selectedYear, clients, monthlyRevenue, monthlyExpenses]);
+  }, [viewMode, selectedYear, clients, monthlyRevenue, monthlyExpenses, clientExpenses]);
 
   const viewLabel = viewMode === 'month'
     ? `${MONTHS[selectedMonth]} ${selectedYear}`
     : viewMode === 'quarter'
     ? `${currentQuarter.label} ${selectedYear}`
     : `${selectedYear}`;
+
+  function formatRenewalDate(date?: string): string {
+    if (!date) return '';
+    const d = new Date(date);
+    return d.toLocaleDateString('default', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function renderStatusBadge(status?: string) {
+    const s = status || 'Active';
+    const colors = STATUS_COLORS[s] || STATUS_COLORS.Active;
+    return (
+      <span style={{
+        fontSize: 9,
+        fontWeight: 600,
+        padding: '2px 6px',
+        borderRadius: 4,
+        background: colors.bg,
+        color: colors.text,
+        textTransform: 'uppercase',
+        letterSpacing: '0.05em',
+      }}>
+        {s}
+      </span>
+    );
+  }
 
   return (
     <div style={{ padding: '20px 24px', overflowY: 'auto', height: '100%' }}>
@@ -143,54 +188,29 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, onRe
         <div style={{ fontSize: 12, color: '#444' }}>Revenue, expenses, and profitability</div>
       </div>
 
-      {/* Controls: Year, View mode, Month selector */}
+      {/* Controls */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-        {/* Year + View mode */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-            <button
-              className="btn-ghost"
-              style={{ padding: '4px 8px', fontSize: 11 }}
-              onClick={() => setSelectedYear(y => y - 1)}
-            >
-              &lt;
-            </button>
+            <button className="btn-ghost" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => setSelectedYear(y => y - 1)}>&lt;</button>
             <span style={{ fontSize: 13, fontWeight: 700, minWidth: 44, textAlign: 'center' }}>{selectedYear}</span>
-            <button
-              className="btn-ghost"
-              style={{ padding: '4px 8px', fontSize: 11 }}
-              onClick={() => setSelectedYear(y => y + 1)}
-            >
-              &gt;
-            </button>
+            <button className="btn-ghost" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => setSelectedYear(y => y + 1)}>&gt;</button>
           </div>
           <div style={{ display: 'flex', gap: 2 }}>
             {(['month', 'quarter', 'annual'] as ViewMode[]).map(mode => (
-              <button
-                key={mode}
-                className={`subtab${viewMode === mode ? ' active' : ''}`}
-                onClick={() => setViewMode(mode)}
-                style={{ textTransform: 'capitalize', fontSize: 11 }}
-              >
+              <button key={mode} className={`subtab${viewMode === mode ? ' active' : ''}`} onClick={() => setViewMode(mode)} style={{ textTransform: 'capitalize', fontSize: 11 }}>
                 {mode === 'month' ? 'Monthly' : mode === 'quarter' ? 'Quarterly' : 'Annual'}
               </button>
             ))}
           </div>
         </div>
-
-        {/* Month selector (for month and quarter views) */}
         {viewMode !== 'annual' && (
           <div style={{ display: 'flex', gap: 2 }}>
             {MONTHS.map((m, i) => {
               const isInQuarter = viewMode === 'quarter' && currentQuarter.months.includes(i);
               const isSelected = viewMode === 'month' ? i === selectedMonth : isInQuarter;
               return (
-                <button
-                  key={m}
-                  className={`subtab${isSelected ? ' active' : ''}`}
-                  onClick={() => setSelectedMonth(i)}
-                  style={{ flex: 1, fontSize: 10, padding: '5px 0' }}
-                >
+                <button key={m} className={`subtab${isSelected ? ' active' : ''}`} onClick={() => setSelectedMonth(i)} style={{ flex: 1, fontSize: 10, padding: '5px 0' }}>
                   {m}
                 </button>
               );
@@ -203,7 +223,7 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, onRe
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
         {[
           { label: 'Total Revenue', value: fm(viewData.totalRevenue), sub: viewLabel, color: '#10b981' },
-          { label: 'Total Expenses', value: fm(viewData.totalExpenses), sub: `${viewData.allExpenses.length} items`, color: '#f59e0b' },
+          { label: 'Total Expenses', value: fm(viewData.totalExpenses), sub: `${viewData.allExpenses.length} operational + client`, color: '#f59e0b' },
           { label: 'Net Profit', value: fm(viewData.netProfit), sub: `${viewData.margin.toFixed(1)}% margin`, color: viewData.netProfit >= 0 ? '#10b981' : '#ef4444' },
           { label: 'Profit Margin', value: `${viewData.margin.toFixed(1)}%`, sub: viewData.netProfit >= 0 ? 'healthy' : 'negative', color: viewData.netProfit >= 0 ? '#10b981' : '#ef4444' },
         ].map(m => (
@@ -244,7 +264,7 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, onRe
         </div>
       )}
 
-      {/* Client Revenue */}
+      {/* Client Revenue + Per-Client Breakdown */}
       <div className="card" style={{ marginBottom: 14 }}>
         <div style={{ fontSize: 11, color: '#555', marginBottom: 14, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Client Revenue — {viewLabel}
@@ -258,7 +278,13 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, onRe
               {viewData.clientBreakdown.map((cr, i) => (
                 <div key={cr.client.id}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                    <span style={{ fontSize: 12 }}>{cr.client.name}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 12 }}>{cr.client.name}</span>
+                      {renderStatusBadge(cr.client.status)}
+                      {cr.client.renewal_date && (
+                        <span style={{ fontSize: 9, color: '#555' }}>Renews {formatRenewalDate(cr.client.renewal_date)}</span>
+                      )}
+                    </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 11, color: '#10b981', fontWeight: 600 }}>{fm(cr.revenue)}</span>
                       {viewMode === 'month' && (
@@ -295,39 +321,102 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, onRe
               ))}
             </div>
 
-            {/* Table */}
+            {/* Client table with breakdown */}
             <table className="data-table">
               <thead>
                 <tr>
                   <th>Client</th>
-                  <th>Niche</th>
-                  <th>Revenue</th>
-                  <th>% of Total</th>
+                  <th>Status</th>
+                  <th>Retainer</th>
+                  <th>Client Expenses</th>
+                  <th>Net Profit</th>
+                  <th>Margin</th>
+                  {viewMode === 'month' && <th></th>}
                 </tr>
               </thead>
               <tbody>
-                {viewData.clientBreakdown.map(cr => {
-                  const pct = viewData.totalRevenue > 0 ? (cr.revenue / viewData.totalRevenue) * 100 : 0;
-                  return (
-                    <tr key={cr.client.id}>
-                      <td style={{ color: '#fff', fontWeight: 600 }}>{cr.client.name}</td>
-                      <td style={{ color: '#555' }}>{cr.client.niche || '—'}</td>
+                {viewData.clientBreakdown.map(cr => (
+                  <>
+                    <tr key={cr.client.id} style={{ cursor: 'pointer' }} onClick={() => setExpandedClient(expandedClient === cr.client.id ? null : cr.client.id)}>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ color: '#fff', fontWeight: 600 }}>{cr.client.name}</span>
+                          {cr.client.renewal_date && (
+                            <span style={{ fontSize: 9, color: '#555' }}>{formatRenewalDate(cr.client.renewal_date)}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td>{renderStatusBadge(cr.client.status)}</td>
                       <td style={{ color: '#10b981' }}>{fm(cr.revenue)}</td>
-                      <td style={{ color: '#555' }}>{pct.toFixed(1)}%</td>
+                      <td style={{ color: '#f59e0b' }}>{fm(cr.totalClientExpenses)}</td>
+                      <td style={{ color: cr.netProfit >= 0 ? '#10b981' : '#ef4444', fontWeight: 600 }}>{fm(cr.netProfit)}</td>
+                      <td style={{ color: '#555' }}>{cr.margin.toFixed(1)}%</td>
+                      {viewMode === 'month' && (
+                        <td>
+                          <button
+                            className="btn-ghost"
+                            style={{ fontSize: 10, padding: '2px 6px' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setClientExpenseTarget({ clientId: cr.client.id, clientName: cr.client.name });
+                              setEditClientExpense(null);
+                              setShowClientExpenseModal(true);
+                            }}
+                          >
+                            + Expense
+                          </button>
+                        </td>
+                      )}
                     </tr>
-                  );
-                })}
+                    {expandedClient === cr.client.id && cr.expenses.length > 0 && (
+                      <tr key={`${cr.client.id}-details`}>
+                        <td colSpan={viewMode === 'month' ? 7 : 6} style={{ padding: '8px 16px', background: '#0a0a0a' }}>
+                          <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8, fontWeight: 600 }}>Client Expenses Breakdown</div>
+                          {cr.expenses.map(exp => (
+                            <div key={exp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: '0.5px solid #1a1a1a' }}>
+                              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                <span style={{ fontSize: 11, color: '#fff' }}>{exp.name}</span>
+                                <span style={{ fontSize: 9, color: '#444', padding: '1px 4px', border: '0.5px solid #1a1a1a', borderRadius: 3 }}>{exp.category}</span>
+                              </div>
+                              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                <span style={{ fontSize: 11, color: '#f59e0b', fontWeight: 600 }}>{fm(exp.amount)}</span>
+                                {viewMode === 'month' && (
+                                  <div style={{ display: 'flex', gap: 4 }}>
+                                    <button
+                                      style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', fontSize: 11, padding: '2px 4px' }}
+                                      onClick={() => {
+                                        setClientExpenseTarget({ clientId: cr.client.id, clientName: cr.client.name });
+                                        setEditClientExpense(exp);
+                                        setShowClientExpenseModal(true);
+                                      }}
+                                    >
+                                      ✎
+                                    </button>
+                                    <button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteClientExpense(exp.id)}>✕</button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 8 }}>
+                            <span style={{ fontSize: 11, color: '#555' }}>Total: <span style={{ color: '#f59e0b', fontWeight: 600 }}>{fm(cr.totalClientExpenses)}</span></span>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                ))}
               </tbody>
             </table>
           </div>
         )}
       </div>
 
-      {/* Expenses */}
+      {/* Operational Expenses */}
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div style={{ fontSize: 11, color: '#555', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Expenses — {viewLabel}
+            Operational Expenses — {viewLabel}
           </div>
           {viewMode === 'month' && (
             <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px' }} onClick={() => { setEditExpense(null); setShowModal(true); }}>+ Add Expense</button>
@@ -335,7 +424,7 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, onRe
         </div>
 
         {viewData.allExpenses.length === 0 ? (
-          <div style={{ color: '#333', fontSize: 12 }}>No expenses for this period.{viewMode === 'month' && ' Add expenses to track your costs.'}</div>
+          <div style={{ color: '#333', fontSize: 12 }}>No operational expenses for this period.{viewMode === 'month' && ' Add expenses to track your costs.'}</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {Object.entries(viewData.expenseCategories).map(([cat, catExpenses]) => (
@@ -378,7 +467,7 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, onRe
                 <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   {viewMode === 'month' ? 'Monthly' : viewMode === 'quarter' ? 'Quarterly' : 'Annual'} Total
                 </div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: '#f59e0b' }}>{fm(viewData.totalExpenses)}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: '#f59e0b' }}>{fm(viewData.allExpenses.reduce((s, e) => s + e.cost, 0))}</div>
               </div>
             </div>
           </div>
@@ -390,6 +479,17 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, onRe
           expense={editExpense}
           month={mk}
           onClose={() => setShowModal(false)}
+          onSaved={onReload}
+        />
+      )}
+
+      {showClientExpenseModal && clientExpenseTarget && (
+        <ClientExpenseModal
+          expense={editClientExpense}
+          clientId={clientExpenseTarget.clientId}
+          clientName={clientExpenseTarget.clientName}
+          month={mk}
+          onClose={() => setShowClientExpenseModal(false)}
           onSaved={onReload}
         />
       )}

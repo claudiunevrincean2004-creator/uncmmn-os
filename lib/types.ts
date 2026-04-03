@@ -5,6 +5,8 @@ export interface Client {
   retainer: number;
   cost: number;
   platforms: string[];
+  status?: 'Active' | 'Inactive' | 'Paused';
+  renewal_date?: string;
   created_at?: string;
 }
 
@@ -93,6 +95,16 @@ export interface MonthlyExpense {
   id: string;
   name: string;
   cost: number;
+  category: string;
+  month: string; // YYYY-MM
+  created_at?: string;
+}
+
+export interface ClientExpense {
+  id: string;
+  client_id: string;
+  name: string;
+  amount: number;
   category: string;
   month: string; // YYYY-MM
   created_at?: string;
