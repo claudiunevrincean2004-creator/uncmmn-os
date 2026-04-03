@@ -17,6 +17,7 @@ export default function ClientExpenseModal({ expense, clientId, clientName, mont
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (expense) {
@@ -29,6 +30,7 @@ export default function ClientExpenseModal({ expense, clientId, clientName, mont
   async function handleSave() {
     if (!name.trim()) return;
     setSaving(true);
+    setError(null);
     const data = {
       client_id: clientId,
       name: name.trim(),
@@ -36,12 +38,17 @@ export default function ClientExpenseModal({ expense, clientId, clientName, mont
       category: category.trim(),
       month,
     };
+    let result;
     if (expense?.id) {
-      await supabase.from('client_expenses').update(data).eq('id', expense.id);
+      result = await supabase.from('client_expenses').update(data).eq('id', expense.id);
     } else {
-      await supabase.from('client_expenses').insert([data]);
+      result = await supabase.from('client_expenses').insert([data]);
     }
     setSaving(false);
+    if (result.error) {
+      setError(result.error.message);
+      return;
+    }
     onSaved();
     onClose();
   }
@@ -78,6 +85,12 @@ export default function ClientExpenseModal({ expense, clientId, clientName, mont
             <input className="form-input" value={category} onChange={e => setCategory(e.target.value)} placeholder="e.g. Freelance, Ads, Tools, Software..." />
           </div>
         </div>
+
+        {error && (
+          <div style={{ marginTop: 12, padding: '8px 10px', background: '#1a0a0a', border: '0.5px solid #3a1a1a', borderRadius: 6, color: '#ef4444', fontSize: 11 }}>
+            {error}
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}>
           <button className="btn-ghost" onClick={onClose}>Cancel</button>
