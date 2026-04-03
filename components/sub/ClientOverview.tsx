@@ -1,0 +1,341 @@
+'use client';
+import { useMemo, useEffect, useRef } from 'react';
+import { Client, Post, Goal, Pillar, Format } from '@/lib/types';
+import { fn, er, avg, getColor, getPlatformColor } from '@/lib/utils';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler,
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
+
+interface Props {
+  client: Client;
+  posts: Post[];
+  goals: Goal[];
+  pillars: Pillar[];
+  formats: Format[];
+  activePlat: string;
+  showCmp: boolean;
+}
+
+export default function ClientOverview({ client, posts, goals, pillars, formats, activePlat, showCmp }: Props) {
+  const clientPosts = posts.filter(p => p.client_id === client.id && (activePlat === 'All' || p.platform === activePlat));
+  const clientGoals = goals.filter(g => g.client_id === client.id);
+  const clientPillars = pillars.filter(p => p.client_id === client.id);
+  const clientFormats = formats.filter(f => f.client_id === client.id);
+
+  const totalViews = clientPosts.reduce((s, p) => s + p.views, 0);
+  const totalLikes = clientPosts.reduce((s, p) => s + p.likes, 0);
+  const totalFollows = clientPosts.reduce((s, p) => s + p.follows, 0);
+  const avgER = clientPosts.length > 0 ? avg(clientPosts.map(er)) : 0;
+  const topPost = [...clientPosts].sort((a, b) => b.views - a.views)[0];
+
+  // Previous month comparison
+  const now = new Date();
+  const thisMonth = clientPosts.filter(p => {
+    if (!p.date) return false;
+    const d = new Date(p.date);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+  const prevMonth = clientPosts.filter(p => {
+    if (!p.date) return false;
+    const d = new Date(p.date);
+    const pm = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+    const py = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    return d.getMonth() === pm && d.getFullYear() === py;
+  });
+
+  const thisViews = thisMonth.reduce((s, p) => s + p.views, 0);
+  const prevViews = prevMonth.reduce((s, p) => s + p.views, 0);
+  const viewsDiff = prevViews > 0 ? ((thisViews - prevViews) / prevViews) * 100 : 0;
+
+  // Growth chart data – group posts by month
+  const monthlyData = useMemo(() => {
+    const sorted = [...clientPosts].filter(p => p.date).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const months: Record<string, { views: number; follows: number }> = {};
+    sorted.forEach(p => {
+      const key = p.date.slice(0, 7); // YYYY-MM
+      if (!months[key]) months[key] = { views: 0, follows: 0 };
+      months[key].views += p.views;
+      months[key].follows += p.follows;
+    });
+    return months;
+  }, [clientPosts]);
+
+  const chartLabels = Object.keys(monthlyData).map(k => {
+    const [y, m] = k.split('-');
+    return new Date(parseInt(y), parseInt(m) - 1).toLocaleString('default', { month: 'short', year: '2-digit' });
+  });
+  const chartViews = Object.values(monthlyData).map(d => d.views);
+  const chartFollows = Object.values(monthlyData).map(d => d.follows);
+
+  const chartData = {
+    labels: chartLabels,
+    datasets: [
+      {
+        label: 'Views',
+        data: chartViews,
+        borderColor: '#fff',
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        tension: 0.4,
+        fill: true,
+        pointRadius: 3,
+        pointBackgroundColor: '#fff',
+        yAxisID: 'y',
+        borderWidth: 1.5,
+      },
+      {
+        label: 'Follows',
+        data: chartFollows,
+        borderColor: '#6366f1',
+        backgroundColor: 'rgba(99,102,241,0.05)',
+        tension: 0.4,
+        fill: true,
+        pointRadius: 3,
+        pointBackgroundColor: '#6366f1',
+        yAxisID: 'y1',
+        borderWidth: 1.5,
+      },
+    ],
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index' as const, intersect: false },
+    plugins: {
+      legend: {
+        labels: {
+          color: '#555',
+          font: { size: 11 },
+          boxWidth: 12,
+        },
+      },
+      tooltip: {
+        backgroundColor: '#0d0d0d',
+        borderColor: '#2a2a2a',
+        borderWidth: 1,
+        titleColor: '#fff',
+        bodyColor: '#888',
+        titleFont: { size: 12 },
+        bodyFont: { size: 11 },
+      },
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(255,255,255,0.03)' },
+        ticks: { color: '#444', font: { size: 10 } },
+      },
+      y: {
+        grid: { color: 'rgba(255,255,255,0.03)' },
+        ticks: { color: '#444', font: { size: 10 } },
+        position: 'left' as const,
+      },
+      y1: {
+        grid: { display: false },
+        ticks: { color: '#6366f1', font: { size: 10 } },
+        position: 'right' as const,
+      },
+    },
+  };
+
+  // Pillar effectiveness
+  const pillarStats = clientPillars.map(pillar => {
+    const pp = clientPosts.filter(p => p.pillar === pillar.name);
+    return { name: pillar.name, avgViews: pp.length > 0 ? avg(pp.map(p => p.views)) : 0, count: pp.length };
+  }).sort((a, b) => b.avgViews - a.avgViews);
+  const maxPillarViews = Math.max(...pillarStats.map(p => p.avgViews), 1);
+
+  // Format performance
+  const formatStats = clientFormats.map(fmt => {
+    const fp = clientPosts.filter(p => p.format === fmt.name);
+    return { name: fmt.name, platform: fmt.platform, avgViews: fp.length > 0 ? avg(fp.map(p => p.views)) : fmt.avg_views, count: fp.length };
+  });
+
+  // Top posts
+  const topPosts = [...clientPosts].sort((a, b) => b.views - a.views).slice(0, 5);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* Metrics row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+        {[
+          { label: 'Total Views', value: fn(totalViews), sub: showCmp ? `${viewsDiff >= 0 ? '+' : ''}${viewsDiff.toFixed(1)}% vs last month` : `${clientPosts.length} posts` },
+          { label: 'Total Likes', value: fn(totalLikes), sub: `${clientPosts.length} posts` },
+          { label: 'Total Follows', value: fn(totalFollows), sub: 'from content' },
+          { label: 'Avg ER%', value: `${avgER.toFixed(2)}%`, sub: 'engagement rate' },
+        ].map(m => (
+          <div key={m.label} className="metric-chip">
+            <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>{m.label}</div>
+            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 3 }}>{m.value}</div>
+            {showCmp && m.label === 'Total Views' ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span className={`badge ${viewsDiff >= 0 ? 'badge-up' : 'badge-down'}`}>{viewsDiff >= 0 ? '+' : ''}{viewsDiff.toFixed(1)}%</span>
+                <span style={{ fontSize: 10, color: '#444' }}>vs prev month</span>
+              </div>
+            ) : (
+              <div style={{ fontSize: 11, color: '#444' }}>{m.sub}</div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Growth chart */}
+      <div className="card">
+        <div style={{ fontSize: 11, color: '#555', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Growth Trend</div>
+        <div style={{ height: 200 }}>
+          {chartLabels.length > 0 ? (
+            <Line data={chartData} options={chartOptions} />
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#333', fontSize: 12 }}>
+              No data with dates yet
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        {/* Goals snapshot */}
+        <div className="card">
+          <div style={{ fontSize: 11, color: '#555', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Goals Snapshot</div>
+          {clientGoals.length === 0 ? (
+            <div style={{ color: '#333', fontSize: 12 }}>No goals set</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {clientGoals.slice(0, 4).map(goal => {
+                const pct = goal.target_val > 0 ? Math.min(100, (goal.current_val / goal.target_val) * 100) : 0;
+                const done = pct >= 100;
+                return (
+                  <div key={goal.id}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <span style={{ fontSize: 12 }}>{goal.name}</span>
+                      <span style={{ fontSize: 11, color: done ? '#10b981' : '#555' }}>{pct.toFixed(0)}%</span>
+                    </div>
+                    <div className="progress-bar">
+                      <div className={`progress-bar-fill${done ? ' complete' : ''}`} style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Top post */}
+        <div className="card">
+          <div style={{ fontSize: 11, color: '#555', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Top Post</div>
+          {topPost ? (
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6, lineHeight: 1.4 }}>{topPost.title}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: getPlatformColor(topPost.platform), display: 'inline-block' }} />
+                <span style={{ fontSize: 11, color: '#555' }}>{topPost.platform} · {topPost.format}</span>
+                {topPost.date && <span style={{ fontSize: 11, color: '#444' }}>· {topPost.date.slice(0, 10)}</span>}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                {[
+                  { l: 'Views', v: fn(topPost.views) },
+                  { l: 'Likes', v: fn(topPost.likes) },
+                  { l: 'ER%', v: `${er(topPost).toFixed(1)}%` },
+                ].map(m => (
+                  <div key={m.l}>
+                    <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{m.l}</div>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>{m.v}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div style={{ color: '#333', fontSize: 12 }}>No posts yet</div>
+          )}
+        </div>
+      </div>
+
+      {/* Pillar effectiveness */}
+      {pillarStats.length > 0 && (
+        <div className="card">
+          <div style={{ fontSize: 11, color: '#555', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pillar Effectiveness</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {pillarStats.map((ps, i) => (
+              <div key={ps.name}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ fontSize: 12 }}>{ps.name}</span>
+                  <span style={{ fontSize: 11, color: '#555' }}>{fn(ps.avgViews)} avg · {ps.count} posts</span>
+                </div>
+                <div style={{ height: 4, background: '#1a1a1a', borderRadius: 2 }}>
+                  <div style={{ height: '100%', width: `${(ps.avgViews / maxPillarViews) * 100}%`, background: getColor(i), borderRadius: 2 }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Format performance */}
+      {formatStats.length > 0 && (
+        <div className="card">
+          <div style={{ fontSize: 11, color: '#555', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Format Performance</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
+            {formatStats.map((fs, i) => (
+              <div key={fs.name} style={{ background: '#111', border: '0.5px solid #1a1a1a', borderRadius: 8, padding: 10 }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: getColor(i), marginBottom: 6 }} />
+                <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 4 }}>{fs.name}</div>
+                {fs.platform && <div style={{ fontSize: 10, color: '#444', marginBottom: 6 }}>{fs.platform}</div>}
+                <div style={{ fontSize: 15, fontWeight: 700 }}>{fn(fs.avgViews)}</div>
+                <div style={{ fontSize: 10, color: '#555' }}>avg views · {fs.count} posts</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Top posts table */}
+      {topPosts.length > 0 && (
+        <div className="card">
+          <div style={{ fontSize: 11, color: '#555', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Top Posts</div>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Platform</th>
+                <th>Views</th>
+                <th>Likes</th>
+                <th>ER%</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topPosts.map((post, i) => (
+                <tr key={post.id}>
+                  <td style={{ color: '#fff', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {i === 0 && <span className="badge badge-outlier" style={{ marginRight: 6 }}>Top</span>}
+                    {post.title}
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: getPlatformColor(post.platform), display: 'inline-block' }} />
+                      <span style={{ fontSize: 11, color: '#888' }}>{post.platform}</span>
+                    </div>
+                  </td>
+                  <td style={{ fontWeight: 600 }}>{fn(post.views)}</td>
+                  <td>{fn(post.likes)}</td>
+                  <td style={{ color: '#6366f1' }}>{er(post).toFixed(1)}%</td>
+                  <td style={{ color: '#555', fontSize: 11 }}>{post.date ? post.date.slice(0, 10) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
