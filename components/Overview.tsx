@@ -6,9 +6,10 @@ interface Props {
   clients: Client[];
   posts: Post[];
   onSelectClient: (id: string) => void;
+  onOpenSidebar: (id: string) => void;
 }
 
-export default function Overview({ clients, posts, onSelectClient }: Props) {
+export default function Overview({ clients, posts, onSelectClient, onOpenSidebar }: Props) {
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -104,7 +105,12 @@ export default function Overview({ clients, posts, onSelectClient }: Props) {
                   <span style={{ fontSize: 9, color: getPlatformColor(post.platform), textTransform: 'uppercase', fontWeight: 600 }}>{post.platform}</span>
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4, marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{post.title}</div>
-                <div style={{ fontSize: 11, color: '#555', marginBottom: 10 }}>{post.clientName}</div>
+                <div
+                  style={{ fontSize: 11, color: '#555', marginBottom: 10, cursor: 'pointer' }}
+                  onClick={() => onOpenSidebar(post.client_id)}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#999')}
+                  onMouseLeave={e => (e.currentTarget.style.color = '#555')}
+                >{post.clientName}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
                   {[
                     { l: 'Views', v: fn(post.views) },
@@ -137,7 +143,12 @@ export default function Overview({ clients, posts, onSelectClient }: Props) {
                 onClick={() => onSelectClient(cc.client.id)}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700 }}>{cc.client.name}</div>
+                  <div
+                    style={{ fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+                    onClick={(e) => { e.stopPropagation(); onOpenSidebar(cc.client.id); }}
+                    onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
+                    onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
+                  >{cc.client.name}</div>
                   <span style={{ fontSize: 18, color: arrowColor, fontWeight: 700 }}>{arrow}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>

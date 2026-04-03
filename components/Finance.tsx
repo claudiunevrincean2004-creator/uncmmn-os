@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Client, MonthlyRevenue, MonthlyExpense, ClientExpense } from '@/lib/types';
 import { fm, getColor } from '@/lib/utils';
@@ -12,6 +12,7 @@ interface Props {
   monthlyExpenses: MonthlyExpense[];
   clientExpenses: ClientExpense[];
   onReload: () => void;
+  onOpenSidebar: (id: string) => void;
 }
 
 type ViewMode = 'month' | 'quarter' | 'annual';
@@ -34,7 +35,7 @@ function monthKey(year: number, month: number): string {
   return `${year}-${String(month + 1).padStart(2, '0')}`;
 }
 
-export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clientExpenses, onReload }: Props) {
+export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clientExpenses, onReload, onOpenSidebar }: Props) {
   const now = new Date();
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
@@ -279,7 +280,12 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
                 <div key={cr.client.id}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 12 }}>{cr.client.name}</span>
+                      <span
+                        style={{ fontSize: 12, cursor: 'pointer' }}
+                        onClick={(e) => { e.stopPropagation(); onOpenSidebar(cr.client.id); }}
+                        onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
+                        onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
+                      >{cr.client.name}</span>
                       {renderStatusBadge(cr.client.status)}
                       {cr.client.renewal_date && (
                         <span style={{ fontSize: 9, color: '#555' }}>Renews {formatRenewalDate(cr.client.renewal_date)}</span>
@@ -336,11 +342,16 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
               </thead>
               <tbody>
                 {viewData.clientBreakdown.map(cr => (
-                  <>
-                    <tr key={cr.client.id} style={{ cursor: 'pointer' }} onClick={() => setExpandedClient(expandedClient === cr.client.id ? null : cr.client.id)}>
+                  <React.Fragment key={cr.client.id}>
+                    <tr style={{ cursor: 'pointer' }} onClick={() => setExpandedClient(expandedClient === cr.client.id ? null : cr.client.id)}>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ color: '#fff', fontWeight: 600 }}>{cr.client.name}</span>
+                          <span
+                            style={{ color: '#fff', fontWeight: 600, cursor: 'pointer' }}
+                            onClick={(e) => { e.stopPropagation(); onOpenSidebar(cr.client.id); }}
+                            onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
+                            onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
+                          >{cr.client.name}</span>
                           {cr.client.renewal_date && (
                             <span style={{ fontSize: 9, color: '#555' }}>{formatRenewalDate(cr.client.renewal_date)}</span>
                           )}
@@ -369,7 +380,7 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
                       )}
                     </tr>
                     {expandedClient === cr.client.id && cr.expenses.length > 0 && (
-                      <tr key={`${cr.client.id}-details`}>
+                      <tr>
                         <td colSpan={viewMode === 'month' ? 7 : 6} style={{ padding: '8px 16px', background: '#0a0a0a' }}>
                           <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8, fontWeight: 600 }}>Client Expenses Breakdown</div>
                           {cr.expenses.map(exp => (
@@ -404,7 +415,7 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
                         </td>
                       </tr>
                     )}
-                  </>
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>

@@ -161,8 +161,10 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
     return { name: fmt.name, platform: fmt.platform, avgViews: fp.length > 0 ? avg(fp.map(p => p.views)) : fmt.avg_views, count: fp.length };
   });
 
-  // Top posts
-  const topPosts = [...clientPosts].sort((a, b) => b.views - a.views).slice(0, 5);
+  // Outlier posts — 1.5x above client average
+  const clientAvgViews = avg(clientPosts.map(p => p.views));
+  const outlierThreshold = clientAvgViews * 1.5;
+  const outlierPosts = clientPosts.filter(p => p.views >= outlierThreshold).sort((a, b) => b.views - a.views);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -298,10 +300,17 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
         </div>
       )}
 
-      {/* Top posts table */}
-      {topPosts.length > 0 && (
-        <div className="card">
-          <div style={{ fontSize: 11, color: '#555', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Top Posts</div>
+      {/* Outlier posts table */}
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div style={{ fontSize: 11, color: '#555', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Outlier Posts</div>
+          <span style={{ fontSize: 11, color: '#555' }}>{outlierPosts.length} posts above 1.5x avg ({fn(clientAvgViews)} views)</span>
+        </div>
+        {outlierPosts.length === 0 ? (
+          <div style={{ textAlign: 'center', color: '#333', padding: '30px 0', fontSize: 12 }}>
+            No outlier posts yet — keep posting
+          </div>
+        ) : (
           <table className="data-table">
             <thead>
               <tr>
@@ -310,32 +319,36 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
                 <th>Views</th>
                 <th>Likes</th>
                 <th>ER%</th>
+                <th>Multiplier</th>
                 <th>Date</th>
               </tr>
             </thead>
             <tbody>
-              {topPosts.map((post, i) => (
-                <tr key={post.id}>
-                  <td style={{ color: '#fff', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {i === 0 && <span className="badge badge-outlier" style={{ marginRight: 6 }}>Top</span>}
-                    {post.title}
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: getPlatformColor(post.platform), display: 'inline-block' }} />
-                      <span style={{ fontSize: 11, color: '#888' }}>{post.platform}</span>
-                    </div>
-                  </td>
-                  <td style={{ fontWeight: 600 }}>{fn(post.views)}</td>
-                  <td>{fn(post.likes)}</td>
-                  <td style={{ color: '#6366f1' }}>{er(post).toFixed(1)}%</td>
-                  <td style={{ color: '#555', fontSize: 11 }}>{post.date ? post.date.slice(0, 10) : '—'}</td>
-                </tr>
-              ))}
+              {outlierPosts.map(post => {
+                const mult = clientAvgViews > 0 ? (post.views / clientAvgViews).toFixed(1) : '—';
+                return (
+                  <tr key={post.id}>
+                    <td style={{ color: '#fff', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {post.title}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: getPlatformColor(post.platform), display: 'inline-block' }} />
+                        <span style={{ fontSize: 11, color: '#888' }}>{post.platform}</span>
+                      </div>
+                    </td>
+                    <td style={{ fontWeight: 600 }}>{fn(post.views)}</td>
+                    <td>{fn(post.likes)}</td>
+                    <td style={{ color: '#6366f1' }}>{er(post).toFixed(1)}%</td>
+                    <td><span className="badge badge-outlier">{mult}x</span></td>
+                    <td style={{ color: '#555', fontSize: 11 }}>{post.date ? post.date.slice(0, 10) : '—'}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

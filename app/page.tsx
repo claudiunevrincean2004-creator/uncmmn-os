@@ -15,6 +15,7 @@ import FormatsTab from '@/components/sub/FormatsTab';
 import PillarsTab from '@/components/sub/PillarsTab';
 import DriveTab from '@/components/sub/DriveTab';
 import ClientModal from '@/components/modals/ClientModal';
+import ClientSidebar from '@/components/ClientSidebar';
 
 const CLIENT_TABS: { key: ClientTab; label: string }[] = [
   { key: 'overview', label: 'Overview' },
@@ -52,6 +53,7 @@ export default function Home() {
   // Modal state
   const [showClientModal, setShowClientModal] = useState(false);
   const [editClient, setEditClient] = useState<Client | null>(null);
+  const [sidebarClientId, setSidebarClientId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     const [
@@ -221,10 +223,10 @@ export default function Home() {
               </div>
               {clientTab === 'overview' && (
                 <button
-                  className={`subtab${showCmp ? ' active' : ''}`}
+                  className={`btn-compare${showCmp ? ' active' : ''}`}
                   onClick={() => setShowCmp(v => !v)}
-                  style={{ fontSize: 10 }}
                 >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
                   vs Prev Month
                 </button>
               )}
@@ -253,6 +255,7 @@ export default function Home() {
               clients={clients}
               posts={posts}
               onSelectClient={handleSelectClient}
+              onOpenSidebar={(id: string) => setSidebarClientId(id)}
             />
           )}
           {mainPage === 'finance' && (
@@ -262,6 +265,7 @@ export default function Home() {
               monthlyExpenses={monthlyExpenses}
               clientExpenses={clientExpenses}
               onReload={loadData}
+              onOpenSidebar={(id: string) => setSidebarClientId(id)}
             />
           )}
           {mainPage === 'client' && activeClient && (
@@ -280,6 +284,21 @@ export default function Home() {
           onSaved={handleClientSaved}
         />
       )}
+
+      {/* Client sidebar */}
+      {sidebarClientId && (() => {
+        const sidebarClient = clients.find(c => c.id === sidebarClientId);
+        if (!sidebarClient) return null;
+        return (
+          <ClientSidebar
+            client={sidebarClient}
+            clientExpenses={clientExpenses}
+            monthlyRevenue={monthlyRevenue}
+            onClose={() => setSidebarClientId(null)}
+            onReload={loadData}
+          />
+        );
+      })()}
     </div>
   );
 }

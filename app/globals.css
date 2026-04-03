@@ -300,3 +300,42 @@ html, body {
 .stars .empty {
   color: #333;
 }
+
+/* Slide-in animation for sidebar */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* "vs Prev Month" comparison button */
+.btn-compare {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  background: rgba(255, 255, 255, 0.04);
+  color: #777;
+  border: 0.5px solid #2a2a2a;
+}
+
+.btn-compare:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #bbb;
+  border-color: #444;
+}
+
+.btn-compare.active {
+  background: rgba(99, 102, 241, 0.12);
+  color: #a5b4fc;
+  border-color: #6366f1;
+}
