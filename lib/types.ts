@@ -81,5 +81,22 @@ export interface Expense {
   created_at?: string;
 }
 
+export interface MonthlyRevenue {
+  id: string;
+  client_id: string;
+  month: string; // YYYY-MM
+  amount: number;
+  created_at?: string;
+}
+
+export interface MonthlyExpense {
+  id: string;
+  name: string;
+  cost: number;
+  category: string;
+  month: string; // YYYY-MM
+  created_at?: string;
+}
+
 export type MainPage = 'overview' | 'finance' | 'client';
 export type ClientTab = 'overview' | 'content' | 'outliers' | 'goals' | 'hooks' | 'formats' | 'pillars' | 'drive';

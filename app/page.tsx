@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Client, Post, Goal, Hook, Format, Pillar, DriveFolder, Expense, MainPage, ClientTab } from '@/lib/types';
+import { Client, Post, Goal, Hook, Format, Pillar, DriveFolder, Expense, MonthlyRevenue, MonthlyExpense, MainPage, ClientTab } from '@/lib/types';
 
 import Sidebar from '@/components/Sidebar';
 import Overview from '@/components/Overview';
@@ -37,6 +37,8 @@ export default function Home() {
   const [pillars, setPillars] = useState<Pillar[]>([]);
   const [driveFolders, setDriveFolders] = useState<DriveFolder[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [monthlyRevenue, setMonthlyRevenue] = useState<MonthlyRevenue[]>([]);
+  const [monthlyExpenses, setMonthlyExpenses] = useState<MonthlyExpense[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Navigation state
@@ -60,6 +62,8 @@ export default function Home() {
       { data: pl },
       { data: d },
       { data: e },
+      { data: mr },
+      { data: me },
     ] = await Promise.all([
       supabase.from('clients').select('*').order('name'),
       supabase.from('posts').select('*').order('date', { ascending: false }),
@@ -69,6 +73,8 @@ export default function Home() {
       supabase.from('pillars').select('*').order('name'),
       supabase.from('drive_folders').select('*').order('category'),
       supabase.from('expenses').select('*').order('category'),
+      supabase.from('monthly_revenue').select('*').order('month'),
+      supabase.from('monthly_expenses').select('*').order('month'),
     ]);
     setClients(c || []);
     setPosts(p || []);
@@ -78,6 +84,8 @@ export default function Home() {
     setPillars(pl || []);
     setDriveFolders(d || []);
     setExpenses(e || []);
+    setMonthlyRevenue(mr || []);
+    setMonthlyExpenses(me || []);
     setLoading(false);
   }, []);
 
@@ -240,14 +248,16 @@ export default function Home() {
             <Overview
               clients={clients}
               posts={posts}
-              expenses={expenses}
+              pillars={pillars}
+              formats={formats}
               onSelectClient={handleSelectClient}
             />
           )}
           {mainPage === 'finance' && (
             <Finance
               clients={clients}
-              expenses={expenses}
+              monthlyRevenue={monthlyRevenue}
+              monthlyExpenses={monthlyExpenses}
               onReload={loadData}
             />
           )}
