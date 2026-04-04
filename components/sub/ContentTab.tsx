@@ -40,7 +40,7 @@ export default function ContentTab({ client, posts, pillars, formats, activePlat
 
   const filtered = useMemo(() => {
     let result = clientPosts;
-    if (activePlat !== 'All') result = result.filter(p => p.platform === activePlat);
+    if (activePlat !== 'All') result = result.filter(p => p.platform.toLowerCase() === activePlat.toLowerCase());
     if (filterPillar !== 'All') result = result.filter(p => p.pillar === filterPillar);
     if (filterFormat !== 'All') result = result.filter(p => p.format === filterFormat);
     return result.sort((a, b) => {

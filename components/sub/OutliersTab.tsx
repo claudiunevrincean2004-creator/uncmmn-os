@@ -14,7 +14,7 @@ export default function OutliersTab({ client, posts, activePlat }: Props) {
 
   const outliers = useMemo(() => {
     let filtered = clientPosts;
-    if (activePlat !== 'All') filtered = filtered.filter(p => p.platform === activePlat);
+    if (activePlat !== 'All') filtered = filtered.filter(p => p.platform.toLowerCase() === activePlat.toLowerCase());
 
     const avgViews = avg(filtered.map(p => p.views));
     const threshold = avgViews * 1.5;
@@ -24,7 +24,7 @@ export default function OutliersTab({ client, posts, activePlat }: Props) {
       .sort((a, b) => b.views - a.views);
   }, [clientPosts, activePlat]);
 
-  const avgViews = avg(clientPosts.filter(p => activePlat === 'All' || p.platform === activePlat).map(p => p.views));
+  const avgViews = avg(clientPosts.filter(p => activePlat === 'All' || p.platform.toLowerCase() === activePlat.toLowerCase()).map(p => p.views));
 
   return (
     <div>

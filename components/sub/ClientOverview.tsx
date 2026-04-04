@@ -78,7 +78,7 @@ function inRange(dateStr: string, range: [Date, Date]): boolean {
 }
 
 export default function ClientOverview({ client, posts, goals, pillars, formats, activePlat, showCmp, timePeriod }: Props) {
-  const clientPosts = posts.filter(p => p.client_id === client.id && (activePlat === 'All' || p.platform === activePlat));
+  const clientPosts = posts.filter(p => p.client_id === client.id && (activePlat === 'All' || p.platform.toLowerCase() === activePlat.toLowerCase()));
   const clientGoals = goals.filter(g => g.client_id === client.id);
   const clientPillars = pillars.filter(p => p.client_id === client.id);
   const clientFormats = formats.filter(f => f.client_id === client.id);
