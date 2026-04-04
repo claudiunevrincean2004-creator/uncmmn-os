@@ -1,7 +1,8 @@
 'use client';
-import { useMemo, useEffect, useRef } from 'react';
+import { useMemo } from 'react';
 import { Client, Post, Goal, Pillar, Format } from '@/lib/types';
 import { fn, er, avg, getColor, getPlatformColor } from '@/lib/utils';
+import type { TimePeriod } from '@/app/page';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -25,42 +26,93 @@ interface Props {
   formats: Format[];
   activePlat: string;
   showCmp: boolean;
+  timePeriod: TimePeriod;
 }
 
-export default function ClientOverview({ client, posts, goals, pillars, formats, activePlat, showCmp }: Props) {
+/** Returns [periodStart, periodEnd, prevStart, prevEnd] as Date objects */
+function getPeriodDates(period: TimePeriod): { current: [Date, Date]; previous: [Date, Date] } {
+  const now = new Date();
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+  if (period === '30d') {
+    const start = new Date(end); start.setDate(start.getDate() - 30);
+    const prevEnd = new Date(start); prevEnd.setMilliseconds(-1);
+    const prevStart = new Date(prevEnd); prevStart.setDate(prevStart.getDate() - 30);
+    return { current: [start, end], previous: [prevStart, prevEnd] };
+  }
+  if (period === '3m') {
+    const start = new Date(end); start.setMonth(start.getMonth() - 3);
+    const prevEnd = new Date(start); prevEnd.setMilliseconds(-1);
+    const prevStart = new Date(prevEnd); prevEnd.setMonth(prevEnd.getMonth() - 3);
+    return { current: [start, end], previous: [prevStart, prevEnd] };
+  }
+  if (period === 'quarter') {
+    const q = Math.floor(now.getMonth() / 3);
+    const start = new Date(now.getFullYear(), q * 3, 1);
+    const qEnd = new Date(now.getFullYear(), q * 3 + 3, 0, 23, 59, 59, 999);
+    const prevStart = new Date(now.getFullYear(), (q - 1) * 3, 1);
+    const prevEnd = new Date(start); prevEnd.setMilliseconds(-1);
+    return { current: [start, qEnd], previous: [prevStart, prevEnd] };
+  }
+  if (period === '6m') {
+    const start = new Date(end); start.setMonth(start.getMonth() - 6);
+    const prevEnd = new Date(start); prevEnd.setMilliseconds(-1);
+    const prevStart = new Date(prevEnd); prevStart.setMonth(prevStart.getMonth() - 6);
+    return { current: [start, end], previous: [prevStart, prevEnd] };
+  }
+  if (period === 'year') {
+    const start = new Date(end); start.setFullYear(start.getFullYear() - 1);
+    const prevEnd = new Date(start); prevEnd.setMilliseconds(-1);
+    const prevStart = new Date(prevEnd); prevStart.setFullYear(prevStart.getFullYear() - 1);
+    return { current: [start, end], previous: [prevStart, prevEnd] };
+  }
+  // all time
+  const start = new Date(2000, 0, 1);
+  return { current: [start, end], previous: [start, end] };
+}
+
+function inRange(dateStr: string, range: [Date, Date]): boolean {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  return d >= range[0] && d <= range[1];
+}
+
+export default function ClientOverview({ client, posts, goals, pillars, formats, activePlat, showCmp, timePeriod }: Props) {
   const clientPosts = posts.filter(p => p.client_id === client.id && (activePlat === 'All' || p.platform === activePlat));
   const clientGoals = goals.filter(g => g.client_id === client.id);
   const clientPillars = pillars.filter(p => p.client_id === client.id);
   const clientFormats = formats.filter(f => f.client_id === client.id);
 
-  const totalViews = clientPosts.reduce((s, p) => s + p.views, 0);
-  const totalLikes = clientPosts.reduce((s, p) => s + p.likes, 0);
-  const totalFollows = clientPosts.reduce((s, p) => s + p.follows, 0);
-  const avgER = clientPosts.length > 0 ? avg(clientPosts.map(er)) : 0;
-  const topPost = [...clientPosts].sort((a, b) => b.views - a.views)[0];
+  const { current: currentRange, previous: prevRange } = getPeriodDates(timePeriod);
 
-  // Previous month comparison
-  const now = new Date();
-  const thisMonth = clientPosts.filter(p => {
-    if (!p.date) return false;
-    const d = new Date(p.date);
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  });
-  const prevMonth = clientPosts.filter(p => {
-    if (!p.date) return false;
-    const d = new Date(p.date);
-    const pm = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
-    const py = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
-    return d.getMonth() === pm && d.getFullYear() === py;
-  });
+  const periodPosts = timePeriod === 'all' ? clientPosts : clientPosts.filter(p => inRange(p.date, currentRange));
+  const prevPosts = timePeriod === 'all' ? clientPosts : clientPosts.filter(p => inRange(p.date, prevRange));
 
-  const thisViews = thisMonth.reduce((s, p) => s + p.views, 0);
-  const prevViews = prevMonth.reduce((s, p) => s + p.views, 0);
-  const viewsDiff = prevViews > 0 ? ((thisViews - prevViews) / prevViews) * 100 : 0;
+  const totalViews = periodPosts.reduce((s, p) => s + p.views, 0);
+  const totalFollows = periodPosts.reduce((s, p) => s + p.follows, 0);
+  const totalImpressions = periodPosts.reduce((s, p) => s + p.likes + p.comments + p.shares + p.saves, 0);
+  const totalPostsCount = periodPosts.length;
 
-  // Growth chart data – group posts by month
+  const prevViews = prevPosts.reduce((s, p) => s + p.views, 0);
+  const prevFollows = prevPosts.reduce((s, p) => s + p.follows, 0);
+  const prevImpressions = prevPosts.reduce((s, p) => s + p.likes + p.comments + p.shares + p.saves, 0);
+  const prevPostsCount = prevPosts.length;
+
+  function pctChange(curr: number, prev: number): number {
+    if (prev === 0) return curr > 0 ? 100 : 0;
+    return ((curr - prev) / prev) * 100;
+  }
+
+  const viewsDiff = pctChange(totalViews, prevViews);
+  const followsDiff = pctChange(totalFollows, prevFollows);
+  const impressionsDiff = pctChange(totalImpressions, prevImpressions);
+  const postsDiff = pctChange(totalPostsCount, prevPostsCount);
+
+  const topPost = [...periodPosts].sort((a, b) => b.views - a.views)[0];
+
+  // Growth chart data – group posts by month (use period-filtered posts)
   const monthlyData = useMemo(() => {
-    const sorted = [...clientPosts].filter(p => p.date).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const sorted = [...periodPosts].filter(p => p.date).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     const months: Record<string, { views: number; follows: number }> = {};
     sorted.forEach(p => {
       const key = p.date.slice(0, 7); // YYYY-MM
@@ -69,7 +121,7 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
       months[key].follows += p.follows;
     });
     return months;
-  }, [clientPosts]);
+  }, [periodPosts]);
 
   const chartLabels = Object.keys(monthlyData).map(k => {
     const [y, m] = k.split('-');
@@ -150,39 +202,41 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
 
   // Pillar effectiveness
   const pillarStats = clientPillars.map(pillar => {
-    const pp = clientPosts.filter(p => p.pillar === pillar.name);
+    const pp = periodPosts.filter(p => p.pillar === pillar.name);
     return { name: pillar.name, avgViews: pp.length > 0 ? avg(pp.map(p => p.views)) : 0, count: pp.length };
   }).sort((a, b) => b.avgViews - a.avgViews);
   const maxPillarViews = Math.max(...pillarStats.map(p => p.avgViews), 1);
 
   // Format performance
   const formatStats = clientFormats.map(fmt => {
-    const fp = clientPosts.filter(p => p.format === fmt.name);
+    const fp = periodPosts.filter(p => p.format === fmt.name);
     return { name: fmt.name, platform: fmt.platform, avgViews: fp.length > 0 ? avg(fp.map(p => p.views)) : fmt.avg_views, count: fp.length };
   });
 
   // Outlier posts — 1.5x above client average
-  const clientAvgViews = avg(clientPosts.map(p => p.views));
+  const clientAvgViews = avg(periodPosts.map(p => p.views));
   const outlierThreshold = clientAvgViews * 1.5;
-  const outlierPosts = clientPosts.filter(p => p.views >= outlierThreshold).sort((a, b) => b.views - a.views);
+  const outlierPosts = periodPosts.filter(p => p.views >= outlierThreshold).sort((a, b) => b.views - a.views);
+
+  const metrics = [
+    { label: 'Total Views', value: fn(totalViews), diff: viewsDiff, sub: `${periodPosts.length} posts` },
+    { label: 'Total Follows', value: fn(totalFollows), diff: followsDiff, sub: 'from content' },
+    { label: 'Total Impressions', value: fn(totalImpressions), diff: impressionsDiff, sub: 'likes + comments + shares + saves' },
+    { label: 'Total Posts', value: String(totalPostsCount), diff: postsDiff, sub: 'in period' },
+  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {/* Metrics row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-        {[
-          { label: 'Total Views', value: fn(totalViews), sub: showCmp ? `${viewsDiff >= 0 ? '+' : ''}${viewsDiff.toFixed(1)}% vs last month` : `${clientPosts.length} posts` },
-          { label: 'Total Likes', value: fn(totalLikes), sub: `${clientPosts.length} posts` },
-          { label: 'Total Follows', value: fn(totalFollows), sub: 'from content' },
-          { label: 'Avg ER%', value: `${avgER.toFixed(2)}%`, sub: 'engagement rate' },
-        ].map(m => (
+        {metrics.map(m => (
           <div key={m.label} className="metric-chip">
             <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>{m.label}</div>
             <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 3 }}>{m.value}</div>
-            {showCmp && m.label === 'Total Views' ? (
+            {showCmp && timePeriod !== 'all' ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span className={`badge ${viewsDiff >= 0 ? 'badge-up' : 'badge-down'}`}>{viewsDiff >= 0 ? '+' : ''}{viewsDiff.toFixed(1)}%</span>
-                <span style={{ fontSize: 10, color: '#444' }}>vs prev month</span>
+                <span className={`badge ${m.diff >= 0 ? 'badge-up' : 'badge-down'}`}>{m.diff >= 0 ? '+' : ''}{m.diff.toFixed(1)}%</span>
+                <span style={{ fontSize: 10, color: '#444' }}>vs prev period</span>
               </div>
             ) : (
               <div style={{ fontSize: 11, color: '#444' }}>{m.sub}</div>
@@ -206,31 +260,33 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-        {/* Goals snapshot */}
-        <div className="card">
-          <div style={{ fontSize: 11, color: '#555', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Goals Snapshot</div>
-          {clientGoals.length === 0 ? (
-            <div style={{ color: '#333', fontSize: 12 }}>No goals set</div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {clientGoals.slice(0, 4).map(goal => {
-                const pct = goal.target_val > 0 ? Math.min(100, (goal.current_val / goal.target_val) * 100) : 0;
-                const done = pct >= 100;
-                return (
-                  <div key={goal.id}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span style={{ fontSize: 12 }}>{goal.name}</span>
-                      <span style={{ fontSize: 11, color: done ? '#10b981' : '#555' }}>{pct.toFixed(0)}%</span>
+        {/* Goals snapshot — only show when "All" platform is selected */}
+        {activePlat === 'All' && (
+          <div className="card">
+            <div style={{ fontSize: 11, color: '#555', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Goals Snapshot</div>
+            {clientGoals.length === 0 ? (
+              <div style={{ color: '#333', fontSize: 12 }}>No goals set</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {clientGoals.slice(0, 4).map(goal => {
+                  const pct = goal.target_val > 0 ? Math.min(100, (goal.current_val / goal.target_val) * 100) : 0;
+                  const done = pct >= 100;
+                  return (
+                    <div key={goal.id}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontSize: 12 }}>{goal.name}</span>
+                        <span style={{ fontSize: 11, color: done ? '#10b981' : '#555' }}>{pct.toFixed(0)}%</span>
+                      </div>
+                      <div className="progress-bar">
+                        <div className={`progress-bar-fill${done ? ' complete' : ''}`} style={{ width: `${pct}%` }} />
+                      </div>
                     </div>
-                    <div className="progress-bar">
-                      <div className={`progress-bar-fill${done ? ' complete' : ''}`} style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Top post */}
         <div className="card">

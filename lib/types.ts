@@ -7,6 +7,7 @@ export interface Client {
   platforms: string[];
   status?: 'Active' | 'Inactive' | 'Paused';
   renewal_date?: string;
+  start_date?: string;
   notes?: string;
   created_at?: string;
 }

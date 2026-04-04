@@ -25,6 +25,8 @@ export default function ClientSidebar({ client, clientExpenses, monthlyRevenue, 
 
   const [notes, setNotes] = useState(client.notes || '');
   const [savingNotes, setSavingNotes] = useState(false);
+  const [renewalDate, setRenewalDate] = useState(client.renewal_date || '');
+  const [startDate, setStartDate] = useState(client.start_date || '');
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [editExpense, setEditExpense] = useState<ClientExpense | null>(null);
   const notesTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -32,7 +34,21 @@ export default function ClientSidebar({ client, clientExpenses, monthlyRevenue, 
 
   useEffect(() => {
     setNotes(client.notes || '');
-  }, [client.id, client.notes]);
+    setRenewalDate(client.renewal_date || '');
+    setStartDate(client.start_date || '');
+  }, [client.id, client.notes, client.renewal_date, client.start_date]);
+
+  async function handleRenewalDateChange(value: string) {
+    setRenewalDate(value);
+    await supabase.from('clients').update({ renewal_date: value || null }).eq('id', client.id);
+    onReload();
+  }
+
+  async function handleStartDateChange(value: string) {
+    setStartDate(value);
+    await supabase.from('clients').update({ start_date: value || null }).eq('id', client.id);
+    onReload();
+  }
 
   // Auto-save notes with debounce
   function handleNotesChange(value: string) {
@@ -150,8 +166,29 @@ export default function ClientSidebar({ client, clientExpenses, monthlyRevenue, 
             </div>
             <div>
               <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4, fontWeight: 600 }}>Renewal Date</div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>{formatRenewalDate(client.renewal_date)}</div>
+              <input
+                type="date"
+                className="form-input"
+                value={renewalDate}
+                onChange={e => handleRenewalDateChange(e.target.value)}
+                style={{ fontSize: 12, padding: '4px 6px', width: '100%' }}
+              />
             </div>
+          </div>
+
+          {/* Start date */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4, fontWeight: 600 }}>Start Date</div>
+              <input
+                type="date"
+                className="form-input"
+                value={startDate}
+                onChange={e => handleStartDateChange(e.target.value)}
+                style={{ fontSize: 12, padding: '4px 6px', width: '100%' }}
+              />
+            </div>
+            <div />
           </div>
 
           {/* Niche */}

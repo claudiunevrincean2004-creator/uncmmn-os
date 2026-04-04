@@ -66,12 +66,18 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
     return clientExpenses.filter(e => e.client_id === clientId && months.includes(e.month));
   }
 
+  function clientVisibleInMonths(c: Client, months: string[]): boolean {
+    if (!c.start_date) return true;
+    const startMonth = c.start_date.slice(0, 7); // YYYY-MM
+    return months.some(m => m >= startMonth);
+  }
+
   function computeTotals(months: string[]) {
     let totalRevenue = 0;
     let totalExpenses = 0;
     const clientBreakdown: { client: Client; revenue: number; expenses: ClientExpense[]; totalClientExpenses: number; netProfit: number; margin: number }[] = [];
 
-    clients.forEach(c => {
+    clients.filter(c => clientVisibleInMonths(c, months)).forEach(c => {
       let rev = 0;
       months.forEach(m => { rev += getClientRevenue(c.id, m); });
       totalRevenue += rev;

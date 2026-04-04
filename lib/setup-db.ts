@@ -27,6 +27,7 @@ export async function checkSchema(): Promise<{ missing: string[]; clientColumnsM
       if (!cols.includes('status')) clientColumnsMissing.push('status');
       if (!cols.includes('renewal_date')) clientColumnsMissing.push('renewal_date');
       if (!cols.includes('notes')) clientColumnsMissing.push('notes');
+      if (!cols.includes('start_date')) clientColumnsMissing.push('start_date');
     }
   }
 
@@ -83,6 +84,9 @@ alter table client_expenses disable row level security;`);
   }
   if (clientColumnsMissing.includes('notes')) {
     parts.push(`alter table clients add column if not exists notes text;`);
+  }
+  if (clientColumnsMissing.includes('start_date')) {
+    parts.push(`alter table clients add column if not exists start_date date;`);
   }
 
   return parts.join('\n\n');

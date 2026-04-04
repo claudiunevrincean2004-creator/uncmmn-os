@@ -25,6 +25,17 @@ async function safeSelect(table: string, orderCol: string, ascending = true) {
   return data || [];
 }
 
+export type TimePeriod = '30d' | '3m' | 'quarter' | '6m' | 'year' | 'all';
+
+const TIME_PERIOD_LABELS: Record<TimePeriod, string> = {
+  '30d': 'Last 30 days',
+  '3m': 'Last 3 months',
+  'quarter': 'Last quarter',
+  '6m': 'Last 6 months',
+  'year': 'Last year',
+  'all': 'All time',
+};
+
 const CLIENT_TABS: { key: ClientTab; label: string }[] = [
   { key: 'overview', label: 'Overview' },
   { key: 'content', label: 'Content' },
@@ -59,6 +70,8 @@ export default function Home() {
   const [clientTab, setClientTab] = useState<ClientTab>('overview');
   const [activePlat, setActivePlat] = useState('All');
   const [showCmp, setShowCmp] = useState(false);
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>('30d');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Modal state
   const [showClientModal, setShowClientModal] = useState(false);
@@ -142,7 +155,7 @@ export default function Home() {
     if (!activeClient) return null;
     switch (clientTab) {
       case 'overview':
-        return <ClientOverview client={activeClient} posts={posts} goals={goals} pillars={pillars} formats={formats} activePlat={activePlat} showCmp={showCmp} />;
+        return <ClientOverview client={activeClient} posts={posts} goals={goals} pillars={pillars} formats={formats} activePlat={activePlat} showCmp={showCmp} timePeriod={timePeriod} />;
       case 'content':
         return <ContentTab client={activeClient} posts={posts} pillars={pillars} formats={formats} activePlat={activePlat} onReload={loadData} />;
       case 'outliers':
@@ -177,6 +190,8 @@ export default function Home() {
         clients={clients}
         activeId={activeClientId}
         activeMP={mainPage}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(v => !v)}
         onSelectMain={handleSelectMain}
         onSelectClient={handleSelectClient}
         onAddClient={handleAddClient}
@@ -278,8 +293,8 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Platform filter + Comparison toggle */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            {/* Platform filter + Time period + Comparison toggle */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', gap: 4 }}>
                 {clientPlatforms.map(p => (
                   <button
@@ -292,13 +307,25 @@ export default function Home() {
                 ))}
               </div>
               {clientTab === 'overview' && (
-                <button
-                  className={`btn-compare${showCmp ? ' active' : ''}`}
-                  onClick={() => setShowCmp(v => !v)}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                  vs Prev Month
-                </button>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <select
+                    className="form-input"
+                    style={{ width: 'auto', padding: '4px 8px', fontSize: 11, background: '#111', border: '0.5px solid #2a2a2a', borderRadius: 6, color: '#ccc' }}
+                    value={timePeriod}
+                    onChange={e => setTimePeriod(e.target.value as TimePeriod)}
+                  >
+                    {(Object.entries(TIME_PERIOD_LABELS) as [TimePeriod, string][]).map(([key, label]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
+                  <button
+                    className={`btn-compare${showCmp ? ' active' : ''}`}
+                    onClick={() => setShowCmp(v => !v)}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    vs Previous Period
+                  </button>
+                </div>
               )}
             </div>
 

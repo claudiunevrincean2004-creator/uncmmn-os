@@ -91,6 +91,31 @@ export default function ContentTab({ client, posts, pillars, formats, activePlat
           >
             {formatsOptions.map(f => <option key={f} value={f}>{f === 'All' ? 'All Formats' : f}</option>)}
           </select>
+          <select
+            className="form-input"
+            style={{ width: 'auto', padding: '4px 8px', fontSize: 11 }}
+            value={`${sortKey}-${sortDir}`}
+            onChange={e => {
+              const [k, d] = e.target.value.split('-') as [SortKey, SortDir];
+              setSortKey(k); setSortDir(d);
+            }}
+          >
+            {([
+              { k: 'date', label: 'Date' },
+              { k: 'views', label: 'Views' },
+              { k: 'likes', label: 'Likes' },
+              { k: 'comments', label: 'Comments' },
+              { k: 'shares', label: 'Shares' },
+              { k: 'saves', label: 'Saves' },
+              { k: 'follows', label: 'Follows' },
+              { k: 'er', label: 'ER%' },
+            ] as { k: SortKey; label: string }[]).map(opt => (
+              <optgroup key={opt.k} label={opt.label}>
+                <option value={`${opt.k}-desc`}>{opt.label} ↓ High to Low</option>
+                <option value={`${opt.k}-asc`}>{opt.label} ↑ Low to High</option>
+              </optgroup>
+            ))}
+          </select>
           <span style={{ fontSize: 11, color: '#555' }}>{filtered.length} posts</span>
         </div>
         <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px' }} onClick={() => { setEditPost(null); setShowModal(true); }}>+ Add Post</button>

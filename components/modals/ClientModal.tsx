@@ -19,6 +19,7 @@ export default function ClientModal({ client, onClose, onSaved }: Props) {
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [status, setStatus] = useState<'Active' | 'Inactive' | 'Paused'>('Active');
   const [renewalDate, setRenewalDate] = useState('');
+  const [startDate, setStartDate] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -30,6 +31,7 @@ export default function ClientModal({ client, onClose, onSaved }: Props) {
       setPlatforms(client.platforms || []);
       setStatus(client.status || 'Active');
       setRenewalDate(client.renewal_date || '');
+      setStartDate(client.start_date || '');
     }
   }, [client]);
 
@@ -48,6 +50,7 @@ export default function ClientModal({ client, onClose, onSaved }: Props) {
       platforms,
       status,
       renewal_date: renewalDate || null,
+      start_date: startDate || null,
     };
     if (client?.id) {
       await supabase.from('clients').update(data).eq('id', client.id);
@@ -96,9 +99,16 @@ export default function ClientModal({ client, onClose, onSaved }: Props) {
               </select>
             </div>
             <div>
+              <label className="form-label">Start Date</label>
+              <input className="form-input" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
               <label className="form-label">Renewal Date</label>
               <input className="form-input" type="date" value={renewalDate} onChange={e => setRenewalDate(e.target.value)} />
             </div>
+            <div />
           </div>
           <div>
             <label className="form-label">Platforms</label>
