@@ -35,17 +35,26 @@ function getPeriodDates(period: TimePeriod): { current: [Date, Date]; previous: 
   const now = new Date();
   const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
+  /** Clone a date and reset time to start of day (00:00:00.000) */
+  function startOfDay(d: Date): Date {
+    const c = new Date(d);
+    c.setHours(0, 0, 0, 0);
+    return c;
+  }
+
   if (period === '30d') {
     const start = new Date(end); start.setDate(start.getDate() - 30);
-    const prevEnd = new Date(start); prevEnd.setMilliseconds(-1);
+    const s = startOfDay(start);
+    const prevEnd = new Date(s); prevEnd.setMilliseconds(-1);
     const prevStart = new Date(prevEnd); prevStart.setDate(prevStart.getDate() - 30);
-    return { current: [start, end], previous: [prevStart, prevEnd] };
+    return { current: [s, end], previous: [startOfDay(prevStart), prevEnd] };
   }
   if (period === '3m') {
     const start = new Date(end); start.setMonth(start.getMonth() - 3);
-    const prevEnd = new Date(start); prevEnd.setMilliseconds(-1);
-    const prevStart = new Date(prevEnd); prevEnd.setMonth(prevEnd.getMonth() - 3);
-    return { current: [start, end], previous: [prevStart, prevEnd] };
+    const s = startOfDay(start);
+    const prevEnd = new Date(s); prevEnd.setMilliseconds(-1);
+    const prevStart = new Date(prevEnd); prevStart.setMonth(prevStart.getMonth() - 3);
+    return { current: [s, end], previous: [startOfDay(prevStart), prevEnd] };
   }
   if (period === 'quarter') {
     const q = Math.floor(now.getMonth() / 3);
@@ -57,15 +66,17 @@ function getPeriodDates(period: TimePeriod): { current: [Date, Date]; previous: 
   }
   if (period === '6m') {
     const start = new Date(end); start.setMonth(start.getMonth() - 6);
-    const prevEnd = new Date(start); prevEnd.setMilliseconds(-1);
+    const s = startOfDay(start);
+    const prevEnd = new Date(s); prevEnd.setMilliseconds(-1);
     const prevStart = new Date(prevEnd); prevStart.setMonth(prevStart.getMonth() - 6);
-    return { current: [start, end], previous: [prevStart, prevEnd] };
+    return { current: [s, end], previous: [startOfDay(prevStart), prevEnd] };
   }
   if (period === 'year') {
     const start = new Date(end); start.setFullYear(start.getFullYear() - 1);
-    const prevEnd = new Date(start); prevEnd.setMilliseconds(-1);
+    const s = startOfDay(start);
+    const prevEnd = new Date(s); prevEnd.setMilliseconds(-1);
     const prevStart = new Date(prevEnd); prevStart.setFullYear(prevStart.getFullYear() - 1);
-    return { current: [start, end], previous: [prevStart, prevEnd] };
+    return { current: [s, end], previous: [startOfDay(prevStart), prevEnd] };
   }
   // all time
   const start = new Date(2000, 0, 1);
@@ -74,7 +85,10 @@ function getPeriodDates(period: TimePeriod): { current: [Date, Date]; previous: 
 
 function inRange(dateStr: string, range: [Date, Date]): boolean {
   if (!dateStr) return false;
-  const d = new Date(dateStr);
+  // Date-only strings ("YYYY-MM-DD") are parsed as UTC by spec.
+  // Append T00:00:00 to force local-time parsing so it matches our local-time ranges.
+  const raw = dateStr.length === 10 ? dateStr + 'T00:00:00' : dateStr;
+  const d = new Date(raw);
   return d >= range[0] && d <= range[1];
 }
 
@@ -129,20 +143,19 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
   const prevImpressions = prevPosts.reduce((s, p) => s + p.likes + p.comments + p.shares + p.saves, 0);
   const prevPostsCount = prevPosts.length;
 
-  // Followers card — platform-aware logic
-  const isAllPlatform = activePlat === 'All';
-  const isInstagram = activePlat.toLowerCase() === 'instagram';
+  // Followers card — always visible, platform-aware logic
+  const followerData = useMemo((): { netGained: number; prevNetGained: number; latestTotal: number | null; hasSnapshots: boolean; noTotalLabel: string | null } => {
+    const isAll = activePlat === 'All';
+    const isIG = activePlat.toLowerCase() === 'instagram';
 
-  // For "All": aggregate across all platforms with snapshots
-  // For specific platform: use that platform's snapshots (or fallback to posts)
-  const followerData = useMemo(() => {
-    if (isAllPlatform) {
-      // Aggregate across all platforms
+    if (isAll) {
+      // Aggregate across all platforms that have snapshot data
       const platforms = ['tiktok', 'youtube', 'instagram'];
       let totalCurrent = 0;
       let totalPrev = 0;
       let latestTotal = 0;
       let hasAnySnapshots = false;
+      let hasAnyTotal = false;
 
       for (const plat of platforms) {
         const curr = getSnapshotFollowGain(subscriberSnapshots, client.id, plat, currentRange);
@@ -150,34 +163,39 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
         const latest = getLatestFollowerCount(subscriberSnapshots, client.id, plat);
         if (curr) { totalCurrent += curr.gain; hasAnySnapshots = true; }
         if (prev) { totalPrev += prev.gain; }
-        if (latest) { latestTotal += latest; }
+        if (latest !== null) { latestTotal += latest; hasAnyTotal = true; }
       }
 
-      if (hasAnySnapshots) {
-        return { netGained: totalCurrent, prevNetGained: totalPrev, latestTotal, hasSnapshots: true, label: 'all platforms' };
+      if (hasAnySnapshots || hasAnyTotal) {
+        return { netGained: totalCurrent, prevNetGained: totalPrev, latestTotal: hasAnyTotal ? latestTotal : null, hasSnapshots: true, noTotalLabel: null };
       }
-      // Fallback to post follows
+      // No snapshots at all — fall back to post follows
       const postFollows = periodPosts.reduce((s, p) => s + p.follows, 0);
       const prevPostFollows = prevPosts.reduce((s, p) => s + p.follows, 0);
-      return { netGained: postFollows, prevNetGained: prevPostFollows, latestTotal: null as number | null, hasSnapshots: false, label: 'from posts' };
+      return { netGained: postFollows, prevNetGained: prevPostFollows, latestTotal: null, hasSnapshots: false, noTotalLabel: 'No data yet' };
     }
 
-    // Specific platform
+    if (isIG) {
+      // Instagram — no snapshots, use post-based follows
+      const postFollows = periodPosts.reduce((s, p) => s + p.follows, 0);
+      const prevPostFollows = prevPosts.reduce((s, p) => s + p.follows, 0);
+      return { netGained: postFollows, prevNetGained: prevPostFollows, latestTotal: null, hasSnapshots: false, noTotalLabel: 'Connect API to track' };
+    }
+
+    // TikTok or YouTube — use snapshots, fall back to post follows for net gained
     const platKey = activePlat.toLowerCase();
     const curr = getSnapshotFollowGain(subscriberSnapshots, client.id, platKey, currentRange);
     const prev = getSnapshotFollowGain(subscriberSnapshots, client.id, platKey, prevRange);
     const latest = getLatestFollowerCount(subscriberSnapshots, client.id, platKey);
 
     if (curr) {
-      return { netGained: curr.gain, prevNetGained: prev?.gain ?? 0, latestTotal: latest, hasSnapshots: true, label: activePlat };
+      return { netGained: curr.gain, prevNetGained: prev?.gain ?? 0, latestTotal: latest, hasSnapshots: true, noTotalLabel: null };
     }
-    // Fallback to post follows for this platform
+    // No snapshots in period — try post follows as fallback for net gained
     const postFollows = periodPosts.reduce((s, p) => s + p.follows, 0);
     const prevPostFollows = prevPosts.reduce((s, p) => s + p.follows, 0);
-    return { netGained: postFollows, prevNetGained: prevPostFollows, latestTotal: latest, hasSnapshots: false, label: activePlat };
+    return { netGained: postFollows, prevNetGained: prevPostFollows, latestTotal: latest, hasSnapshots: false, noTotalLabel: latest === null ? 'No data yet' : null };
   }, [activePlat, subscriberSnapshots, client.id, currentRange, prevRange, periodPosts, prevPosts]);
-
-  const showFollowersCard = followerData.netGained > 0 || (followerData.latestTotal !== null && followerData.latestTotal > 0) || followerData.hasSnapshots;
 
   function pctChange(curr: number, prev: number): number {
     if (prev === 0) return curr > 0 ? 100 : 0;
@@ -308,7 +326,7 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {/* Metrics row */}
-      <div style={{ display: 'grid', gridTemplateColumns: showFollowersCard ? 'repeat(3, 1fr) minmax(0, 1.2fr)' : 'repeat(3, 1fr)', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr) minmax(0, 1.2fr)', gap: 10 }}>
         {metrics.map(m => (
           <div key={m.label} className="metric-chip">
             <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>{m.label}</div>
@@ -324,36 +342,36 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
           </div>
         ))}
 
-        {/* Followers card — platform-aware, contains Net Gained + Total */}
-        {showFollowersCard && (
-          <div className="metric-chip" style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>
-              Followers
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, flex: 1 }}>
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: followerData.netGained >= 0 ? '#10b981' : '#ef4444', marginBottom: 2 }}>
-                  {followerData.netGained >= 0 ? '+' : ''}{fn(followerData.netGained)}
-                </div>
-                <div style={{ fontSize: 10, color: '#444' }}>
-                  {showCmp && timePeriod !== 'all' ? (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                      <span className={`badge ${netGainedDiff >= 0 ? 'badge-up' : 'badge-down'}`} style={{ fontSize: 9 }}>{netGainedDiff >= 0 ? '+' : ''}{netGainedDiff.toFixed(1)}%</span>
-                    </span>
-                  ) : (
-                    'net gained'
-                  )}
-                </div>
+        {/* Followers card — always visible, platform-aware */}
+        <div className="metric-chip" style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>
+            Followers
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, flex: 1 }}>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: followerData.netGained >= 0 ? '#10b981' : '#ef4444', marginBottom: 2 }}>
+                {followerData.netGained >= 0 ? '+' : ''}{fn(followerData.netGained)}
               </div>
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: '#6366f1', marginBottom: 2 }}>
-                  {followerData.latestTotal !== null ? fn(followerData.latestTotal) : '—'}
-                </div>
-                <div style={{ fontSize: 10, color: '#444' }}>total</div>
+              <div style={{ fontSize: 10, color: '#444' }}>
+                {showCmp && timePeriod !== 'all' ? (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <span className={`badge ${netGainedDiff >= 0 ? 'badge-up' : 'badge-down'}`} style={{ fontSize: 9 }}>{netGainedDiff >= 0 ? '+' : ''}{netGainedDiff.toFixed(1)}%</span>
+                  </span>
+                ) : (
+                  'net gained'
+                )}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#6366f1', marginBottom: 2 }}>
+                {followerData.latestTotal !== null ? fn(followerData.latestTotal) : '—'}
+              </div>
+              <div style={{ fontSize: 10, color: '#444' }}>
+                {followerData.noTotalLabel ? followerData.noTotalLabel : 'total'}
               </div>
             </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Growth chart */}
