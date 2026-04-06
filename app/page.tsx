@@ -22,6 +22,10 @@ import ClientSidebar from '@/components/ClientSidebar';
 async function safeSelect(table: string, orderCol: string, ascending = true) {
   const { data, error } = await supabase.from(table).select('*').order(orderCol, { ascending });
   if (error && error.code === 'PGRST205') return []; // table doesn't exist
+  if (error) {
+    console.warn(`[safeSelect] Error querying "${table}":`, error.message, error.code);
+    return [];
+  }
   return data || [];
 }
 

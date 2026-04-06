@@ -118,8 +118,8 @@ function getSnapshotFollowGain(snapshots: SubscriberSnapshot[], clientId: string
 
   if (clientSnaps.length < 1) return null;
 
-  const startCount = clientSnaps[0].subscriber_count;
-  const endCount = clientSnaps[clientSnaps.length - 1].subscriber_count;
+  const startCount = Number(clientSnaps[0].subscriber_count);
+  const endCount = Number(clientSnaps[clientSnaps.length - 1].subscriber_count);
   return { gain: endCount - startCount, startCount, endCount };
 }
 
@@ -128,7 +128,7 @@ function getLatestFollowerCount(snapshots: SubscriberSnapshot[], clientId: strin
   const clientSnaps = snapshots
     .filter(s => s.client_id === clientId && s.platform.toLowerCase() === platform.toLowerCase())
     .sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime());
-  return clientSnaps.length > 0 ? clientSnaps[0].subscriber_count : null;
+  return clientSnaps.length > 0 ? Number(clientSnaps[0].subscriber_count) : null;
 }
 
 export default function ClientOverview({ client, posts, goals, pillars, formats, subscriberSnapshots, activePlat, showCmp, timePeriod }: Props) {
@@ -152,6 +152,27 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
 
   // Followers card — always visible, platform-aware logic
   const followerData = useMemo((): { netGained: number; prevNetGained: number; latestTotal: number | null; hasSnapshots: boolean; noTotalLabel: string | null } => {
+    // Debug: log snapshot data for this client so we can verify what's loaded
+    const clientSnaps = subscriberSnapshots.filter(s => s.client_id === client.id);
+    if (clientSnaps.length > 0) {
+      const platforms = Array.from(new Set(clientSnaps.map(s => s.platform)));
+      console.log(`[Followers Debug] Client: ${client.name} (${client.id})`);
+      console.log(`[Followers Debug] Total snapshots for client: ${clientSnaps.length}, platforms: ${JSON.stringify(platforms)}`);
+      console.log(`[Followers Debug] Sample snapshot:`, clientSnaps[0]);
+      console.log(`[Followers Debug] Current range: ${currentRange[0].toISOString()} to ${currentRange[1].toISOString()}`);
+      platforms.forEach(plat => {
+        const platSnaps = clientSnaps.filter(s => s.platform === plat);
+        const inRangeSnaps = platSnaps.filter(s => inRange(s.date, currentRange));
+        console.log(`[Followers Debug] Platform "${plat}": ${platSnaps.length} total, ${inRangeSnaps.length} in current range`);
+        if (inRangeSnaps.length > 0) {
+          console.log(`[Followers Debug]   First in range: date=${inRangeSnaps[0].date}, count=${inRangeSnaps[0].subscriber_count}`);
+          console.log(`[Followers Debug]   Last in range: date=${inRangeSnaps[inRangeSnaps.length - 1].date}, count=${inRangeSnaps[inRangeSnaps.length - 1].subscriber_count}`);
+        }
+      });
+    } else {
+      console.log(`[Followers Debug] No snapshots found for client ${client.name} (${client.id}). Total snapshots loaded: ${subscriberSnapshots.length}`);
+    }
+
     const isAll = activePlat === 'All';
     const isIG = activePlat.toLowerCase() === 'instagram';
 
