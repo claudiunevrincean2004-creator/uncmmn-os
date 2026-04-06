@@ -9,6 +9,16 @@ interface Props {
   activePlat: string;
 }
 
+function ExternalLinkIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      <polyline points="15 3 21 3 21 9" />
+      <line x1="10" y1="14" x2="21" y2="3" />
+    </svg>
+  );
+}
+
 export default function OutliersTab({ client, posts, activePlat }: Props) {
   const clientPosts = posts.filter(p => p.client_id === client.id);
 
@@ -62,9 +72,19 @@ export default function OutliersTab({ client, posts, activePlat }: Props) {
             <tbody>
               {outliers.map(post => {
                 const mult = avgViews > 0 ? (post.views / avgViews).toFixed(1) : '∞';
+                const clickable = !!post.post_url;
                 return (
-                  <tr key={post.id}>
-                    <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#fff' }}>{post.title}</td>
+                  <tr
+                    key={post.id}
+                    style={{ cursor: clickable ? 'pointer' : 'default' }}
+                    onClick={() => { if (clickable) window.open(post.post_url, '_blank', 'noopener,noreferrer'); }}
+                  >
+                    <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#fff' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {post.title}
+                        {clickable && <span style={{ color: '#555', flexShrink: 0 }}><ExternalLinkIcon /></span>}
+                      </div>
+                    </td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                         <span style={{ width: 6, height: 6, borderRadius: '50%', background: getPlatformColor(post.platform), display: 'inline-block', flexShrink: 0 }} />
@@ -84,8 +104,26 @@ export default function OutliersTab({ client, posts, activePlat }: Props) {
                       <span className="badge badge-outlier">{mult}×</span>
                     </td>
                     <td>
-                      {post.drive_link ? (
-                        <a href={post.drive_link} target="_blank" rel="noopener noreferrer" style={{ color: '#6366f1', fontSize: 11, textDecoration: 'none' }}>↗</a>
+                      {post.post_url ? (
+                        <a
+                          href={post.post_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: '#6366f1', fontSize: 11, textDecoration: 'none' }}
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <ExternalLinkIcon />
+                        </a>
+                      ) : post.drive_link ? (
+                        <a
+                          href={post.drive_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: '#6366f1', fontSize: 11, textDecoration: 'none' }}
+                          onClick={e => e.stopPropagation()}
+                        >
+                          ↗
+                        </a>
                       ) : <span style={{ color: '#333' }}>—</span>}
                     </td>
                   </tr>

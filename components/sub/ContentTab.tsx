@@ -165,7 +165,9 @@ export default function ContentTab({ client, posts, pillars, formats, activePlat
                   <td>{fn(post.follows)}</td>
                   <td style={{ color: '#6366f1' }}>{er(post).toFixed(1)}%</td>
                   <td>
-                    {post.drive_link ? (
+                    {post.post_url ? (
+                      <a href={post.post_url} target="_blank" rel="noopener noreferrer" style={{ color: '#6366f1', fontSize: 11, textDecoration: 'none' }}>↗ Post</a>
+                    ) : post.drive_link ? (
                       <a href={post.drive_link} target="_blank" rel="noopener noreferrer" style={{ color: '#6366f1', fontSize: 11, textDecoration: 'none' }}>↗</a>
                     ) : <span style={{ color: '#333' }}>—</span>}
                   </td>

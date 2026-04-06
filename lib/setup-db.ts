@@ -4,7 +4,7 @@ import { supabase } from './supabase';
  * Checks which tables exist and returns missing ones.
  * Call this on app load to detect schema issues early.
  */
-export async function checkSchema(): Promise<{ missing: string[]; clientColumnsMissing: string[] }> {
+export async function checkSchema(): Promise<{ missing: string[]; clientColumnsMissing: string[]; postColumnsMissing: string[] }> {
   const requiredTables = [
     'clients', 'posts', 'goals', 'hooks', 'formats', 'pillars',
     'drive_folders', 'expenses', 'monthly_revenue', 'monthly_expenses', 'client_expenses', 'client_month_exclusions',
@@ -31,13 +31,23 @@ export async function checkSchema(): Promise<{ missing: string[]; clientColumnsM
     }
   }
 
-  return { missing, clientColumnsMissing };
+  // Check if posts table has post_url column
+  const postColumnsMissing: string[] = [];
+  if (!missing.includes('posts')) {
+    const { data } = await supabase.from('posts').select('*').limit(1);
+    if (data && data.length > 0) {
+      const cols = Object.keys(data[0]);
+      if (!cols.includes('post_url')) postColumnsMissing.push('post_url');
+    }
+  }
+
+  return { missing, clientColumnsMissing, postColumnsMissing };
 }
 
 /**
  * Returns the SQL needed to fix the schema.
  */
-export function getMigrationSQL(missing: string[], clientColumnsMissing: string[]): string {
+export function getMigrationSQL(missing: string[], clientColumnsMissing: string[], postColumnsMissing: string[] = []): string {
   const parts: string[] = [];
 
   if (missing.includes('monthly_revenue')) {
@@ -98,6 +108,10 @@ alter table client_month_exclusions disable row level security;`);
   }
   if (clientColumnsMissing.includes('start_date')) {
     parts.push(`alter table clients add column if not exists start_date date;`);
+  }
+
+  if (postColumnsMissing.includes('post_url')) {
+    parts.push(`alter table posts add column if not exists post_url text;`);
   }
 
   return parts.join('\n\n');

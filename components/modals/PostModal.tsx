@@ -25,6 +25,7 @@ export default function PostModal({ post, client, pillars, formats, onClose, onS
   const [saves, setSaves] = useState('');
   const [follows, setFollows] = useState('');
   const [driveLink, setDriveLink] = useState('');
+  const [postUrl, setPostUrl] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -41,6 +42,7 @@ export default function PostModal({ post, client, pillars, formats, onClose, onS
       setSaves(String(post.saves || ''));
       setFollows(String(post.follows || ''));
       setDriveLink(post.drive_link || '');
+      setPostUrl(post.post_url || '');
     }
   }, [post]);
 
@@ -65,6 +67,7 @@ export default function PostModal({ post, client, pillars, formats, onClose, onS
       saves: parseFloat(saves) || 0,
       follows: parseFloat(follows) || 0,
       drive_link: driveLink.trim(),
+      post_url: postUrl.trim(),
     };
     if (post?.id) {
       await supabase.from('posts').update(data).eq('id', post.id);
@@ -134,6 +137,11 @@ export default function PostModal({ post, client, pillars, formats, onClose, onS
                 <input className="form-input" type="number" value={val as string} onChange={e => (setter as (v: string) => void)(e.target.value)} placeholder="0" style={inputStyle} />
               </div>
             ))}
+          </div>
+
+          <div>
+            <label className="form-label">Post URL</label>
+            <input className="form-input" value={postUrl} onChange={e => setPostUrl(e.target.value)} placeholder="https://tiktok.com/... or https://instagram.com/..." style={inputStyle} />
           </div>
 
           <div>

@@ -1,6 +1,6 @@
 'use client';
 import { useMemo } from 'react';
-import { Client, Post, Goal, Pillar, Format } from '@/lib/types';
+import { Client, Post, Goal, Pillar, Format, SubscriberSnapshot } from '@/lib/types';
 import { fn, er, avg, getColor, getPlatformColor } from '@/lib/utils';
 import type { TimePeriod } from '@/app/page';
 import {
@@ -24,6 +24,7 @@ interface Props {
   goals: Goal[];
   pillars: Pillar[];
   formats: Format[];
+  subscriberSnapshots: SubscriberSnapshot[];
   activePlat: string;
   showCmp: boolean;
   timePeriod: TimePeriod;
@@ -77,7 +78,31 @@ function inRange(dateStr: string, range: [Date, Date]): boolean {
   return d >= range[0] && d <= range[1];
 }
 
-export default function ClientOverview({ client, posts, goals, pillars, formats, activePlat, showCmp, timePeriod }: Props) {
+function ExternalLinkIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      <polyline points="15 3 21 3 21 9" />
+      <line x1="10" y1="14" x2="21" y2="3" />
+    </svg>
+  );
+}
+
+/** Get follower gain from snapshots in a date range. Returns null if no data. */
+function getSnapshotFollowGain(snapshots: SubscriberSnapshot[], clientId: string, range: [Date, Date]): { gain: number; startCount: number; endCount: number } | null {
+  const clientSnaps = snapshots
+    .filter(s => s.client_id === clientId && s.platform.toLowerCase() === 'tiktok')
+    .filter(s => inRange(s.date, range))
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  if (clientSnaps.length < 1) return null;
+
+  const startCount = clientSnaps[0].subscriber_count;
+  const endCount = clientSnaps[clientSnaps.length - 1].subscriber_count;
+  return { gain: endCount - startCount, startCount, endCount };
+}
+
+export default function ClientOverview({ client, posts, goals, pillars, formats, subscriberSnapshots, activePlat, showCmp, timePeriod }: Props) {
   const clientPosts = posts.filter(p => p.client_id === client.id && (activePlat === 'All' || p.platform.toLowerCase() === activePlat.toLowerCase()));
   const clientGoals = goals.filter(g => g.client_id === client.id);
   const clientPillars = pillars.filter(p => p.client_id === client.id);
@@ -89,14 +114,40 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
   const prevPosts = timePeriod === 'all' ? clientPosts : clientPosts.filter(p => inRange(p.date, prevRange));
 
   const totalViews = periodPosts.reduce((s, p) => s + p.views, 0);
-  const totalFollows = periodPosts.reduce((s, p) => s + p.follows, 0);
   const totalImpressions = periodPosts.reduce((s, p) => s + p.likes + p.comments + p.shares + p.saves, 0);
   const totalPostsCount = periodPosts.length;
 
   const prevViews = prevPosts.reduce((s, p) => s + p.views, 0);
-  const prevFollows = prevPosts.reduce((s, p) => s + p.follows, 0);
   const prevImpressions = prevPosts.reduce((s, p) => s + p.likes + p.comments + p.shares + p.saves, 0);
   const prevPostsCount = prevPosts.length;
+
+  // TikTok follower tracking from subscriber_snapshots
+  const currentSnapshotData = useMemo(
+    () => getSnapshotFollowGain(subscriberSnapshots, client.id, currentRange),
+    [subscriberSnapshots, client.id, currentRange]
+  );
+  const prevSnapshotData = useMemo(
+    () => getSnapshotFollowGain(subscriberSnapshots, client.id, prevRange),
+    [subscriberSnapshots, client.id, prevRange]
+  );
+
+  const hasTikTokSnapshots = currentSnapshotData !== null;
+
+  // Total follows: use snapshots if available, else fall back to posts
+  const totalFollows = hasTikTokSnapshots
+    ? currentSnapshotData.gain
+    : periodPosts.reduce((s, p) => s + p.follows, 0);
+  const prevFollows = prevSnapshotData
+    ? prevSnapshotData.gain
+    : prevPosts.reduce((s, p) => s + p.follows, 0);
+
+  // Latest total follower count from all snapshots for this client
+  const latestTotalFollowers = useMemo(() => {
+    const clientSnaps = subscriberSnapshots
+      .filter(s => s.client_id === client.id && s.platform.toLowerCase() === 'tiktok')
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return clientSnaps.length > 0 ? clientSnaps[0].subscriber_count : null;
+  }, [subscriberSnapshots, client.id]);
 
   function pctChange(curr: number, prev: number): number {
     if (prev === 0) return curr > 0 ? 100 : 0;
@@ -220,7 +271,7 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
 
   const metrics = [
     { label: 'Total Views', value: fn(totalViews), diff: viewsDiff, sub: `${periodPosts.length} posts` },
-    { label: 'Total Follows', value: fn(totalFollows), diff: followsDiff, sub: 'from content' },
+    { label: 'Total Follows', value: fn(totalFollows), diff: followsDiff, sub: hasTikTokSnapshots ? 'from TikTok' : 'from content' },
     { label: 'Total Impressions', value: fn(totalImpressions), diff: impressionsDiff, sub: 'likes + comments + shares + saves' },
     { label: 'Total Posts', value: String(totalPostsCount), diff: postsDiff, sub: 'in period' },
   ];
@@ -244,6 +295,36 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
           </div>
         ))}
       </div>
+
+      {/* TikTok Follower Growth card — only show if snapshot data exists */}
+      {hasTikTokSnapshots && currentSnapshotData && (
+        <div className="card">
+          <div style={{ fontSize: 11, color: '#555', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: getPlatformColor('TikTok'), display: 'inline-block' }} />
+            Follower Growth — TikTok
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Start of Period</div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>{fn(currentSnapshotData.startCount)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>End of Period</div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>{fn(currentSnapshotData.endCount)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Net Gain</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: currentSnapshotData.gain >= 0 ? '#10b981' : '#ef4444' }}>
+                {currentSnapshotData.gain >= 0 ? '+' : ''}{fn(currentSnapshotData.gain)}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Current Total</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#6366f1' }}>{latestTotalFollowers !== null ? fn(latestTotalFollowers) : '—'}</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Growth chart */}
       <div className="card">
@@ -288,11 +369,19 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
           </div>
         )}
 
-        {/* Top post */}
-        <div className="card">
+        {/* Top post — clickable if post_url exists */}
+        <div className="card" style={{ position: 'relative' }}>
           <div style={{ fontSize: 11, color: '#555', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Top Post</div>
           {topPost ? (
-            <div>
+            <div
+              style={{ cursor: topPost.post_url ? 'pointer' : 'default' }}
+              onClick={() => { if (topPost.post_url) window.open(topPost.post_url, '_blank', 'noopener,noreferrer'); }}
+            >
+              {topPost.post_url && (
+                <div style={{ position: 'absolute', top: 12, right: 12, color: '#555' }}>
+                  <ExternalLinkIcon />
+                </div>
+              )}
               <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6, lineHeight: 1.4 }}>{topPost.title}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: getPlatformColor(topPost.platform), display: 'inline-block' }} />
@@ -382,10 +471,18 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
             <tbody>
               {outlierPosts.map(post => {
                 const mult = clientAvgViews > 0 ? (post.views / clientAvgViews).toFixed(1) : '—';
+                const clickable = !!post.post_url;
                 return (
-                  <tr key={post.id}>
+                  <tr
+                    key={post.id}
+                    style={{ cursor: clickable ? 'pointer' : 'default' }}
+                    onClick={() => { if (clickable) window.open(post.post_url, '_blank', 'noopener,noreferrer'); }}
+                  >
                     <td style={{ color: '#fff', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {post.title}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {post.title}
+                        {clickable && <span style={{ color: '#555', flexShrink: 0 }}><ExternalLinkIcon /></span>}
+                      </div>
                     </td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>

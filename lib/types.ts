@@ -27,7 +27,16 @@ export interface Post {
   saves: number;
   follows: number;
   drive_link: string;
+  post_url?: string;
   created_at?: string;
+}
+
+export interface SubscriberSnapshot {
+  id?: string;
+  client_id: string;
+  platform: string;
+  subscriber_count: number;
+  date: string;
 }
 
 export interface Goal {
