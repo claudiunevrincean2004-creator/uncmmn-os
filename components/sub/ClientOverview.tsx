@@ -130,49 +130,54 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
   const prevPostsCount = prevPosts.length;
 
   // Followers card — platform-aware logic
-  // Determine which platform to use for the followers card
-  const followersPlatform = useMemo((): string | null => {
-    if (activePlat.toLowerCase() === 'instagram') return null; // no snapshot data for IG
-    if (activePlat.toLowerCase() === 'tiktok') return 'tiktok';
-    if (activePlat.toLowerCase() === 'youtube') return 'youtube';
-    // "All" — prefer tiktok if data exists, else try youtube
-    const hasTT = subscriberSnapshots.some(s => s.client_id === client.id && s.platform.toLowerCase() === 'tiktok');
-    if (hasTT) return 'tiktok';
-    const hasYT = subscriberSnapshots.some(s => s.client_id === client.id && s.platform.toLowerCase() === 'youtube');
-    if (hasYT) return 'youtube';
-    return null;
-  }, [activePlat, subscriberSnapshots, client.id]);
+  const isAllPlatform = activePlat === 'All';
+  const isInstagram = activePlat.toLowerCase() === 'instagram';
 
-  const currentSnapshotData = useMemo(
-    () => followersPlatform ? getSnapshotFollowGain(subscriberSnapshots, client.id, followersPlatform, currentRange) : null,
-    [subscriberSnapshots, client.id, followersPlatform, currentRange]
-  );
-  const prevSnapshotData = useMemo(
-    () => followersPlatform ? getSnapshotFollowGain(subscriberSnapshots, client.id, followersPlatform, prevRange) : null,
-    [subscriberSnapshots, client.id, followersPlatform, prevRange]
-  );
+  // For "All": aggregate across all platforms with snapshots
+  // For specific platform: use that platform's snapshots (or fallback to posts)
+  const followerData = useMemo(() => {
+    if (isAllPlatform) {
+      // Aggregate across all platforms
+      const platforms = ['tiktok', 'youtube', 'instagram'];
+      let totalCurrent = 0;
+      let totalPrev = 0;
+      let latestTotal = 0;
+      let hasAnySnapshots = false;
 
-  const hasSnapshots = currentSnapshotData !== null;
+      for (const plat of platforms) {
+        const curr = getSnapshotFollowGain(subscriberSnapshots, client.id, plat, currentRange);
+        const prev = getSnapshotFollowGain(subscriberSnapshots, client.id, plat, prevRange);
+        const latest = getLatestFollowerCount(subscriberSnapshots, client.id, plat);
+        if (curr) { totalCurrent += curr.gain; hasAnySnapshots = true; }
+        if (prev) { totalPrev += prev.gain; }
+        if (latest) { latestTotal += latest; }
+      }
 
-  // Net gained: use snapshots if available, else fall back to summing post follows
-  const netGained = hasSnapshots
-    ? currentSnapshotData.gain
-    : (followersPlatform !== null ? periodPosts.reduce((s, p) => s + p.follows, 0) : 0);
-  const prevNetGained = prevSnapshotData
-    ? prevSnapshotData.gain
-    : (followersPlatform !== null ? prevPosts.reduce((s, p) => s + p.follows, 0) : 0);
+      if (hasAnySnapshots) {
+        return { netGained: totalCurrent, prevNetGained: totalPrev, latestTotal, hasSnapshots: true, label: 'all platforms' };
+      }
+      // Fallback to post follows
+      const postFollows = periodPosts.reduce((s, p) => s + p.follows, 0);
+      const prevPostFollows = prevPosts.reduce((s, p) => s + p.follows, 0);
+      return { netGained: postFollows, prevNetGained: prevPostFollows, latestTotal: null as number | null, hasSnapshots: false, label: 'from posts' };
+    }
 
-  // Latest total follower count
-  const latestTotalFollowers = useMemo(
-    () => followersPlatform ? getLatestFollowerCount(subscriberSnapshots, client.id, followersPlatform) : null,
-    [subscriberSnapshots, client.id, followersPlatform]
-  );
+    // Specific platform
+    const platKey = activePlat.toLowerCase();
+    const curr = getSnapshotFollowGain(subscriberSnapshots, client.id, platKey, currentRange);
+    const prev = getSnapshotFollowGain(subscriberSnapshots, client.id, platKey, prevRange);
+    const latest = getLatestFollowerCount(subscriberSnapshots, client.id, platKey);
 
-  // Show the followers card if: we have a valid platform AND (snapshot data exists OR post follows > 0)
-  const showFollowersCard = followersPlatform !== null && (hasSnapshots || netGained > 0 || (latestTotalFollowers !== null && latestTotalFollowers > 0));
+    if (curr) {
+      return { netGained: curr.gain, prevNetGained: prev?.gain ?? 0, latestTotal: latest, hasSnapshots: true, label: activePlat };
+    }
+    // Fallback to post follows for this platform
+    const postFollows = periodPosts.reduce((s, p) => s + p.follows, 0);
+    const prevPostFollows = prevPosts.reduce((s, p) => s + p.follows, 0);
+    return { netGained: postFollows, prevNetGained: prevPostFollows, latestTotal: latest, hasSnapshots: false, label: activePlat };
+  }, [activePlat, subscriberSnapshots, client.id, currentRange, prevRange, periodPosts, prevPosts]);
 
-  // Platform display label for the followers card
-  const followersPlatformLabel = followersPlatform === 'tiktok' ? 'TikTok' : followersPlatform === 'youtube' ? 'YouTube' : '';
+  const showFollowersCard = followerData.netGained > 0 || (followerData.latestTotal !== null && followerData.latestTotal > 0) || followerData.hasSnapshots;
 
   function pctChange(curr: number, prev: number): number {
     if (prev === 0) return curr > 0 ? 100 : 0;
@@ -180,7 +185,7 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
   }
 
   const viewsDiff = pctChange(totalViews, prevViews);
-  const netGainedDiff = pctChange(netGained, prevNetGained);
+  const netGainedDiff = pctChange(followerData.netGained, followerData.prevNetGained);
   const impressionsDiff = pctChange(totalImpressions, prevImpressions);
   const postsDiff = pctChange(totalPostsCount, prevPostsCount);
 
@@ -322,14 +327,13 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
         {/* Followers card — platform-aware, contains Net Gained + Total */}
         {showFollowersCard && (
           <div className="metric-chip" style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ width: 5, height: 5, borderRadius: '50%', background: getPlatformColor(followersPlatformLabel), display: 'inline-block' }} />
+            <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>
               Followers
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, flex: 1 }}>
               <div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: netGained >= 0 ? '#10b981' : '#ef4444', marginBottom: 2 }}>
-                  {netGained >= 0 ? '+' : ''}{fn(netGained)}
+                <div style={{ fontSize: 18, fontWeight: 700, color: followerData.netGained >= 0 ? '#10b981' : '#ef4444', marginBottom: 2 }}>
+                  {followerData.netGained >= 0 ? '+' : ''}{fn(followerData.netGained)}
                 </div>
                 <div style={{ fontSize: 10, color: '#444' }}>
                   {showCmp && timePeriod !== 'all' ? (
@@ -343,12 +347,11 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
               </div>
               <div>
                 <div style={{ fontSize: 18, fontWeight: 700, color: '#6366f1', marginBottom: 2 }}>
-                  {latestTotalFollowers !== null ? fn(latestTotalFollowers) : '—'}
+                  {followerData.latestTotal !== null ? fn(followerData.latestTotal) : '—'}
                 </div>
                 <div style={{ fontSize: 10, color: '#444' }}>total</div>
               </div>
             </div>
-            <div style={{ fontSize: 9, color: '#555', marginTop: 4 }}>from {followersPlatformLabel}</div>
           </div>
         )}
       </div>

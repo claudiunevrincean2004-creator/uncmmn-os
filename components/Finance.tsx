@@ -203,16 +203,6 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
     onReload();
   }
 
-  async function toggleClientMonthExclusion(clientId: string, month: string) {
-    const existing = clientMonthExclusions.find(e => e.client_id === clientId && e.month === month);
-    if (existing) {
-      await supabase.from('client_month_exclusions').delete().eq('id', existing.id);
-    } else {
-      await supabase.from('client_month_exclusions').insert([{ client_id: clientId, month }]);
-    }
-    onReload();
-  }
-
   async function handleSaveNewClient() {
     if (!newClientName.trim()) return;
     setSavingClient(true);
@@ -275,13 +265,6 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
         {s}
       </span>
     );
-  }
-
-  // Get months for current view (for exclusion buttons)
-  function getCurrentViewMonths(): string[] {
-    if (viewMode === 'month') return [mk];
-    if (viewMode === 'quarter') return currentQuarter.months.map(m => monthKey(selectedYear, m));
-    return Array.from({ length: 12 }, (_, i) => monthKey(selectedYear, i));
   }
 
   return (
@@ -475,34 +458,7 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
                         <span style={{ fontSize: 9, color: '#555' }}>Renews {formatRenewalDate(cr.client.renewal_date)}</span>
                       )}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 11, color: '#10b981', fontWeight: 600 }}>{fm(cr.revenue)}</span>
-                      {viewMode === 'month' && (
-                        showRevenueEdit === cr.client.id ? (
-                          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                            <input
-                              className="form-input"
-                              type="number"
-                              value={revenueInput}
-                              onChange={e => setRevenueInput(e.target.value)}
-                              style={{ width: 80, padding: '2px 6px', fontSize: 11 }}
-                              placeholder="0"
-                              autoFocus
-                              onKeyDown={e => { if (e.key === 'Enter') saveClientRevenue(cr.client.id); if (e.key === 'Escape') setShowRevenueEdit(null); }}
-                            />
-                            <button className="btn-primary" style={{ fontSize: 10, padding: '2px 6px' }} onClick={() => saveClientRevenue(cr.client.id)}>Save</button>
-                            <button className="btn-ghost" style={{ fontSize: 10, padding: '2px 6px' }} onClick={() => setShowRevenueEdit(null)}>Cancel</button>
-                          </div>
-                        ) : (
-                          <button
-                            style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', fontSize: 11, padding: '2px 4px' }}
-                            onClick={() => { setShowRevenueEdit(cr.client.id); setRevenueInput(String(getClientRevenue(cr.client.id, mk))); }}
-                          >
-                            ✎
-                          </button>
-                        )
-                      )}
-                    </div>
+                    <span style={{ fontSize: 11, color: '#10b981', fontWeight: 600 }}>{fm(cr.revenue)}</span>
                   </div>
                   <div style={{ height: 4, background: '#1a1a1a', borderRadius: 2, overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${(cr.revenue / maxRevenue) * 100}%`, background: getColor(i), borderRadius: 2 }} />
@@ -542,37 +498,55 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
                         </div>
                       </td>
                       <td>{renderStatusBadge(cr.client.status)}</td>
-                      <td style={{ color: '#10b981' }}>{fm(cr.revenue)}</td>
+                      <td style={{ color: '#10b981' }}>
+                        {viewMode === 'month' ? (
+                          showRevenueEdit === cr.client.id ? (
+                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+                              <input
+                                className="form-input"
+                                type="number"
+                                value={revenueInput}
+                                onChange={e => setRevenueInput(e.target.value)}
+                                style={{ width: 80, padding: '2px 6px', fontSize: 11 }}
+                                placeholder="0"
+                                autoFocus
+                                onKeyDown={e => { if (e.key === 'Enter') saveClientRevenue(cr.client.id); if (e.key === 'Escape') setShowRevenueEdit(null); }}
+                              />
+                              <button className="btn-primary" style={{ fontSize: 10, padding: '2px 6px' }} onClick={() => saveClientRevenue(cr.client.id)}>Save</button>
+                              <button className="btn-ghost" style={{ fontSize: 10, padding: '2px 6px' }} onClick={() => setShowRevenueEdit(null)}>Cancel</button>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <span>{fm(cr.revenue)}</span>
+                              <button
+                                style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', fontSize: 11, padding: '2px 4px' }}
+                                onClick={(e) => { e.stopPropagation(); setShowRevenueEdit(cr.client.id); setRevenueInput(String(getClientRevenue(cr.client.id, mk))); }}
+                              >
+                                ✎
+                              </button>
+                            </div>
+                          )
+                        ) : (
+                          fm(cr.revenue)
+                        )}
+                      </td>
                       <td style={{ color: '#f59e0b' }}>{fm(cr.totalClientExpenses)}</td>
                       <td style={{ color: cr.netProfit >= 0 ? '#10b981' : '#ef4444', fontWeight: 600 }}>{fm(cr.netProfit)}</td>
                       <td style={{ color: '#555' }}>{cr.margin.toFixed(1)}%</td>
                       {viewMode === 'month' && (
                         <td>
-                          <div style={{ display: 'flex', gap: 4 }}>
-                            <button
-                              className="btn-ghost"
-                              style={{ fontSize: 10, padding: '2px 6px' }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setClientExpenseTarget({ clientId: cr.client.id, clientName: cr.client.name });
-                                setEditClientExpense(null);
-                                setShowClientExpenseModal(true);
-                              }}
-                            >
-                              + Expense
-                            </button>
-                            <button
-                              className="btn-ghost"
-                              style={{ fontSize: 10, padding: '2px 6px', color: '#ef4444', borderColor: '#ef444444' }}
-                              title={`Remove ${cr.client.name} from ${MONTHS[selectedMonth]} ${selectedYear}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleClientMonthExclusion(cr.client.id, mk);
-                              }}
-                            >
-                              ✕
-                            </button>
-                          </div>
+                          <button
+                            className="btn-ghost"
+                            style={{ fontSize: 10, padding: '2px 6px' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setClientExpenseTarget({ clientId: cr.client.id, clientName: cr.client.name });
+                              setEditClientExpense(null);
+                              setShowClientExpenseModal(true);
+                            }}
+                          >
+                            + Expense
+                          </button>
                         </td>
                       )}
                     </tr>
@@ -617,31 +591,6 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
               </tbody>
             </table>
 
-            {/* Show excluded clients for current month with restore button */}
-            {viewMode === 'month' && (() => {
-              const excludedClients = clients.filter(c => isClientExcluded(c.id, mk) && !viewData.clientBreakdown.some(cb => cb.client.id === c.id));
-              if (excludedClients.length === 0) return null;
-              return (
-                <div style={{ marginTop: 12, padding: '8px 12px', background: '#0a0a0a', borderRadius: 6, border: '0.5px solid #1a1a1a' }}>
-                  <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>
-                    Excluded from {MONTHS[selectedMonth]} {selectedYear}
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {excludedClients.map(c => (
-                      <button
-                        key={c.id}
-                        className="btn-ghost"
-                        style={{ fontSize: 10, padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 4 }}
-                        onClick={() => toggleClientMonthExclusion(c.id, mk)}
-                        title={`Restore ${c.name} to ${MONTHS[selectedMonth]}`}
-                      >
-                        <span style={{ color: '#555' }}>+</span> {c.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
           </div>
         )}
       </div>
