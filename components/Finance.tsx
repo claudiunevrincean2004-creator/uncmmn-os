@@ -203,6 +203,16 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
     onReload();
   }
 
+  async function toggleClientMonthExclusion(clientId: string, month: string) {
+    const existing = clientMonthExclusions.find(e => e.client_id === clientId && e.month === month);
+    if (existing) {
+      await supabase.from('client_month_exclusions').delete().eq('id', existing.id);
+    } else {
+      await supabase.from('client_month_exclusions').insert([{ client_id: clientId, month }]);
+    }
+    onReload();
+  }
+
   async function handleSaveNewClient() {
     if (!newClientName.trim()) return;
     setSavingClient(true);
@@ -535,18 +545,31 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
                       <td style={{ color: '#555' }}>{cr.margin.toFixed(1)}%</td>
                       {viewMode === 'month' && (
                         <td>
-                          <button
-                            className="btn-ghost"
-                            style={{ fontSize: 10, padding: '2px 6px' }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setClientExpenseTarget({ clientId: cr.client.id, clientName: cr.client.name });
-                              setEditClientExpense(null);
-                              setShowClientExpenseModal(true);
-                            }}
-                          >
-                            + Expense
-                          </button>
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <button
+                              className="btn-ghost"
+                              style={{ fontSize: 10, padding: '2px 6px' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setClientExpenseTarget({ clientId: cr.client.id, clientName: cr.client.name });
+                                setEditClientExpense(null);
+                                setShowClientExpenseModal(true);
+                              }}
+                            >
+                              + Expense
+                            </button>
+                            <button
+                              className="btn-ghost"
+                              style={{ fontSize: 10, padding: '2px 6px', color: '#ef4444', borderColor: '#ef444444' }}
+                              title={`Remove ${cr.client.name} from ${MONTHS[selectedMonth]} ${selectedYear}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleClientMonthExclusion(cr.client.id, mk);
+                              }}
+                            >
+                              −
+                            </button>
+                          </div>
                         </td>
                       )}
                     </tr>

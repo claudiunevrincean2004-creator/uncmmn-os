@@ -85,10 +85,11 @@ function getPeriodDates(period: TimePeriod): { current: [Date, Date]; previous: 
 
 function inRange(dateStr: string, range: [Date, Date]): boolean {
   if (!dateStr) return false;
-  // Date-only strings ("YYYY-MM-DD") are parsed as UTC by spec.
-  // Append T00:00:00 to force local-time parsing so it matches our local-time ranges.
-  const raw = dateStr.length === 10 ? dateStr + 'T00:00:00' : dateStr;
-  const d = new Date(raw);
+  // Always extract the YYYY-MM-DD portion and parse as local midnight.
+  // This handles both "2026-04-07" and "2026-04-07T00:00:00+00:00" formats
+  // that Supabase may return for date columns.
+  const datePart = dateStr.slice(0, 10); // "YYYY-MM-DD"
+  const d = new Date(datePart + 'T00:00:00'); // local midnight
   return d >= range[0] && d <= range[1];
 }
 
@@ -102,12 +103,18 @@ function ExternalLinkIcon() {
   );
 }
 
+/** Parse a date string to local time consistently */
+function parseLocalDate(dateStr: string): Date {
+  const datePart = dateStr.slice(0, 10);
+  return new Date(datePart + 'T00:00:00');
+}
+
 /** Get follower gain from snapshots in a date range for a specific platform. Returns null if no data. */
 function getSnapshotFollowGain(snapshots: SubscriberSnapshot[], clientId: string, platform: string, range: [Date, Date]): { gain: number; startCount: number; endCount: number } | null {
   const clientSnaps = snapshots
     .filter(s => s.client_id === clientId && s.platform.toLowerCase() === platform.toLowerCase())
     .filter(s => inRange(s.date, range))
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    .sort((a, b) => parseLocalDate(a.date).getTime() - parseLocalDate(b.date).getTime());
 
   if (clientSnaps.length < 1) return null;
 
@@ -120,7 +127,7 @@ function getSnapshotFollowGain(snapshots: SubscriberSnapshot[], clientId: string
 function getLatestFollowerCount(snapshots: SubscriberSnapshot[], clientId: string, platform: string): number | null {
   const clientSnaps = snapshots
     .filter(s => s.client_id === clientId && s.platform.toLowerCase() === platform.toLowerCase())
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    .sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime());
   return clientSnaps.length > 0 ? clientSnaps[0].subscriber_count : null;
 }
 
