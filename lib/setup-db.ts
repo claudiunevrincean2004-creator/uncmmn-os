@@ -7,7 +7,7 @@ import { supabase } from './supabase';
 export async function checkSchema(): Promise<{ missing: string[]; clientColumnsMissing: string[] }> {
   const requiredTables = [
     'clients', 'posts', 'goals', 'hooks', 'formats', 'pillars',
-    'drive_folders', 'expenses', 'monthly_revenue', 'monthly_expenses', 'client_expenses',
+    'drive_folders', 'expenses', 'monthly_revenue', 'monthly_expenses', 'client_expenses', 'client_month_exclusions',
   ];
 
   const missing: string[] = [];
@@ -74,6 +74,17 @@ alter table monthly_expenses disable row level security;`);
   created_at timestamptz default now()
 );
 alter table client_expenses disable row level security;`);
+  }
+
+  if (missing.includes('client_month_exclusions')) {
+    parts.push(`create table if not exists client_month_exclusions (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid references clients(id) on delete cascade,
+  month text not null,
+  created_at timestamptz default now(),
+  unique(client_id, month)
+);
+alter table client_month_exclusions disable row level security;`);
   }
 
   if (clientColumnsMissing.includes('status')) {

@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { checkSchema, getMigrationSQL } from '@/lib/setup-db';
-import { Client, Post, Goal, Hook, Format, Pillar, DriveFolder, Expense, MonthlyRevenue, MonthlyExpense, ClientExpense, MainPage, ClientTab } from '@/lib/types';
+import { Client, Post, Goal, Hook, Format, Pillar, DriveFolder, Expense, MonthlyRevenue, MonthlyExpense, ClientExpense, ClientMonthExclusion, MainPage, ClientTab } from '@/lib/types';
 
 import Sidebar from '@/components/Sidebar';
 import Overview from '@/components/Overview';
@@ -60,6 +60,7 @@ export default function Home() {
   const [monthlyRevenue, setMonthlyRevenue] = useState<MonthlyRevenue[]>([]);
   const [monthlyExpenses, setMonthlyExpenses] = useState<MonthlyExpense[]>([]);
   const [clientExpenses, setClientExpenses] = useState<ClientExpense[]>([]);
+  const [clientMonthExclusions, setClientMonthExclusions] = useState<ClientMonthExclusion[]>([]);
   const [loading, setLoading] = useState(true);
   const [schemaMissing, setSchemaMissing] = useState<{ missing: string[]; clientColumnsMissing: string[] } | null>(null);
   const [showMigrationSQL, setShowMigrationSQL] = useState(false);
@@ -79,7 +80,7 @@ export default function Home() {
   const [sidebarClientId, setSidebarClientId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
-    const [c, p, g, h, f, pl, d, e, mr, me, ce] = await Promise.all([
+    const [c, p, g, h, f, pl, d, e, mr, me, ce, cme] = await Promise.all([
       safeSelect('clients', 'name'),
       safeSelect('posts', 'date', false),
       safeSelect('goals', 'created_at'),
@@ -91,6 +92,7 @@ export default function Home() {
       safeSelect('monthly_revenue', 'month'),
       safeSelect('monthly_expenses', 'month'),
       safeSelect('client_expenses', 'month'),
+      safeSelect('client_month_exclusions', 'month'),
     ]);
     setClients(c as Client[]);
     setPosts(p as Post[]);
@@ -103,6 +105,7 @@ export default function Home() {
     setMonthlyRevenue(mr as MonthlyRevenue[]);
     setMonthlyExpenses(me as MonthlyExpense[]);
     setClientExpenses(ce as ClientExpense[]);
+    setClientMonthExclusions(cme as ClientMonthExclusion[]);
     setLoading(false);
   }, []);
 
@@ -187,7 +190,7 @@ export default function Home() {
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       <Sidebar
-        clients={clients}
+        clients={clients.filter(c => c.status === 'Active')}
         activeId={activeClientId}
         activeMP={mainPage}
         collapsed={sidebarCollapsed}
@@ -361,6 +364,7 @@ export default function Home() {
               monthlyRevenue={monthlyRevenue}
               monthlyExpenses={monthlyExpenses}
               clientExpenses={clientExpenses}
+              clientMonthExclusions={clientMonthExclusions}
               onReload={loadData}
               onOpenSidebar={(id: string) => setSidebarClientId(id)}
             />

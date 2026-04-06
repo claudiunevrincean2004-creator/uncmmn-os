@@ -114,6 +114,15 @@ create table if not exists client_expenses (
   created_at timestamptz default now()
 );
 
+-- Client-month exclusions (hide a client from a specific month's financials)
+create table if not exists client_month_exclusions (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid references clients(id) on delete cascade,
+  month text not null,  -- YYYY-MM
+  created_at timestamptz default now(),
+  unique(client_id, month)
+);
+
 -- Add new columns to clients (safe with if not exists via DO block)
 do $$
 begin
@@ -140,3 +149,4 @@ alter table expenses disable row level security;
 alter table monthly_revenue disable row level security;
 alter table monthly_expenses disable row level security;
 alter table client_expenses disable row level security;
+alter table client_month_exclusions disable row level security;
