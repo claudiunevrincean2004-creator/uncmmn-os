@@ -1,6 +1,5 @@
 'use client';
-import { useMemo, useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useMemo } from 'react';
 import { Client, Post, Goal, Pillar, Format, SubscriberSnapshot } from '@/lib/types';
 import { fn, er, avg, getColor, getPlatformColor } from '@/lib/utils';
 import type { TimePeriod } from '@/app/page';
@@ -25,6 +24,7 @@ interface Props {
   goals: Goal[];
   pillars: Pillar[];
   formats: Format[];
+  subscriberSnapshots: SubscriberSnapshot[];
   activePlat: string;
   showCmp: boolean;
   timePeriod: TimePeriod;
@@ -131,7 +131,7 @@ function getLatestCount(snapshots: SubscriberSnapshot[]): number | null {
   return Number(sorted[0].subscriber_count);
 }
 
-export default function ClientOverview({ client, posts, goals, pillars, formats, activePlat, showCmp, timePeriod }: Props) {
+export default function ClientOverview({ client, posts, goals, pillars, formats, subscriberSnapshots, activePlat, showCmp, timePeriod }: Props) {
   const clientPosts = posts.filter(p => p.client_id === client.id && (activePlat === 'All' || p.platform.toLowerCase() === activePlat.toLowerCase()));
   const clientGoals = goals.filter(g => g.client_id === client.id);
   const clientPillars = pillars.filter(p => p.client_id === client.id);
@@ -150,56 +150,20 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
   const prevImpressions = prevPosts.reduce((s, p) => s + p.likes + p.comments + p.shares + p.saves, 0);
   const prevPostsCount = prevPosts.length;
 
-  // --- Fetch subscriber snapshots directly from Supabase, filtered by client_id + platform ---
-  const [tiktokSnaps, setTiktokSnaps] = useState<SubscriberSnapshot[]>([]);
-  const [youtubeSnaps, setYoutubeSnaps] = useState<SubscriberSnapshot[]>([]);
-  const [snapsLoaded, setSnapsLoaded] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function fetchSnapshots() {
-      const [ttRes, ytRes] = await Promise.all([
-        supabase
-          .from('subscriber_snapshots')
-          .select('*')
-          .eq('client_id', client.id)
-          .ilike('platform', 'tiktok')
-          .order('date', { ascending: true }),
-        supabase
-          .from('subscriber_snapshots')
-          .select('*')
-          .eq('client_id', client.id)
-          .ilike('platform', 'youtube')
-          .order('date', { ascending: true }),
-      ]);
-      if (cancelled) return;
-
-      const tt = (ttRes.data || []) as SubscriberSnapshot[];
-      const yt = (ytRes.data || []) as SubscriberSnapshot[];
-
-      if (ttRes.error) console.warn('[Snapshots] TikTok query error:', ttRes.error.message);
-      if (ytRes.error) console.warn('[Snapshots] YouTube query error:', ytRes.error.message);
-
-      console.log(`[Snapshots] Client "${client.name}": TikTok=${tt.length} rows, YouTube=${yt.length} rows`);
-      if (tt.length > 0) console.log('[Snapshots] TikTok sample:', { date: tt[0].date, count: tt[0].subscriber_count, platform: tt[0].platform });
-      if (yt.length > 0) console.log('[Snapshots] YouTube sample:', { date: yt[0].date, count: yt[0].subscriber_count, platform: yt[0].platform });
-
-      setTiktokSnaps(tt);
-      setYoutubeSnaps(yt);
-      setSnapsLoaded(true);
-    }
-    fetchSnapshots();
-    return () => { cancelled = true; };
-  }, [client.id]);
+  // Filter snapshots for this client by platform (case-insensitive) in JavaScript
+  const tiktokSnaps = useMemo(
+    () => subscriberSnapshots.filter(s => s.client_id === client.id && s.platform.toLowerCase() === 'tiktok'),
+    [subscriberSnapshots, client.id]
+  );
+  const youtubeSnaps = useMemo(
+    () => subscriberSnapshots.filter(s => s.client_id === client.id && s.platform.toLowerCase() === 'youtube'),
+    [subscriberSnapshots, client.id]
+  );
 
   // Followers card — always visible, platform-aware logic
   type FollowerResult = { netGained: number | null; prevNetGained: number | null; latestTotal: number | null; noTotalLabel: string | null; netGainedLabel: string | null };
 
   const followerData = useMemo((): FollowerResult => {
-    if (!snapsLoaded) {
-      return { netGained: null, prevNetGained: null, latestTotal: null, noTotalLabel: 'Loading...', netGainedLabel: 'Loading...' };
-    }
-
     const isAll = activePlat === 'All';
     const isIG = activePlat.toLowerCase() === 'instagram';
 
@@ -223,12 +187,10 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
       const hasAnyTotal = tt.latestTotal !== null || yt.latestTotal !== null;
       const latestTotal = hasAnyTotal ? (tt.latestTotal ?? 0) + (yt.latestTotal ?? 0) : null;
 
-      // Sum net gained across platforms that have 2+ snapshots
       const hasAnyGain = tt.netGained !== null || yt.netGained !== null;
       const netGained = hasAnyGain ? (tt.netGained ?? 0) + (yt.netGained ?? 0) : null;
       const prevNetGained = (tt.prevNetGained ?? 0) + (yt.prevNetGained ?? 0);
 
-      // Determine labels
       const totalSnapsInRange = tt.count + yt.count;
       let netGainedLabel: string | null = null;
       if (!hasAnyTotal && totalSnapsInRange === 0) {
@@ -247,13 +209,12 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
     }
 
     if (isIG) {
-      // Instagram — no snapshots, use post-based follows
       const postFollows = periodPosts.reduce((s, p) => s + p.follows, 0);
       const prevPostFollows = prevPosts.reduce((s, p) => s + p.follows, 0);
       return { netGained: postFollows, prevNetGained: prevPostFollows, latestTotal: null, noTotalLabel: 'Connect API to track', netGainedLabel: null };
     }
 
-    // TikTok or YouTube — use that platform's snapshots
+    // TikTok or YouTube
     const snaps = activePlat.toLowerCase() === 'tiktok' ? tiktokSnaps : youtubeSnaps;
     const data = computeForPlatform(snaps);
 
@@ -271,7 +232,7 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
       noTotalLabel: data.latestTotal === null ? 'No data yet' : null,
       netGainedLabel,
     };
-  }, [activePlat, tiktokSnaps, youtubeSnaps, snapsLoaded, currentRange, prevRange, periodPosts, prevPosts]);
+  }, [activePlat, tiktokSnaps, youtubeSnaps, currentRange, prevRange, periodPosts, prevPosts]);
 
   function pctChange(curr: number, prev: number): number {
     if (prev === 0) return curr > 0 ? 100 : 0;

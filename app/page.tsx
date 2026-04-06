@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { checkSchema, getMigrationSQL } from '@/lib/setup-db';
-import { Client, Post, Goal, Hook, Format, Pillar, DriveFolder, Expense, MonthlyRevenue, MonthlyExpense, ClientExpense, ClientMonthExclusion, MainPage, ClientTab } from '@/lib/types';
+import { Client, Post, Goal, Hook, Format, Pillar, DriveFolder, Expense, MonthlyRevenue, MonthlyExpense, ClientExpense, ClientMonthExclusion, SubscriberSnapshot, MainPage, ClientTab } from '@/lib/types';
 
 import Sidebar from '@/components/Sidebar';
 import Overview from '@/components/Overview';
@@ -65,6 +65,7 @@ export default function Home() {
   const [monthlyExpenses, setMonthlyExpenses] = useState<MonthlyExpense[]>([]);
   const [clientExpenses, setClientExpenses] = useState<ClientExpense[]>([]);
   const [clientMonthExclusions, setClientMonthExclusions] = useState<ClientMonthExclusion[]>([]);
+  const [subscriberSnapshots, setSubscriberSnapshots] = useState<SubscriberSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [schemaMissing, setSchemaMissing] = useState<{ missing: string[]; clientColumnsMissing: string[]; postColumnsMissing: string[] } | null>(null);
   const [showMigrationSQL, setShowMigrationSQL] = useState(false);
@@ -84,7 +85,7 @@ export default function Home() {
   const [sidebarClientId, setSidebarClientId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
-    const [c, p, g, h, f, pl, d, e, mr, me, ce, cme] = await Promise.all([
+    const [c, p, g, h, f, pl, d, e, mr, me, ce, cme, ss] = await Promise.all([
       safeSelect('clients', 'name'),
       safeSelect('posts', 'date', false),
       safeSelect('goals', 'created_at'),
@@ -97,6 +98,7 @@ export default function Home() {
       safeSelect('monthly_expenses', 'month'),
       safeSelect('client_expenses', 'month'),
       safeSelect('client_month_exclusions', 'month'),
+      safeSelect('subscriber_snapshots', 'date'),
     ]);
     setClients(c as Client[]);
     setPosts(p as Post[]);
@@ -110,6 +112,7 @@ export default function Home() {
     setMonthlyExpenses(me as MonthlyExpense[]);
     setClientExpenses(ce as ClientExpense[]);
     setClientMonthExclusions(cme as ClientMonthExclusion[]);
+    setSubscriberSnapshots(ss as SubscriberSnapshot[]);
     setLoading(false);
   }, []);
 
@@ -162,7 +165,7 @@ export default function Home() {
     if (!activeClient) return null;
     switch (clientTab) {
       case 'overview':
-        return <ClientOverview client={activeClient} posts={posts} goals={goals} pillars={pillars} formats={formats} activePlat={activePlat} showCmp={showCmp} timePeriod={timePeriod} />;
+        return <ClientOverview client={activeClient} posts={posts} goals={goals} pillars={pillars} formats={formats} subscriberSnapshots={subscriberSnapshots} activePlat={activePlat} showCmp={showCmp} timePeriod={timePeriod} />;
       case 'content':
         return <ContentTab client={activeClient} posts={posts} pillars={pillars} formats={formats} activePlat={activePlat} onReload={loadData} />;
       case 'outliers':
