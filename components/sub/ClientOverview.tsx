@@ -1,5 +1,6 @@
 'use client';
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 import { Client, Post, Goal, Pillar, Format, SubscriberSnapshot } from '@/lib/types';
 import { fn, er, avg, getColor, getPlatformColor } from '@/lib/utils';
 import type { TimePeriod } from '@/app/page';
@@ -24,7 +25,6 @@ interface Props {
   goals: Goal[];
   pillars: Pillar[];
   formats: Format[];
-  subscriberSnapshots: SubscriberSnapshot[];
   activePlat: string;
   showCmp: boolean;
   timePeriod: TimePeriod;
@@ -109,29 +109,29 @@ function parseLocalDate(dateStr: string): Date {
   return new Date(datePart + 'T00:00:00');
 }
 
-/** Get follower gain from snapshots in a date range for a specific platform. Returns null if no data. */
-function getSnapshotFollowGain(snapshots: SubscriberSnapshot[], clientId: string, platform: string, range: [Date, Date]): { gain: number; startCount: number; endCount: number } | null {
-  const clientSnaps = snapshots
-    .filter(s => s.client_id === clientId && s.platform.toLowerCase() === platform.toLowerCase())
+/** Get follower gain from snapshots in a date range. Snapshots should already be filtered by client+platform. */
+function getSnapshotFollowGain(snapshots: SubscriberSnapshot[], range: [Date, Date]): { gain: number | null; startCount: number; endCount: number; count: number } | null {
+  const inRangeSnaps = snapshots
     .filter(s => inRange(s.date, range))
     .sort((a, b) => parseLocalDate(a.date).getTime() - parseLocalDate(b.date).getTime());
 
-  if (clientSnaps.length < 1) return null;
+  if (inRangeSnaps.length < 1) return null;
 
-  const startCount = Number(clientSnaps[0].subscriber_count);
-  const endCount = Number(clientSnaps[clientSnaps.length - 1].subscriber_count);
-  return { gain: endCount - startCount, startCount, endCount };
+  const startCount = Number(inRangeSnaps[0].subscriber_count);
+  const endCount = Number(inRangeSnaps[inRangeSnaps.length - 1].subscriber_count);
+  // Need 2+ snapshots to calculate a meaningful difference
+  const gain = inRangeSnaps.length >= 2 ? endCount - startCount : null;
+  return { gain, startCount, endCount, count: inRangeSnaps.length };
 }
 
-/** Get latest subscriber count for a client on a given platform. */
-function getLatestFollowerCount(snapshots: SubscriberSnapshot[], clientId: string, platform: string): number | null {
-  const clientSnaps = snapshots
-    .filter(s => s.client_id === clientId && s.platform.toLowerCase() === platform.toLowerCase())
-    .sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime());
-  return clientSnaps.length > 0 ? Number(clientSnaps[0].subscriber_count) : null;
+/** Get latest subscriber count from an array of snapshots (already filtered by client+platform). */
+function getLatestCount(snapshots: SubscriberSnapshot[]): number | null {
+  if (snapshots.length === 0) return null;
+  const sorted = [...snapshots].sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime());
+  return Number(sorted[0].subscriber_count);
 }
 
-export default function ClientOverview({ client, posts, goals, pillars, formats, subscriberSnapshots, activePlat, showCmp, timePeriod }: Props) {
+export default function ClientOverview({ client, posts, goals, pillars, formats, activePlat, showCmp, timePeriod }: Props) {
   const clientPosts = posts.filter(p => p.client_id === client.id && (activePlat === 'All' || p.platform.toLowerCase() === activePlat.toLowerCase()));
   const clientGoals = goals.filter(g => g.client_id === client.id);
   const clientPillars = pillars.filter(p => p.client_id === client.id);
@@ -150,80 +150,128 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
   const prevImpressions = prevPosts.reduce((s, p) => s + p.likes + p.comments + p.shares + p.saves, 0);
   const prevPostsCount = prevPosts.length;
 
+  // --- Fetch subscriber snapshots directly from Supabase, filtered by client_id + platform ---
+  const [tiktokSnaps, setTiktokSnaps] = useState<SubscriberSnapshot[]>([]);
+  const [youtubeSnaps, setYoutubeSnaps] = useState<SubscriberSnapshot[]>([]);
+  const [snapsLoaded, setSnapsLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchSnapshots() {
+      const [ttRes, ytRes] = await Promise.all([
+        supabase
+          .from('subscriber_snapshots')
+          .select('*')
+          .eq('client_id', client.id)
+          .ilike('platform', 'tiktok')
+          .order('date', { ascending: true }),
+        supabase
+          .from('subscriber_snapshots')
+          .select('*')
+          .eq('client_id', client.id)
+          .ilike('platform', 'youtube')
+          .order('date', { ascending: true }),
+      ]);
+      if (cancelled) return;
+
+      const tt = (ttRes.data || []) as SubscriberSnapshot[];
+      const yt = (ytRes.data || []) as SubscriberSnapshot[];
+
+      if (ttRes.error) console.warn('[Snapshots] TikTok query error:', ttRes.error.message);
+      if (ytRes.error) console.warn('[Snapshots] YouTube query error:', ytRes.error.message);
+
+      console.log(`[Snapshots] Client "${client.name}": TikTok=${tt.length} rows, YouTube=${yt.length} rows`);
+      if (tt.length > 0) console.log('[Snapshots] TikTok sample:', { date: tt[0].date, count: tt[0].subscriber_count, platform: tt[0].platform });
+      if (yt.length > 0) console.log('[Snapshots] YouTube sample:', { date: yt[0].date, count: yt[0].subscriber_count, platform: yt[0].platform });
+
+      setTiktokSnaps(tt);
+      setYoutubeSnaps(yt);
+      setSnapsLoaded(true);
+    }
+    fetchSnapshots();
+    return () => { cancelled = true; };
+  }, [client.id]);
+
   // Followers card — always visible, platform-aware logic
-  const followerData = useMemo((): { netGained: number; prevNetGained: number; latestTotal: number | null; hasSnapshots: boolean; noTotalLabel: string | null } => {
-    // Debug: log snapshot data for this client so we can verify what's loaded
-    const clientSnaps = subscriberSnapshots.filter(s => s.client_id === client.id);
-    if (clientSnaps.length > 0) {
-      const platforms = Array.from(new Set(clientSnaps.map(s => s.platform)));
-      console.log(`[Followers Debug] Client: ${client.name} (${client.id})`);
-      console.log(`[Followers Debug] Total snapshots for client: ${clientSnaps.length}, platforms: ${JSON.stringify(platforms)}`);
-      console.log(`[Followers Debug] Sample snapshot:`, clientSnaps[0]);
-      console.log(`[Followers Debug] Current range: ${currentRange[0].toISOString()} to ${currentRange[1].toISOString()}`);
-      platforms.forEach(plat => {
-        const platSnaps = clientSnaps.filter(s => s.platform === plat);
-        const inRangeSnaps = platSnaps.filter(s => inRange(s.date, currentRange));
-        console.log(`[Followers Debug] Platform "${plat}": ${platSnaps.length} total, ${inRangeSnaps.length} in current range`);
-        if (inRangeSnaps.length > 0) {
-          console.log(`[Followers Debug]   First in range: date=${inRangeSnaps[0].date}, count=${inRangeSnaps[0].subscriber_count}`);
-          console.log(`[Followers Debug]   Last in range: date=${inRangeSnaps[inRangeSnaps.length - 1].date}, count=${inRangeSnaps[inRangeSnaps.length - 1].subscriber_count}`);
-        }
-      });
-    } else {
-      console.log(`[Followers Debug] No snapshots found for client ${client.name} (${client.id}). Total snapshots loaded: ${subscriberSnapshots.length}`);
+  type FollowerResult = { netGained: number | null; prevNetGained: number | null; latestTotal: number | null; noTotalLabel: string | null; netGainedLabel: string | null };
+
+  const followerData = useMemo((): FollowerResult => {
+    if (!snapsLoaded) {
+      return { netGained: null, prevNetGained: null, latestTotal: null, noTotalLabel: 'Loading...', netGainedLabel: 'Loading...' };
     }
 
     const isAll = activePlat === 'All';
     const isIG = activePlat.toLowerCase() === 'instagram';
 
+    // Helper to compute follower data for one platform's snapshots
+    function computeForPlatform(snaps: SubscriberSnapshot[]): { netGained: number | null; prevNetGained: number | null; latestTotal: number | null; count: number } {
+      const curr = getSnapshotFollowGain(snaps, currentRange);
+      const prev = getSnapshotFollowGain(snaps, prevRange);
+      const latest = getLatestCount(snaps);
+      return {
+        netGained: curr?.gain ?? null,
+        prevNetGained: prev?.gain ?? null,
+        latestTotal: latest,
+        count: curr?.count ?? 0,
+      };
+    }
+
     if (isAll) {
-      // Aggregate across all platforms that have snapshot data
-      const platforms = ['tiktok', 'youtube', 'instagram'];
-      let totalCurrent = 0;
-      let totalPrev = 0;
-      let latestTotal = 0;
-      let hasAnySnapshots = false;
-      let hasAnyTotal = false;
+      const tt = computeForPlatform(tiktokSnaps);
+      const yt = computeForPlatform(youtubeSnaps);
 
-      for (const plat of platforms) {
-        const curr = getSnapshotFollowGain(subscriberSnapshots, client.id, plat, currentRange);
-        const prev = getSnapshotFollowGain(subscriberSnapshots, client.id, plat, prevRange);
-        const latest = getLatestFollowerCount(subscriberSnapshots, client.id, plat);
-        if (curr) { totalCurrent += curr.gain; hasAnySnapshots = true; }
-        if (prev) { totalPrev += prev.gain; }
-        if (latest !== null) { latestTotal += latest; hasAnyTotal = true; }
+      const hasAnyTotal = tt.latestTotal !== null || yt.latestTotal !== null;
+      const latestTotal = hasAnyTotal ? (tt.latestTotal ?? 0) + (yt.latestTotal ?? 0) : null;
+
+      // Sum net gained across platforms that have 2+ snapshots
+      const hasAnyGain = tt.netGained !== null || yt.netGained !== null;
+      const netGained = hasAnyGain ? (tt.netGained ?? 0) + (yt.netGained ?? 0) : null;
+      const prevNetGained = (tt.prevNetGained ?? 0) + (yt.prevNetGained ?? 0);
+
+      // Determine labels
+      const totalSnapsInRange = tt.count + yt.count;
+      let netGainedLabel: string | null = null;
+      if (!hasAnyTotal && totalSnapsInRange === 0) {
+        netGainedLabel = 'No data yet';
+      } else if (netGained === null && totalSnapsInRange > 0) {
+        netGainedLabel = 'Need more data';
       }
 
-      if (hasAnySnapshots || hasAnyTotal) {
-        return { netGained: totalCurrent, prevNetGained: totalPrev, latestTotal: hasAnyTotal ? latestTotal : null, hasSnapshots: true, noTotalLabel: null };
-      }
-      // No snapshots at all — fall back to post follows
-      const postFollows = periodPosts.reduce((s, p) => s + p.follows, 0);
-      const prevPostFollows = prevPosts.reduce((s, p) => s + p.follows, 0);
-      return { netGained: postFollows, prevNetGained: prevPostFollows, latestTotal: null, hasSnapshots: false, noTotalLabel: 'No data yet' };
+      return {
+        netGained,
+        prevNetGained: hasAnyGain ? prevNetGained : null,
+        latestTotal,
+        noTotalLabel: hasAnyTotal ? null : 'No data yet',
+        netGainedLabel,
+      };
     }
 
     if (isIG) {
       // Instagram — no snapshots, use post-based follows
       const postFollows = periodPosts.reduce((s, p) => s + p.follows, 0);
       const prevPostFollows = prevPosts.reduce((s, p) => s + p.follows, 0);
-      return { netGained: postFollows, prevNetGained: prevPostFollows, latestTotal: null, hasSnapshots: false, noTotalLabel: 'Connect API to track' };
+      return { netGained: postFollows, prevNetGained: prevPostFollows, latestTotal: null, noTotalLabel: 'Connect API to track', netGainedLabel: null };
     }
 
-    // TikTok or YouTube — use snapshots, fall back to post follows for net gained
-    const platKey = activePlat.toLowerCase();
-    const curr = getSnapshotFollowGain(subscriberSnapshots, client.id, platKey, currentRange);
-    const prev = getSnapshotFollowGain(subscriberSnapshots, client.id, platKey, prevRange);
-    const latest = getLatestFollowerCount(subscriberSnapshots, client.id, platKey);
+    // TikTok or YouTube — use that platform's snapshots
+    const snaps = activePlat.toLowerCase() === 'tiktok' ? tiktokSnaps : youtubeSnaps;
+    const data = computeForPlatform(snaps);
 
-    if (curr) {
-      return { netGained: curr.gain, prevNetGained: prev?.gain ?? 0, latestTotal: latest, hasSnapshots: true, noTotalLabel: null };
+    let netGainedLabel: string | null = null;
+    if (snaps.length === 0) {
+      netGainedLabel = 'No data yet';
+    } else if (data.netGained === null && data.count > 0) {
+      netGainedLabel = 'Need more data';
     }
-    // No snapshots in period — try post follows as fallback for net gained
-    const postFollows = periodPosts.reduce((s, p) => s + p.follows, 0);
-    const prevPostFollows = prevPosts.reduce((s, p) => s + p.follows, 0);
-    return { netGained: postFollows, prevNetGained: prevPostFollows, latestTotal: latest, hasSnapshots: false, noTotalLabel: latest === null ? 'No data yet' : null };
-  }, [activePlat, subscriberSnapshots, client.id, currentRange, prevRange, periodPosts, prevPosts]);
+
+    return {
+      netGained: data.netGained,
+      prevNetGained: data.prevNetGained,
+      latestTotal: data.latestTotal,
+      noTotalLabel: data.latestTotal === null ? 'No data yet' : null,
+      netGainedLabel,
+    };
+  }, [activePlat, tiktokSnaps, youtubeSnaps, snapsLoaded, currentRange, prevRange, periodPosts, prevPosts]);
 
   function pctChange(curr: number, prev: number): number {
     if (prev === 0) return curr > 0 ? 100 : 0;
@@ -231,7 +279,9 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
   }
 
   const viewsDiff = pctChange(totalViews, prevViews);
-  const netGainedDiff = pctChange(followerData.netGained, followerData.prevNetGained);
+  const netGainedDiff = (followerData.netGained !== null && followerData.prevNetGained !== null)
+    ? pctChange(followerData.netGained, followerData.prevNetGained)
+    : 0;
   const impressionsDiff = pctChange(totalImpressions, prevImpressions);
   const postsDiff = pctChange(totalPostsCount, prevPostsCount);
 
@@ -377,18 +427,31 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, flex: 1 }}>
             <div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: followerData.netGained >= 0 ? '#10b981' : '#ef4444', marginBottom: 2 }}>
-                {followerData.netGained >= 0 ? '+' : ''}{fn(followerData.netGained)}
-              </div>
-              <div style={{ fontSize: 10, color: '#444' }}>
-                {showCmp && timePeriod !== 'all' ? (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                    <span className={`badge ${netGainedDiff >= 0 ? 'badge-up' : 'badge-down'}`} style={{ fontSize: 9 }}>{netGainedDiff >= 0 ? '+' : ''}{netGainedDiff.toFixed(1)}%</span>
-                  </span>
-                ) : (
-                  'net gained'
-                )}
-              </div>
+              {followerData.netGained !== null ? (
+                <>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: followerData.netGained >= 0 ? '#10b981' : '#ef4444', marginBottom: 2 }}>
+                    {followerData.netGained >= 0 ? '+' : ''}{fn(followerData.netGained)}
+                  </div>
+                  <div style={{ fontSize: 10, color: '#444' }}>
+                    {showCmp && timePeriod !== 'all' && followerData.prevNetGained !== null ? (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <span className={`badge ${netGainedDiff >= 0 ? 'badge-up' : 'badge-down'}`} style={{ fontSize: 9 }}>{netGainedDiff >= 0 ? '+' : ''}{netGainedDiff.toFixed(1)}%</span>
+                      </span>
+                    ) : (
+                      'net gained'
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#555', marginBottom: 2 }} title={followerData.netGainedLabel === 'Need more data' ? 'Need more data — updates every 6 hours' : undefined}>
+                    —
+                  </div>
+                  <div style={{ fontSize: 10, color: '#555' }}>
+                    {followerData.netGainedLabel || 'net gained'}
+                  </div>
+                </>
+              )}
             </div>
             <div>
               <div style={{ fontSize: 18, fontWeight: 700, color: '#6366f1', marginBottom: 2 }}>
