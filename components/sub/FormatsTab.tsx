@@ -2,7 +2,8 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Format, Client } from '@/lib/types';
-import { fn, getPlatformColor } from '@/lib/utils';
+import { fn } from '@/lib/utils';
+import PlatformIcon from '@/components/PlatformIcon';
 import FormatModal from '@/components/modals/FormatModal';
 
 interface Props {
@@ -41,7 +42,7 @@ export default function FormatsTab({ client, formats, onReload }: Props) {
                   <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 3 }}>{fmt.name}</div>
                   {fmt.platform && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: getPlatformColor(fmt.platform), display: 'inline-block' }} />
+                      <PlatformIcon platform={fmt.platform} size={14} />
                       <span style={{ fontSize: 11, color: '#555' }}>{fmt.platform}</span>
                     </div>
                   )}

@@ -1,7 +1,8 @@
 'use client';
 import { useMemo } from 'react';
 import { Post, Client } from '@/lib/types';
-import { fn, er, getPlatformColor, avg } from '@/lib/utils';
+import { fn, er, avg } from '@/lib/utils';
+import PlatformIcon from '@/components/PlatformIcon';
 
 interface Props {
   client: Client;
@@ -87,7 +88,7 @@ export default function OutliersTab({ client, posts, activePlat }: Props) {
                     </td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: getPlatformColor(post.platform), display: 'inline-block', flexShrink: 0 }} />
+                        <PlatformIcon platform={post.platform} size={14} />
                         <span style={{ fontSize: 11, color: '#888' }}>{post.platform}</span>
                       </div>
                     </td>

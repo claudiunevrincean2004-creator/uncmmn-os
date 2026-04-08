@@ -1,19 +1,13 @@
 'use client';
-import { Client } from '@/lib/types';
-import { getPlatformColor } from '@/lib/utils';
 
 interface Props {
-  clients: Client[];
-  activeId: string | null;
   activeMP: string;
   collapsed: boolean;
   onToggleCollapse: () => void;
   onSelectMain: (page: string) => void;
-  onSelectClient: (id: string) => void;
-  onAddClient: () => void;
 }
 
-export default function Sidebar({ clients, activeId, activeMP, collapsed, onToggleCollapse, onSelectMain, onSelectClient, onAddClient }: Props) {
+export default function Sidebar({ activeMP, collapsed, onToggleCollapse, onSelectMain }: Props) {
   const w = collapsed ? 56 : 210;
 
   return (
@@ -70,9 +64,9 @@ export default function Sidebar({ clients, activeId, activeMP, collapsed, onTogg
       </div>
 
       {/* Main nav */}
-      <div style={{ padding: collapsed ? '10px 4px' : '10px 8px', borderBottom: '0.5px solid #111' }}>
+      <div style={{ padding: collapsed ? '10px 4px' : '10px 8px', flex: 1 }}>
         <div
-          className={`nav-item${activeMP === 'overview' && !activeId ? ' active' : ''}`}
+          className={`nav-item${activeMP === 'overview' ? ' active' : ''}`}
           onClick={() => onSelectMain('overview')}
           title="Overview"
           style={collapsed ? { justifyContent: 'center', padding: '8px 0' } : undefined}
@@ -98,89 +92,6 @@ export default function Sidebar({ clients, activeId, activeMP, collapsed, onTogg
           <span style={{ fontSize: 13 }}>☷</span>
           {!collapsed && <span>Clients</span>}
         </div>
-      </div>
-
-      {/* Clients */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: collapsed ? '10px 4px' : '10px 8px' }}>
-        {!collapsed && (
-          <div style={{ fontSize: 9, color: '#333', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600, padding: '4px 10px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Clients</span>
-            <button
-              onClick={onAddClient}
-              style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px' }}
-              title="Add client"
-            >
-              +
-            </button>
-          </div>
-        )}
-        {collapsed && (
-          <div style={{ textAlign: 'center', marginBottom: 6 }}>
-            <button
-              onClick={onAddClient}
-              style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '2px' }}
-              title="Add client"
-            >
-              +
-            </button>
-          </div>
-        )}
-        {clients.length === 0 && !collapsed && (
-          <div style={{ fontSize: 11, color: '#333', padding: '6px 10px' }}>No clients yet</div>
-        )}
-        {clients.map(client => (
-          <div
-            key={client.id}
-            className={`nav-item${activeId === client.id ? ' active' : ''}`}
-            onClick={() => onSelectClient(client.id)}
-            title={client.name}
-            style={collapsed ? { justifyContent: 'center', padding: '6px 0' } : undefined}
-          >
-            <div style={{
-              width: 20,
-              height: 20,
-              borderRadius: 5,
-              background: activeId === client.id ? '#111' : '#111',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 10,
-              fontWeight: 700,
-              color: activeId === client.id ? '#000' : '#666',
-              flexShrink: 0,
-            }}>
-              {client.name.charAt(0).toUpperCase()}
-            </div>
-            {!collapsed && (
-              <div style={{ minWidth: 0 }}>
-                <div style={{
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  fontSize: 12,
-                }}>
-                  {client.name}
-                </div>
-                {client.platforms?.length > 0 && (
-                  <div style={{ display: 'flex', gap: 3, marginTop: 2 }}>
-                    {client.platforms.slice(0, 3).map(p => (
-                      <span
-                        key={p}
-                        style={{
-                          width: 5,
-                          height: 5,
-                          borderRadius: '50%',
-                          background: getPlatformColor(p),
-                          display: 'inline-block',
-                        }}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
       </div>
 
       {/* Footer */}

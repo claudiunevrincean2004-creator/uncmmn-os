@@ -18,6 +18,7 @@ import DriveTab from '@/components/sub/DriveTab';
 import ClientModal from '@/components/modals/ClientModal';
 import ClientSidebar from '@/components/ClientSidebar';
 import ClientsPage from '@/components/ClientsPage';
+import PlatformIcon from '@/components/PlatformIcon';
 
 // Helper: query a table, return [] if the table doesn't exist
 async function safeSelect(table: string, orderCol: string, ascending = true) {
@@ -199,14 +200,10 @@ export default function Home() {
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       <Sidebar
-        clients={clients.filter(c => c.status === 'Active')}
-        activeId={activeClientId}
         activeMP={mainPage}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(v => !v)}
         onSelectMain={handleSelectMain}
-        onSelectClient={handleSelectClient}
-        onAddClient={handleAddClient}
       />
 
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -313,7 +310,9 @@ export default function Home() {
                     key={p}
                     className={`subtab${activePlat === p ? ' active' : ''}`}
                     onClick={() => setActivePlat(p)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4 }}
                   >
+                    {p !== 'All' && <PlatformIcon platform={p} size={14} />}
                     {p}
                   </button>
                 ))}

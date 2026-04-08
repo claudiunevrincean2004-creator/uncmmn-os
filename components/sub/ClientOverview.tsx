@@ -1,7 +1,8 @@
 'use client';
 import { useMemo } from 'react';
 import { Client, Post, Goal, Pillar, Format, SubscriberSnapshot } from '@/lib/types';
-import { fn, er, avg, getColor, getPlatformColor } from '@/lib/utils';
+import { fn, er, avg, getColor } from '@/lib/utils';
+import PlatformIcon from '@/components/PlatformIcon';
 import type { TimePeriod } from '@/app/page';
 import {
   Chart as ChartJS,
@@ -474,17 +475,17 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
           <div style={{ fontSize: 11, color: '#555', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Top Post</div>
           {topPost ? (
             <div
-              style={{ cursor: topPost.post_url ? 'pointer' : 'default' }}
-              onClick={() => { if (topPost.post_url) window.open(topPost.post_url, '_blank', 'noopener,noreferrer'); }}
+              style={{ cursor: (topPost.post_url || topPost.drive_link) ? 'pointer' : 'default' }}
+              onClick={() => { const url = topPost.post_url || topPost.drive_link; if (url) window.open(url, '_blank', 'noopener,noreferrer'); }}
             >
-              {topPost.post_url && (
+              {(topPost.post_url || topPost.drive_link) && (
                 <div style={{ position: 'absolute', top: 12, right: 12, color: '#555' }}>
                   <ExternalLinkIcon />
                 </div>
               )}
               <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6, lineHeight: 1.4 }}>{topPost.title}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: getPlatformColor(topPost.platform), display: 'inline-block' }} />
+                <PlatformIcon platform={topPost.platform} size={14} />
                 <span style={{ fontSize: 11, color: '#555' }}>{topPost.platform} · {topPost.format}</span>
                 {topPost.date && <span style={{ fontSize: 11, color: '#444' }}>· {topPost.date.slice(0, 10)}</span>}
               </div>
@@ -571,12 +572,13 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
             <tbody>
               {outlierPosts.map(post => {
                 const mult = clientAvgViews > 0 ? (post.views / clientAvgViews).toFixed(1) : '—';
-                const clickable = !!post.post_url;
+                const postLink = post.post_url || post.drive_link;
+                const clickable = !!postLink;
                 return (
                   <tr
                     key={post.id}
                     style={{ cursor: clickable ? 'pointer' : 'default' }}
-                    onClick={() => { if (clickable) window.open(post.post_url, '_blank', 'noopener,noreferrer'); }}
+                    onClick={() => { if (clickable) window.open(postLink, '_blank', 'noopener,noreferrer'); }}
                   >
                     <td style={{ color: '#fff', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -586,7 +588,7 @@ export default function ClientOverview({ client, posts, goals, pillars, formats,
                     </td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: getPlatformColor(post.platform), display: 'inline-block' }} />
+                        <PlatformIcon platform={post.platform} size={14} />
                         <span style={{ fontSize: 11, color: '#888' }}>{post.platform}</span>
                       </div>
                     </td>

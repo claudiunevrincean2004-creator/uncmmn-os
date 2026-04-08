@@ -2,7 +2,8 @@
 import { useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Post, Client, Pillar, Format } from '@/lib/types';
-import { fn, er, getPlatformColor } from '@/lib/utils';
+import { fn, er } from '@/lib/utils';
+import PlatformIcon from '@/components/PlatformIcon';
 import PostModal from '@/components/modals/PostModal';
 
 interface Props {
@@ -150,7 +151,7 @@ export default function ContentTab({ client, posts, pillars, formats, activePlat
                   <td style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#fff' }}>{post.title}</td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: getPlatformColor(post.platform), display: 'inline-block', flexShrink: 0 }} />
+                      <PlatformIcon platform={post.platform} size={14} />
                       <span style={{ fontSize: 11, color: '#888' }}>{post.platform}</span>
                     </div>
                   </td>

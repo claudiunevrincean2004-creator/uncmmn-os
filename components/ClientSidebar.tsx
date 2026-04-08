@@ -2,7 +2,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Client, ClientExpense, MonthlyRevenue } from '@/lib/types';
-import { fm, getPlatformColor } from '@/lib/utils';
+import { fm } from '@/lib/utils';
+import PlatformIcon from '@/components/PlatformIcon';
 import ClientExpenseModal from '@/components/modals/ClientExpenseModal';
 
 interface Props {
@@ -205,18 +206,12 @@ export default function ClientSidebar({ client, clientExpenses, monthlyRevenue, 
           {/* Platforms */}
           <div>
             <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>Platforms</div>
-            <div style={{ display: 'flex', gap: 6 }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               {(client.platforms || []).map(p => (
-                <span key={p} style={{
-                  fontSize: 10,
-                  padding: '3px 8px',
-                  borderRadius: 4,
-                  border: '0.5px solid #2a2a2a',
-                  color: getPlatformColor(p),
-                  fontWeight: 600,
-                }}>
-                  {p}
-                </span>
+                <div key={p} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 4, border: '0.5px solid #2a2a2a' }}>
+                  <PlatformIcon platform={p} size={14} />
+                  <span style={{ fontSize: 10, color: '#888', fontWeight: 600 }}>{p}</span>
+                </div>
               ))}
               {(!client.platforms || client.platforms.length === 0) && (
                 <span style={{ fontSize: 12, color: '#333' }}>No platforms set</span>

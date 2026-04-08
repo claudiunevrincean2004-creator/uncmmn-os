@@ -1,6 +1,7 @@
 'use client';
 import { Client, Post } from '@/lib/types';
-import { fn, avg, er, getPlatformColor } from '@/lib/utils';
+import { fn, avg, er } from '@/lib/utils';
+import PlatformIcon from '@/components/PlatformIcon';
 
 interface Props {
   clients: Client[];
@@ -119,7 +120,7 @@ export default function Overview({ clients, posts, onSelectClient, onOpenSidebar
                 )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                   <span className="badge badge-outlier">{post.multiple.toFixed(1)}x</span>
-                  <span style={{ fontSize: 9, color: getPlatformColor(post.platform), textTransform: 'uppercase', fontWeight: 600 }}>{post.platform}</span>
+                  <PlatformIcon platform={post.platform} size={14} />
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4, marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{post.title}</div>
                 <div
