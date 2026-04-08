@@ -17,6 +17,7 @@ import PillarsTab from '@/components/sub/PillarsTab';
 import DriveTab from '@/components/sub/DriveTab';
 import ClientModal from '@/components/modals/ClientModal';
 import ClientSidebar from '@/components/ClientSidebar';
+import ClientsPage from '@/components/ClientsPage';
 
 // Helper: query a table, return [] if the table doesn't exist
 async function safeSelect(table: string, orderCol: string, ascending = true) {
@@ -83,6 +84,7 @@ export default function Home() {
   const [showClientModal, setShowClientModal] = useState(false);
   const [editClient, setEditClient] = useState<Client | null>(null);
   const [sidebarClientId, setSidebarClientId] = useState<string | null>(null);
+  const [sidebarMonth, setSidebarMonth] = useState<string | undefined>(undefined);
 
   const loadData = useCallback(async () => {
     const [c, p, g, h, f, pl, d, e, mr, me, ce, cme, ss] = await Promise.all([
@@ -362,7 +364,7 @@ export default function Home() {
               clients={clients}
               posts={posts}
               onSelectClient={handleSelectClient}
-              onOpenSidebar={(id: string) => setSidebarClientId(id)}
+              onOpenSidebar={(id: string) => { setSidebarClientId(id); setSidebarMonth(undefined); }}
             />
           )}
           {mainPage === 'finance' && (
@@ -373,7 +375,14 @@ export default function Home() {
               clientExpenses={clientExpenses}
               clientMonthExclusions={clientMonthExclusions}
               onReload={loadData}
-              onOpenSidebar={(id: string) => setSidebarClientId(id)}
+              onOpenSidebar={(id: string, month?: string) => { setSidebarClientId(id); setSidebarMonth(month); }}
+            />
+          )}
+          {mainPage === 'clients' && (
+            <ClientsPage
+              clients={clients}
+              onSelectClient={handleSelectClient}
+              onAddClient={handleAddClient}
             />
           )}
           {mainPage === 'client' && activeClient && (
@@ -402,6 +411,7 @@ export default function Home() {
             client={sidebarClient}
             clientExpenses={clientExpenses}
             monthlyRevenue={monthlyRevenue}
+            month={sidebarMonth}
             onClose={() => setSidebarClientId(null)}
             onReload={loadData}
           />

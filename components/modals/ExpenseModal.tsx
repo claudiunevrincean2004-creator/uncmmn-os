@@ -1,20 +1,23 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { MonthlyExpense } from '@/lib/types';
 
 interface Props {
   expense?: MonthlyExpense | null;
   month: string; // YYYY-MM
+  existingNames?: string[];
   onClose: () => void;
   onSaved: () => void;
 }
 
-export default function ExpenseModal({ expense, month, onClose, onSaved }: Props) {
+export default function ExpenseModal({ expense, month, existingNames = [], onClose, onSaved }: Props) {
   const [name, setName] = useState('');
   const [cost, setCost] = useState('');
   const [category, setCategory] = useState('');
   const [saving, setSaving] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (expense) {
@@ -23,6 +26,10 @@ export default function ExpenseModal({ expense, month, onClose, onSaved }: Props
       setCategory(expense.category || '');
     }
   }, [expense]);
+
+  const suggestions = name.trim().length > 0
+    ? Array.from(new Set(existingNames)).filter(n => n.toLowerCase().includes(name.toLowerCase()) && n.toLowerCase() !== name.toLowerCase())
+    : [];
 
   async function handleSave() {
     if (!name.trim()) return;
@@ -62,9 +69,36 @@ export default function ExpenseModal({ expense, month, onClose, onSaved }: Props
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div>
+          <div style={{ position: 'relative' }}>
             <label className="form-label">Expense Name</label>
-            <input className="form-input" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Adobe CC, CapCut Pro, Notion..." />
+            <input
+              ref={nameRef}
+              className="form-input"
+              value={name}
+              onChange={e => { setName(e.target.value); setShowSuggestions(true); }}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+              placeholder="e.g. Adobe CC, CapCut Pro, Notion..."
+            />
+            {showSuggestions && suggestions.length > 0 && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
+                background: '#1a1a1a', border: '0.5px solid #2a2a2a', borderRadius: 6,
+                maxHeight: 150, overflowY: 'auto', marginTop: 2,
+              }}>
+                {suggestions.slice(0, 8).map(s => (
+                  <div
+                    key={s}
+                    style={{ padding: '6px 10px', fontSize: 12, color: '#ccc', cursor: 'pointer' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#252525')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    onMouseDown={() => { setName(s); setShowSuggestions(false); }}
+                  >
+                    {s}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <div>
             <label className="form-label">Cost ($)</label>

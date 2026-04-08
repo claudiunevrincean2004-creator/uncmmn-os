@@ -89,6 +89,15 @@ export default function Sidebar({ clients, activeId, activeMP, collapsed, onTogg
           <span style={{ fontSize: 13 }}>$</span>
           {!collapsed && <span>Finance</span>}
         </div>
+        <div
+          className={`nav-item${activeMP === 'clients' ? ' active' : ''}`}
+          onClick={() => onSelectMain('clients')}
+          title="Clients"
+          style={collapsed ? { justifyContent: 'center', padding: '8px 0' } : undefined}
+        >
+          <span style={{ fontSize: 13 }}>☷</span>
+          {!collapsed && <span>Clients</span>}
+        </div>
       </div>
 
       {/* Clients */}

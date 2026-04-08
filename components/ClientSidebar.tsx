@@ -9,6 +9,7 @@ interface Props {
   client: Client;
   clientExpenses: ClientExpense[];
   monthlyRevenue: MonthlyRevenue[];
+  month?: string; // YYYY-MM — if provided, use this instead of current date
   onClose: () => void;
   onReload: () => void;
 }
@@ -19,9 +20,9 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   Paused: { bg: '#f59e0b22', text: '#f59e0b' },
 };
 
-export default function ClientSidebar({ client, clientExpenses, monthlyRevenue, onClose, onReload }: Props) {
+export default function ClientSidebar({ client, clientExpenses, monthlyRevenue, month, onClose, onReload }: Props) {
   const now = new Date();
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const currentMonth = month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   const [notes, setNotes] = useState(client.notes || '');
   const [savingNotes, setSavingNotes] = useState(false);
@@ -86,7 +87,11 @@ export default function ClientSidebar({ client, clientExpenses, monthlyRevenue, 
     return d.toLocaleDateString('default', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
-  const monthLabel = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+  const monthLabel = (() => {
+    const [y, m] = currentMonth.split('-');
+    const d = new Date(parseInt(y), parseInt(m) - 1);
+    return d.toLocaleString('default', { month: 'long', year: 'numeric' });
+  })();
 
   return (
     <div
@@ -327,6 +332,7 @@ export default function ClientSidebar({ client, clientExpenses, monthlyRevenue, 
           clientId={client.id}
           clientName={client.name}
           month={currentMonth}
+          existingNames={clientExpenses.map(e => e.name)}
           onClose={() => setShowExpenseModal(false)}
           onSaved={onReload}
         />

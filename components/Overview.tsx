@@ -98,8 +98,25 @@ export default function Overview({ clients, posts, onSelectClient, onOpenSidebar
           <div style={{ color: '#333', fontSize: 12 }}>No outlier posts this month (posts need 1.5x above client average)</div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(topOutliers.length, 3)}, 1fr)`, gap: 12 }}>
-            {topOutliers.map((post) => (
-              <div key={post.id} style={{ background: '#111', border: '0.5px solid #1a1a1a', borderRadius: 8, padding: 14 }}>
+            {topOutliers.map((post) => {
+              const postLink = post.post_url || post.drive_link;
+              return (
+              <div
+                key={post.id}
+                style={{ background: '#111', border: '0.5px solid #1a1a1a', borderRadius: 8, padding: 14, cursor: postLink ? 'pointer' : 'default', position: 'relative', transition: 'border-color 0.15s' }}
+                onClick={() => { if (postLink) window.open(postLink, '_blank', 'noopener,noreferrer'); }}
+                onMouseEnter={e => { if (postLink) e.currentTarget.style.borderColor = '#333'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = '#1a1a1a'; }}
+              >
+                {postLink && (
+                  <div style={{ position: 'absolute', top: 10, right: 10, color: '#444' }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                      <polyline points="15 3 21 3 21 9" />
+                      <line x1="10" y1="14" x2="21" y2="3" />
+                    </svg>
+                  </div>
+                )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                   <span className="badge badge-outlier">{post.multiple.toFixed(1)}x</span>
                   <span style={{ fontSize: 9, color: getPlatformColor(post.platform), textTransform: 'uppercase', fontWeight: 600 }}>{post.platform}</span>
@@ -107,7 +124,7 @@ export default function Overview({ clients, posts, onSelectClient, onOpenSidebar
                 <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4, marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{post.title}</div>
                 <div
                   style={{ fontSize: 11, color: '#555', marginBottom: 10, cursor: 'pointer' }}
-                  onClick={() => onOpenSidebar(post.client_id)}
+                  onClick={(e) => { e.stopPropagation(); onOpenSidebar(post.client_id); }}
                   onMouseEnter={e => (e.currentTarget.style.color = '#999')}
                   onMouseLeave={e => (e.currentTarget.style.color = '#555')}
                 >{post.clientName}</div>
@@ -124,7 +141,8 @@ export default function Overview({ clients, posts, onSelectClient, onOpenSidebar
                   ))}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

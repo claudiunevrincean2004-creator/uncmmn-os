@@ -128,5 +128,5 @@ export interface ClientMonthExclusion {
   created_at?: string;
 }
 
-export type MainPage = 'overview' | 'finance' | 'client';
+export type MainPage = 'overview' | 'finance' | 'clients' | 'client';
 export type ClientTab = 'overview' | 'content' | 'outliers' | 'goals' | 'hooks' | 'formats' | 'pillars' | 'drive';

@@ -25,7 +25,7 @@ interface Props {
   clientExpenses: ClientExpense[];
   clientMonthExclusions: ClientMonthExclusion[];
   onReload: () => void;
-  onOpenSidebar: (id: string) => void;
+  onOpenSidebar: (id: string, month?: string) => void;
 }
 
 type ViewMode = 'month' | 'quarter' | 'annual';
@@ -216,6 +216,7 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
   async function handleSaveNewClient() {
     if (!newClientName.trim()) return;
     setSavingClient(true);
+    const defaultStartDate = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`;
     await supabase.from('clients').insert([{
       name: newClientName.trim(),
       niche: '',
@@ -223,7 +224,7 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
       cost: 0,
       platforms: newClientPlatforms,
       status: newClientStatus,
-      start_date: newClientStartDate || null,
+      start_date: newClientStartDate || defaultStartDate,
       renewal_date: newClientRenewalDate || null,
     }]);
     setSavingClient(false);
@@ -231,7 +232,7 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
     setNewClientName('');
     setNewClientStatus('Inactive');
     setNewClientRetainer('');
-    setNewClientStartDate('');
+    setNewClientStartDate(defaultStartDate);
     setNewClientPlatforms([]);
     setNewClientRenewalDate('');
     onReload();
@@ -288,7 +289,7 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
         <button
           className="btn-primary"
           style={{ fontSize: 11, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 4 }}
-          onClick={() => setShowAddClientModal(true)}
+          onClick={() => { setNewClientStartDate(`${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`); setShowAddClientModal(true); }}
         >
           + Add Client
         </button>
@@ -459,7 +460,7 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span
                         style={{ fontSize: 12, cursor: 'pointer' }}
-                        onClick={(e) => { e.stopPropagation(); onOpenSidebar(cr.client.id); }}
+                        onClick={(e) => { e.stopPropagation(); onOpenSidebar(cr.client.id, mk); }}
                         onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
                         onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
                       >{cr.client.name}</span>
@@ -498,7 +499,7 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span
                             style={{ color: '#fff', fontWeight: 600, cursor: 'pointer' }}
-                            onClick={(e) => { e.stopPropagation(); onOpenSidebar(cr.client.id); }}
+                            onClick={(e) => { e.stopPropagation(); onOpenSidebar(cr.client.id, mk); }}
                             onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
                             onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
                           >{cr.client.name}</span>
@@ -684,6 +685,7 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
         <ExpenseModal
           expense={editExpense}
           month={mk}
+          existingNames={monthlyExpenses.map(e => e.name)}
           onClose={() => setShowModal(false)}
           onSaved={onReload}
         />
@@ -695,6 +697,7 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
           clientId={clientExpenseTarget.clientId}
           clientName={clientExpenseTarget.clientName}
           month={mk}
+          existingNames={clientExpenses.map(e => e.name)}
           onClose={() => setShowClientExpenseModal(false)}
           onSaved={onReload}
         />
