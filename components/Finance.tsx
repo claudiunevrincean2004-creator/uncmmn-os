@@ -698,66 +698,154 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
         )}
       </div>
 
-      {/* Operational Expenses */}
+      {/* Expense Breakdown — Unified section */}
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div style={{ fontSize: 11, color: '#555', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Operational Expenses — {viewLabel}
+            Expense Breakdown — {viewLabel}
           </div>
           {viewMode === 'month' && (
             <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px' }} onClick={() => { setEditExpense(null); setShowModal(true); }}>+ Add Expense</button>
           )}
         </div>
 
-        {viewData.allExpenses.length === 0 ? (
-          <div style={{ color: '#333', fontSize: 12 }}>No operational expenses for this period.{viewMode === 'month' && ' Add expenses to track your costs.'}</div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {Object.entries(viewData.expenseCategories).map(([cat, catExpenses]) => (
-              <div key={cat}>
-                <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#444', fontWeight: 600, marginBottom: 8, paddingBottom: 6, borderBottom: '0.5px solid #1a1a1a', display: 'flex', justifyContent: 'space-between' }}>
-                  <span>{cat}</span>
-                  <span style={{ color: '#555' }}>{fm(catExpenses.reduce((s, e) => s + e.cost, 0))}</span>
+        {(() => {
+          // Build ordered category sections
+          const OPEX_CATEGORY_ORDER = [
+            'Software & Subscriptions',
+            'Contractors & Team',
+            'Sales & Marketing',
+            'Professional Development',
+            'Admin & Compliance',
+            'Banking & Fees',
+            'Equipment',
+          ];
+
+          // Fulfillment costs grouped by client
+          const fulfillmentByClient = viewData.clientBreakdown.filter(cr => cr.expenses.length > 0);
+          const hasFulfillment = fulfillmentByClient.length > 0;
+
+          // Operational categories in order
+          const opexSections = OPEX_CATEGORY_ORDER
+            .filter(cat => viewData.expenseCategories[cat] && viewData.expenseCategories[cat].length > 0)
+            .map(cat => ({ cat, expenses: viewData.expenseCategories[cat] }));
+
+          // Uncategorized catch-all
+          const uncategorized = Object.entries(viewData.expenseCategories)
+            .filter(([cat]) => !OPEX_CATEGORY_ORDER.includes(cat))
+            .flatMap(([, exps]) => exps);
+
+          const grandTotal = viewData.totalClientExpenses + viewData.operationalExpenses;
+          const hasAnything = hasFulfillment || opexSections.length > 0 || uncategorized.length > 0;
+
+          if (!hasAnything) {
+            return <div style={{ color: '#333', fontSize: 12 }}>No expenses for this period.{viewMode === 'month' && ' Click "+ Add Expense" to start tracking.'}</div>;
+          }
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Fulfillment Costs */}
+              {hasFulfillment && (
+                <div>
+                  <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#f59e0b', fontWeight: 600, marginBottom: 8, paddingBottom: 6, borderBottom: '0.5px solid #1a1a1a', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Fulfillment Costs</span>
+                    <span>{fm(viewData.totalClientExpenses)}</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {fulfillmentByClient.map(cr => (
+                      cr.expenses.map(exp => (
+                        <div key={exp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 8px', background: '#0d0d0d', borderRadius: 4 }}>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <span style={{ fontSize: 11, color: '#888' }}>{cr.client.name}</span>
+                            <span style={{ fontSize: 11, color: '#fff' }}>—</span>
+                            <span style={{ fontSize: 11, color: '#fff' }}>{exp.name}</span>
+                            {exp.category && <span style={{ fontSize: 9, color: '#444', padding: '1px 4px', border: '0.5px solid #1a1a1a', borderRadius: 3 }}>{exp.category}</span>}
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <span style={{ fontSize: 11, color: '#f59e0b', fontWeight: 600 }}>{fm(exp.amount)}</span>
+                            {viewMode === 'month' && (
+                              <div style={{ display: 'flex', gap: 4 }}>
+                                <button
+                                  style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', fontSize: 11, padding: '2px 4px' }}
+                                  onClick={() => {
+                                    setClientExpenseTarget({ clientId: cr.client.id, clientName: cr.client.name });
+                                    setEditClientExpense(exp);
+                                    setShowClientExpenseModal(true);
+                                  }}
+                                >✎</button>
+                                <button className="btn-danger" style={{ padding: '2px 6px', fontSize: 10 }} onClick={() => deleteClientExpense(exp.id)}>✕</button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    ))}
+                  </div>
                 </div>
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Cost</th>
-                      {viewMode !== 'month' && <th>Month</th>}
-                      {viewMode === 'month' && <th></th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {catExpenses.map(exp => (
-                      <tr key={exp.id}>
-                        <td style={{ color: '#fff' }}>{exp.name}</td>
-                        <td style={{ color: '#f59e0b', fontWeight: 600 }}>{fm(exp.cost)}</td>
-                        {viewMode !== 'month' && <td style={{ color: '#555', fontSize: 11 }}>{exp.month}</td>}
-                        {viewMode === 'month' && (
-                          <td>
+              )}
+
+              {/* Operational expense categories in order */}
+              {opexSections.map(({ cat, expenses: catExpenses }) => (
+                <div key={cat}>
+                  <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#444', fontWeight: 600, marginBottom: 8, paddingBottom: 6, borderBottom: '0.5px solid #1a1a1a', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{cat}</span>
+                    <span style={{ color: '#555' }}>{fm(catExpenses.reduce((s: number, e: MonthlyExpense) => s + e.cost, 0))}</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {catExpenses.map((exp: MonthlyExpense) => (
+                      <div key={exp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 8px', background: '#0d0d0d', borderRadius: 4 }}>
+                        <span style={{ fontSize: 11, color: '#fff' }}>{exp.name}</span>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <span style={{ fontSize: 11, color: '#f59e0b', fontWeight: 600 }}>{fm(exp.cost)}</span>
+                          {viewMode === 'month' && (
                             <div style={{ display: 'flex', gap: 4 }}>
                               <button style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', fontSize: 11, padding: '2px 4px' }} onClick={() => { setEditExpense(exp); setShowModal(true); }}>✎</button>
-                              <button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteExpense(exp.id)}>✕</button>
+                              <button className="btn-danger" style={{ padding: '2px 6px', fontSize: 10 }} onClick={() => deleteExpense(exp.id)}>✕</button>
                             </div>
-                          </td>
-                        )}
-                      </tr>
+                          )}
+                        </div>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            ))}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '0.5px solid #1a1a1a', paddingTop: 10 }}>
-              <div>
-                <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  {viewMode === 'month' ? 'Monthly' : viewMode === 'quarter' ? 'Quarterly' : 'Annual'} Total
+                  </div>
                 </div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: '#f59e0b' }}>{fm(viewData.allExpenses.reduce((s, e) => s + e.cost, 0))}</div>
+              ))}
+
+              {/* Uncategorized */}
+              {uncategorized.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#444', fontWeight: 600, marginBottom: 8, paddingBottom: 6, borderBottom: '0.5px solid #1a1a1a', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Other</span>
+                    <span style={{ color: '#555' }}>{fm(uncategorized.reduce((s, e) => s + e.cost, 0))}</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {uncategorized.map(exp => (
+                      <div key={exp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 8px', background: '#0d0d0d', borderRadius: 4 }}>
+                        <span style={{ fontSize: 11, color: '#fff' }}>{exp.name}</span>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <span style={{ fontSize: 11, color: '#f59e0b', fontWeight: 600 }}>{fm(exp.cost)}</span>
+                          {viewMode === 'month' && (
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <button style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', fontSize: 11, padding: '2px 4px' }} onClick={() => { setEditExpense(exp); setShowModal(true); }}>✎</button>
+                              <button className="btn-danger" style={{ padding: '2px 6px', fontSize: 10 }} onClick={() => deleteExpense(exp.id)}>✕</button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Grand total */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '0.5px solid #1a1a1a', paddingTop: 10 }}>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Expenses</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: '#f59e0b' }}>{fm(grandTotal)}</div>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       {showModal && (
