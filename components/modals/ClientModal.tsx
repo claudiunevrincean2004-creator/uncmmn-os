@@ -191,7 +191,7 @@ export default function ClientModal({ client, defaultStartDate, onClose, onSaved
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
-              <label className="form-label">{billingType === 'One-time' ? 'Fee ($)' : 'Monthly Retainer ($)'}</label>
+              <label className="form-label">{isConsulting ? 'Fee per Call ($)' : billingType === 'One-time' ? 'Fee ($)' : 'Monthly Retainer ($)'}</label>
               <input className="form-input" type="number" value={retainer} onChange={e => setRetainer(e.target.value)} placeholder="0" />
             </div>
             {billingType === 'Retainer' && (

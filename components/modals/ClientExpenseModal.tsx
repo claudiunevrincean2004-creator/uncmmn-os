@@ -116,7 +116,12 @@ export default function ClientExpenseModal({ expense, clientId, clientName, mont
           </div>
           <div>
             <label className="form-label">Category</label>
-            <input className="form-input" value={category} onChange={e => setCategory(e.target.value)} placeholder="e.g. Freelance, Ads, Tools, Software..." />
+            <select className="form-input" value={category} onChange={e => setCategory(e.target.value)}>
+              <option value="">Select category...</option>
+              {['Software', 'Freelancer', 'Tools', 'Ads', 'Travel', 'Office', 'Other'].map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
           </div>
         </div>
 

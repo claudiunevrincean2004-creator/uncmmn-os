@@ -287,15 +287,47 @@ export default function Home() {
         {/* Client header + tabs */}
         {mainPage === 'client' && activeClient && (
           <div style={{ borderBottom: '0.5px solid #1a1a1a', padding: '14px 24px 0', flexShrink: 0 }}>
+            {/* Breadcrumb */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+              <button
+                onClick={() => handleSelectMain('clients')}
+                style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1 }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#444')}
+              >
+                ←
+              </button>
+              <span
+                style={{ fontSize: 12, color: '#444', cursor: 'pointer' }}
+                onClick={() => handleSelectMain('clients')}
+                onMouseEnter={e => (e.currentTarget.style.color = '#888')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#444')}
+              >
+                Clients
+              </span>
+              <span style={{ fontSize: 11, color: '#333' }}>&gt;</span>
+              <span style={{ fontSize: 12, color: '#888' }}>{activeClient.name}</span>
+            </div>
+
             {/* Client name + actions */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ fontSize: 16, fontWeight: 700 }}>{activeClient.name}</div>
-                {activeClient.client_type && (
-                  <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: '#6366f122', color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    {activeClient.client_type === 'DFY — Agency' ? 'DFY' : activeClient.client_type}
-                  </span>
-                )}
+                {activeClient.client_type && (() => {
+                  const tc: Record<string, { bg: string; text: string }> = {
+                    'DFY — Agency': { bg: '#3b82f622', text: '#3b82f6' },
+                    Consulting: { bg: '#8b5cf622', text: '#8b5cf6' },
+                    Coaching: { bg: '#10b98122', text: '#10b981' },
+                    Partnership: { bg: '#f59e0b22', text: '#f59e0b' },
+                    Other: { bg: '#6b728022', text: '#6b7280' },
+                  };
+                  const c = tc[activeClient.client_type] || tc.Other;
+                  return (
+                    <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: c.bg, color: c.text, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      {activeClient.client_type === 'DFY — Agency' ? 'DFY' : activeClient.client_type}
+                    </span>
+                  );
+                })()}
                 {activeClient.niche && (
                   <span style={{ fontSize: 11, color: '#444', padding: '2px 8px', border: '0.5px solid #2a2a2a', borderRadius: 4 }}>{activeClient.niche}</span>
                 )}

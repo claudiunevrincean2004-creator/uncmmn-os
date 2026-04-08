@@ -282,17 +282,26 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
     );
   }
 
+  const TYPE_COLORS: Record<string, { bg: string; text: string }> = {
+    'DFY — Agency': { bg: '#3b82f622', text: '#3b82f6' },
+    Consulting: { bg: '#8b5cf622', text: '#8b5cf6' },
+    Coaching: { bg: '#10b98122', text: '#10b981' },
+    Partnership: { bg: '#f59e0b22', text: '#f59e0b' },
+    Other: { bg: '#6b728022', text: '#6b7280' },
+  };
+
   function renderTypeBadge(clientType?: string) {
     if (!clientType) return null;
     const short = clientType === 'DFY — Agency' ? 'DFY' : clientType;
+    const tc = TYPE_COLORS[clientType] || TYPE_COLORS.Other;
     return (
       <span style={{
         fontSize: 8,
         fontWeight: 600,
         padding: '2px 5px',
         borderRadius: 3,
-        background: '#6366f122',
-        color: '#6366f1',
+        background: tc.bg,
+        color: tc.text,
         textTransform: 'uppercase',
         letterSpacing: '0.05em',
       }}>
