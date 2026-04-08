@@ -27,6 +27,9 @@ export default function ClientModal({ client, defaultStartDate, onClose, onSaved
   const [renewalDate, setRenewalDate] = useState('');
   const [startDate, setStartDate] = useState(defaultStartDate || '');
   const [saving, setSaving] = useState(false);
+  const nowDate = new Date();
+  const [lastActiveYear, setLastActiveYear] = useState(nowDate.getFullYear());
+  const [lastActiveMonth, setLastActiveMonth] = useState(nowDate.getMonth());
 
   useEffect(() => {
     if (client) {
@@ -40,6 +43,11 @@ export default function ClientModal({ client, defaultStartDate, onClose, onSaved
       setBillingType(client.billing_type || 'Retainer');
       setRenewalDate(client.renewal_date || '');
       setStartDate(client.start_date || '');
+      if (client.inactive_date) {
+        const d = new Date(client.inactive_date);
+        setLastActiveYear(d.getFullYear());
+        setLastActiveMonth(d.getMonth());
+      }
     } else if (defaultStartDate) {
       setStartDate(defaultStartDate);
     }
@@ -60,7 +68,7 @@ export default function ClientModal({ client, defaultStartDate, onClose, onSaved
     if (!name.trim()) return;
     setSaving(true);
 
-    const now = new Date().toISOString().split('T')[0];
+    const lastDayOfMonth = new Date(lastActiveYear, lastActiveMonth + 1, 0).toISOString().split('T')[0];
     const data: Record<string, unknown> = {
       name: name.trim(),
       niche: niche.trim(),
@@ -74,16 +82,19 @@ export default function ClientModal({ client, defaultStartDate, onClose, onSaved
       start_date: startDate || null,
     };
 
+    const isBecomingInactive = status === 'Inactive' || status === 'Paused';
+    const wasInactive = client?.status === 'Inactive' || client?.status === 'Paused';
+
     if (client?.id) {
-      if (status === 'Inactive' && client.status !== 'Inactive') {
-        data.inactive_date = now;
-      } else if (status !== 'Inactive' && client.status === 'Inactive') {
+      if (isBecomingInactive) {
+        data.inactive_date = lastDayOfMonth;
+      } else if (!isBecomingInactive && wasInactive) {
         data.inactive_date = null;
       }
       await supabase.from('clients').update(data).eq('id', client.id);
     } else {
-      if (status === 'Inactive') {
-        data.inactive_date = now;
+      if (isBecomingInactive) {
+        data.inactive_date = lastDayOfMonth;
       }
       await supabase.from('clients').insert([data]);
     }
@@ -149,6 +160,34 @@ export default function ClientModal({ client, defaultStartDate, onClose, onSaved
               <input className="form-input" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
             </div>
           </div>
+
+          {(status === 'Inactive' || status === 'Paused') && (
+            <div>
+              <label className="form-label">Last Active Month</label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <select
+                  className="form-input"
+                  value={lastActiveMonth}
+                  onChange={e => setLastActiveMonth(parseInt(e.target.value))}
+                  style={{ flex: 1 }}
+                >
+                  {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m, i) => (
+                    <option key={i} value={i}>{m}</option>
+                  ))}
+                </select>
+                <select
+                  className="form-input"
+                  value={lastActiveYear}
+                  onChange={e => setLastActiveYear(parseInt(e.target.value))}
+                  style={{ width: 90 }}
+                >
+                  {Array.from({ length: 10 }, (_, i) => nowDate.getFullYear() - 5 + i).map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>

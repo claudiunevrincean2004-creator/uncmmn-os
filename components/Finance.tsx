@@ -110,8 +110,8 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
     // Retainer billing
     if (month < startMonth) return false;
 
-    // If inactive, only show up to inactive_date month
-    if (c.status === 'Inactive' && c.inactive_date) {
+    // If inactive or paused, only show up to inactive_date month
+    if ((c.status === 'Inactive' || c.status === 'Paused') && c.inactive_date) {
       const inactiveMonth = c.inactive_date.slice(0, 7);
       if (month > inactiveMonth) return false;
     }
@@ -226,6 +226,19 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
   async function handleDeleteClient(clientId: string, clientName: string) {
     if (!confirm(`Delete "${clientName}"? This will permanently remove all their data and cannot be undone.`)) return;
     await supabase.from('clients').delete().eq('id', clientId);
+    onReload();
+  }
+
+  async function handleStatusChange(clientId: string, newStatus: 'Active' | 'Inactive' | 'Paused') {
+    const update: Record<string, unknown> = { status: newStatus };
+    if (newStatus === 'Active') {
+      update.inactive_date = null;
+    } else {
+      // Last day of the currently selected Finance month
+      const lastDay = new Date(selectedYear, selectedMonth + 1, 0);
+      update.inactive_date = lastDay.toISOString().split('T')[0];
+    }
+    await supabase.from('clients').update(update).eq('id', clientId);
     onReload();
   }
 
@@ -520,7 +533,39 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
                         </div>
                       </td>
                       <td>{renderTypeBadge(cr.client.client_type)}</td>
-                      <td>{renderStatusBadge(cr.client.status)}</td>
+                      <td onClick={e => e.stopPropagation()}>
+                        {viewMode === 'month' ? (
+                          <select
+                            value={cr.client.status || 'Active'}
+                            onChange={e => handleStatusChange(cr.client.id, e.target.value as 'Active' | 'Inactive' | 'Paused')}
+                            style={{
+                              fontSize: 9,
+                              fontWeight: 600,
+                              padding: '2px 4px',
+                              borderRadius: 4,
+                              background: (STATUS_COLORS[cr.client.status || 'Active'] || STATUS_COLORS.Active).bg,
+                              color: (STATUS_COLORS[cr.client.status || 'Active'] || STATUS_COLORS.Active).text,
+                              border: 'none',
+                              cursor: 'pointer',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                              appearance: 'none',
+                              WebkitAppearance: 'none',
+                              paddingRight: 14,
+                              backgroundImage: `url("data:image/svg+xml,%3Csvg width='8' height='5' viewBox='0 0 8 5' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l3 3 3-3' stroke='%23666' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                              backgroundRepeat: 'no-repeat',
+                              backgroundPosition: 'right 3px center',
+                              fontFamily: 'inherit',
+                            }}
+                          >
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                            <option value="Paused">Paused</option>
+                          </select>
+                        ) : (
+                          renderStatusBadge(cr.client.status)
+                        )}
+                      </td>
                       <td style={{ color: '#10b981' }}>
                         {viewMode === 'month' ? (
                           showRevenueEdit === cr.client.id ? (
