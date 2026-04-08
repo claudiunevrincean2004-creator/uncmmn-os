@@ -108,7 +108,15 @@ export default function ExpenseModal({ expense, month, existingNames = [], onClo
             <label className="form-label">Category</label>
             <select className="form-input" value={category} onChange={e => setCategory(e.target.value)}>
               <option value="">Select category...</option>
-              {['Software', 'Freelancer', 'Tools', 'Ads', 'Travel', 'Office', 'Other'].map(c => (
+              {[
+                'Software & Subscriptions',
+                'Contractors & Team',
+                'Sales & Marketing',
+                'Professional Development',
+                'Admin & Compliance',
+                'Banking & Fees',
+                'Equipment',
+              ].map(c => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>

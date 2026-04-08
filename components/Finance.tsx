@@ -156,7 +156,12 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
       expenseCategories[cat].push(e);
     });
 
-    return { totalRevenue, totalExpenses: grandTotalExpenses, netProfit, margin, clientBreakdown, expenseCategories, allExpenses, operationalExpenses: totalExpenses, totalClientExpenses: totalClientExp };
+    const grossProfit = totalRevenue - totalClientExp;
+    const taxEstimate = Math.max(0, grossProfit * 0.16);
+    const realNetProfit = grossProfit - totalExpenses - taxEstimate;
+    const realMargin = totalRevenue > 0 ? (realNetProfit / totalRevenue) * 100 : 0;
+
+    return { totalRevenue, totalExpenses: grandTotalExpenses, netProfit: realNetProfit, margin: realMargin, grossProfit, taxEstimate, clientBreakdown, expenseCategories, allExpenses, operationalExpenses: totalExpenses, totalClientExpenses: totalClientExp };
   }
 
   const viewData = useMemo(() => {
@@ -185,8 +190,6 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
     }
     return { revenueData, profitData };
   }, [selectedYear, clients, monthlyRevenue, monthlyExpenses, clientExpenses, clientMonthExclusions]);
-
-  const activeClientCount = clients.filter(c => c.status === 'Active').length;
 
   async function deleteExpense(id: string) {
     if (!confirm('Delete this expense?')) return;
@@ -331,7 +334,7 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-            <button className="btn-ghost" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => setSelectedYear(y => y - 1)}>&lt;</button>
+            <button className="btn-ghost" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => setSelectedYear(y => Math.max(2026, y - 1))} disabled={selectedYear <= 2026}>&lt;</button>
             <span style={{ fontSize: 13, fontWeight: 700, minWidth: 44, textAlign: 'center' }}>{selectedYear}</span>
             <button className="btn-ghost" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => setSelectedYear(y => y + 1)}>&gt;</button>
           </div>
@@ -358,18 +361,15 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
         )}
       </div>
 
-      {/* Metrics — including Active Clients stat */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 16 }}>
-        <div className="metric-chip">
-          <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>Active Clients</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#6366f1', marginBottom: 3 }}>{activeClientCount}</div>
-          <div style={{ fontSize: 11, color: '#444' }}>currently active</div>
-        </div>
+      {/* Metrics */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10, marginBottom: 16 }}>
         {[
           { label: 'Total Revenue', value: fm(viewData.totalRevenue), sub: viewLabel, color: '#10b981' },
-          { label: 'Total Expenses', value: fm(viewData.totalExpenses), sub: `${viewData.allExpenses.length} operational + client`, color: '#f59e0b' },
+          { label: 'Fulfillment Costs', value: fm(viewData.totalClientExpenses), sub: `${viewData.clientBreakdown.length} clients`, color: '#f59e0b' },
+          { label: 'Gross Profit', value: fm(viewData.grossProfit), sub: `revenue − fulfillment`, color: '#3b82f6' },
+          { label: 'Operating Expenses', value: fm(viewData.operationalExpenses), sub: `${viewData.allExpenses.length} items`, color: '#ef4444' },
+          { label: 'Tax Estimate', value: fm(viewData.taxEstimate), sub: '~16% of gross profit', color: '#eab308' },
           { label: 'Net Profit', value: fm(viewData.netProfit), sub: `${viewData.margin.toFixed(1)}% margin`, color: viewData.netProfit >= 0 ? '#10b981' : '#ef4444' },
-          { label: 'Profit Margin', value: `${viewData.margin.toFixed(1)}%`, sub: viewData.netProfit >= 0 ? 'healthy' : 'negative', color: viewData.netProfit >= 0 ? '#10b981' : '#ef4444' },
         ].map(m => (
           <div key={m.label} className="metric-chip">
             <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>{m.label}</div>
@@ -518,7 +518,7 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
                   <th>Type</th>
                   <th>Status</th>
                   <th>Retainer</th>
-                  <th>Client Expenses</th>
+                  <th>Fulfillment</th>
                   <th>Net Profit</th>
                   <th>Margin</th>
                   {viewMode === 'month' && <th></th>}
@@ -656,7 +656,7 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
                     {expandedClient === cr.client.id && cr.expenses.length > 0 && (
                       <tr>
                         <td colSpan={viewMode === 'month' ? 8 : 7} style={{ padding: '8px 16px', background: '#0a0a0a' }}>
-                          <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8, fontWeight: 600 }}>Client Expenses Breakdown</div>
+                          <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8, fontWeight: 600 }}>Fulfillment Costs</div>
                           {cr.expenses.map(exp => (
                             <div key={exp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: '0.5px solid #1a1a1a' }}>
                               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
