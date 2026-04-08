@@ -57,18 +57,34 @@ export default function ClientsPage({ clients, onSelectClient, onAddClient }: Pr
             </div>
             <div>
               <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 3 }}>{client.name}</div>
-              <span style={{
-                fontSize: 9,
-                fontWeight: 600,
-                padding: '2px 6px',
-                borderRadius: 4,
-                background: colors.bg,
-                color: colors.text,
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-              }}>
-                {status}
-              </span>
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                <span style={{
+                  fontSize: 9,
+                  fontWeight: 600,
+                  padding: '2px 6px',
+                  borderRadius: 4,
+                  background: colors.bg,
+                  color: colors.text,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}>
+                  {status}
+                </span>
+                {client.client_type && (
+                  <span style={{
+                    fontSize: 8,
+                    fontWeight: 600,
+                    padding: '2px 5px',
+                    borderRadius: 3,
+                    background: '#6366f122',
+                    color: '#6366f1',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}>
+                    {client.client_type === 'DFY — Agency' ? 'DFY' : client.client_type}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>

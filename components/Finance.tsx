@@ -5,6 +5,7 @@ import { Client, MonthlyRevenue, MonthlyExpense, ClientExpense, ClientMonthExclu
 import { fm, getColor } from '@/lib/utils';
 import ExpenseModal from '@/components/modals/ExpenseModal';
 import ClientExpenseModal from '@/components/modals/ClientExpenseModal';
+import ClientModal from '@/components/modals/ClientModal';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -44,8 +45,6 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   Paused: { bg: '#f59e0b22', text: '#f59e0b' },
 };
 
-const PLATFORM_OPTIONS = ['Instagram', 'TikTok', 'YouTube'];
-
 function monthKey(year: number, month: number): string {
   return `${year}-${String(month + 1).padStart(2, '0')}`;
 }
@@ -65,15 +64,6 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
   const [expandedClient, setExpandedClient] = useState<string | null>(null);
   const [showAddClientModal, setShowAddClientModal] = useState(false);
 
-  // Add client modal state
-  const [newClientName, setNewClientName] = useState('');
-  const [newClientStatus, setNewClientStatus] = useState<'Active' | 'Inactive' | 'Paused'>('Inactive');
-  const [newClientRetainer, setNewClientRetainer] = useState('');
-  const [newClientStartDate, setNewClientStartDate] = useState('');
-  const [newClientPlatforms, setNewClientPlatforms] = useState<string[]>([]);
-  const [newClientRenewalDate, setNewClientRenewalDate] = useState('');
-  const [savingClient, setSavingClient] = useState(false);
-
   const mk = monthKey(selectedYear, selectedMonth);
 
   const exclusionSet = useMemo(() => {
@@ -91,11 +81,12 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
   }
 
   function getClientRevenue(clientId: string, month: string): number {
-    if (isClientExcluded(clientId, month)) return 0;
+    const client = clients.find(c => c.id === clientId);
+    if (!client) return 0;
+    if (!clientVisibleInMonth(client, month)) return 0;
     const entry = monthlyRevenue.find(r => r.client_id === clientId && r.month === month);
     if (entry) return entry.amount;
-    const client = clients.find(c => c.id === clientId);
-    return client?.retainer || 0;
+    return client.retainer || 0;
   }
 
   function getMonthExpenses(month: string): MonthlyExpense[] {
@@ -106,11 +97,30 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
     return clientExpenses.filter(e => e.client_id === clientId && months.includes(e.month) && !isClientExcluded(clientId, e.month));
   }
 
-  function clientVisibleInMonths(c: Client, months: string[]): boolean {
-    if (isClientExcludedFromMonths(c.id, months)) return false;
+  function clientVisibleInMonth(c: Client, month: string): boolean {
+    if (isClientExcluded(c.id, month)) return false;
     if (!c.start_date) return true;
     const startMonth = c.start_date.slice(0, 7);
-    return months.some(m => m >= startMonth);
+
+    // One-time billing: show ONLY in the start_date month
+    if (c.billing_type === 'One-time') {
+      return month === startMonth;
+    }
+
+    // Retainer billing
+    if (month < startMonth) return false;
+
+    // If inactive, only show up to inactive_date month
+    if (c.status === 'Inactive' && c.inactive_date) {
+      const inactiveMonth = c.inactive_date.slice(0, 7);
+      if (month > inactiveMonth) return false;
+    }
+
+    return true;
+  }
+
+  function clientVisibleInMonths(c: Client, months: string[]): boolean {
+    return months.some(m => clientVisibleInMonth(c, m));
   }
 
   function computeTotals(months: string[]) {
@@ -213,28 +223,9 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
     onReload();
   }
 
-  async function handleSaveNewClient() {
-    if (!newClientName.trim()) return;
-    setSavingClient(true);
-    const defaultStartDate = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`;
-    await supabase.from('clients').insert([{
-      name: newClientName.trim(),
-      niche: '',
-      retainer: parseFloat(newClientRetainer) || 0,
-      cost: 0,
-      platforms: newClientPlatforms,
-      status: newClientStatus,
-      start_date: newClientStartDate || defaultStartDate,
-      renewal_date: newClientRenewalDate || null,
-    }]);
-    setSavingClient(false);
-    setShowAddClientModal(false);
-    setNewClientName('');
-    setNewClientStatus('Inactive');
-    setNewClientRetainer('');
-    setNewClientStartDate(defaultStartDate);
-    setNewClientPlatforms([]);
-    setNewClientRenewalDate('');
+  async function handleDeleteClient(clientId: string, clientName: string) {
+    if (!confirm(`Delete "${clientName}"? This will permanently remove all their data and cannot be undone.`)) return;
+    await supabase.from('clients').delete().eq('id', clientId);
     onReload();
   }
 
@@ -278,6 +269,25 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
     );
   }
 
+  function renderTypeBadge(clientType?: string) {
+    if (!clientType) return null;
+    const short = clientType === 'DFY — Agency' ? 'DFY' : clientType;
+    return (
+      <span style={{
+        fontSize: 8,
+        fontWeight: 600,
+        padding: '2px 5px',
+        borderRadius: 3,
+        background: '#6366f122',
+        color: '#6366f1',
+        textTransform: 'uppercase',
+        letterSpacing: '0.05em',
+      }}>
+        {short}
+      </span>
+    );
+  }
+
   return (
     <div style={{ padding: '20px 24px', overflowY: 'auto', height: '100%' }}>
       {/* Header */}
@@ -289,7 +299,7 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
         <button
           className="btn-primary"
           style={{ fontSize: 11, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 4 }}
-          onClick={() => { setNewClientStartDate(`${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`); setShowAddClientModal(true); }}
+          onClick={() => setShowAddClientModal(true)}
         >
           + Add Client
         </button>
@@ -483,6 +493,7 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
               <thead>
                 <tr>
                   <th>Client</th>
+                  <th>Type</th>
                   <th>Status</th>
                   <th>Retainer</th>
                   <th>Client Expenses</th>
@@ -508,6 +519,7 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
                           )}
                         </div>
                       </td>
+                      <td>{renderTypeBadge(cr.client.client_type)}</td>
                       <td>{renderStatusBadge(cr.client.status)}</td>
                       <td style={{ color: '#10b981' }}>
                         {viewMode === 'month' ? (
@@ -561,7 +573,7 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
                             </button>
                             <button
                               className="btn-ghost"
-                              style={{ fontSize: 10, padding: '2px 6px', color: '#ef4444', borderColor: '#ef444444' }}
+                              style={{ fontSize: 10, padding: '2px 6px', color: '#f59e0b', borderColor: '#f59e0b44' }}
                               title={`Remove ${cr.client.name} from ${MONTHS[selectedMonth]} ${selectedYear}`}
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -570,13 +582,26 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
                             >
                               −
                             </button>
+                            <button
+                              className="btn-ghost"
+                              style={{ fontSize: 10, padding: '2px 6px', color: '#ef4444', borderColor: '#ef444444' }}
+                              title={`Delete ${cr.client.name} permanently`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteClient(cr.client.id, cr.client.name);
+                              }}
+                            >
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                              </svg>
+                            </button>
                           </div>
                         </td>
                       )}
                     </tr>
                     {expandedClient === cr.client.id && cr.expenses.length > 0 && (
                       <tr>
-                        <td colSpan={viewMode === 'month' ? 7 : 6} style={{ padding: '8px 16px', background: '#0a0a0a' }}>
+                        <td colSpan={viewMode === 'month' ? 8 : 7} style={{ padding: '8px 16px', background: '#0a0a0a' }}>
                           <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8, fontWeight: 600 }}>Client Expenses Breakdown</div>
                           {cr.expenses.map(exp => (
                             <div key={exp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: '0.5px solid #1a1a1a' }}>
@@ -703,78 +728,12 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
         />
       )}
 
-      {/* Add Client Modal */}
       {showAddClientModal && (
-        <div className="modal-overlay" onClick={() => setShowAddClientModal(false)}>
-          <div className="modal-box" onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <span style={{ fontSize: 13, fontWeight: 700 }}>Add Client</span>
-              <button onClick={() => setShowAddClientModal(false)} style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 16 }}>✕</button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div>
-                <label className="form-label">Client Name</label>
-                <input className="form-input" value={newClientName} onChange={e => setNewClientName(e.target.value)} placeholder="e.g. Acme Corp" />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div>
-                  <label className="form-label">Status</label>
-                  <select className="form-input" value={newClientStatus} onChange={e => setNewClientStatus(e.target.value as 'Active' | 'Inactive' | 'Paused')}>
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                    <option value="Paused">Paused</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label">Monthly Retainer ($)</label>
-                  <input className="form-input" type="number" value={newClientRetainer} onChange={e => setNewClientRetainer(e.target.value)} placeholder="0" />
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div>
-                  <label className="form-label">Start Date</label>
-                  <input className="form-input" type="date" value={newClientStartDate} onChange={e => setNewClientStartDate(e.target.value)} />
-                </div>
-                <div>
-                  <label className="form-label">Renewal Date</label>
-                  <input className="form-input" type="date" value={newClientRenewalDate} onChange={e => setNewClientRenewalDate(e.target.value)} />
-                </div>
-              </div>
-              <div>
-                <label className="form-label">Platforms</label>
-                <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                  {PLATFORM_OPTIONS.map(p => (
-                    <button
-                      key={p}
-                      onClick={() => setNewClientPlatforms(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p])}
-                      style={{
-                        padding: '5px 10px',
-                        borderRadius: 6,
-                        border: '0.5px solid',
-                        borderColor: newClientPlatforms.includes(p) ? '#fff' : '#2a2a2a',
-                        background: newClientPlatforms.includes(p) ? '#fff' : 'transparent',
-                        color: newClientPlatforms.includes(p) ? '#000' : '#555',
-                        fontSize: 11,
-                        cursor: 'pointer',
-                        fontFamily: 'inherit',
-                      }}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}>
-              <button className="btn-ghost" onClick={() => setShowAddClientModal(false)}>Cancel</button>
-              <button className="btn-primary" onClick={handleSaveNewClient} disabled={savingClient}>
-                {savingClient ? 'Saving...' : 'Add Client'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ClientModal
+          defaultStartDate={`${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`}
+          onClose={() => setShowAddClientModal(false)}
+          onSaved={onReload}
+        />
       )}
     </div>
   );

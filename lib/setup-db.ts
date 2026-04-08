@@ -1,13 +1,10 @@
 import { supabase } from './supabase';
 
-/**
- * Checks which tables exist and returns missing ones.
- * Call this on app load to detect schema issues early.
- */
 export async function checkSchema(): Promise<{ missing: string[]; clientColumnsMissing: string[]; postColumnsMissing: string[] }> {
   const requiredTables = [
     'clients', 'posts', 'goals', 'hooks', 'formats', 'pillars',
-    'drive_folders', 'expenses', 'monthly_revenue', 'monthly_expenses', 'client_expenses', 'client_month_exclusions',
+    'drive_folders', 'expenses', 'monthly_revenue', 'monthly_expenses',
+    'client_expenses', 'client_month_exclusions', 'consulting_calls', 'consulting_ideas',
   ];
 
   const missing: string[] = [];
@@ -18,16 +15,15 @@ export async function checkSchema(): Promise<{ missing: string[]; clientColumnsM
     }
   }
 
-  // Check if clients table has the new columns
+  // Check if clients table has required columns
   const clientColumnsMissing: string[] = [];
   if (!missing.includes('clients')) {
     const { data } = await supabase.from('clients').select('*').limit(1);
     if (data && data.length > 0) {
       const cols = Object.keys(data[0]);
-      if (!cols.includes('status')) clientColumnsMissing.push('status');
-      if (!cols.includes('renewal_date')) clientColumnsMissing.push('renewal_date');
-      if (!cols.includes('notes')) clientColumnsMissing.push('notes');
-      if (!cols.includes('start_date')) clientColumnsMissing.push('start_date');
+      for (const col of ['status', 'renewal_date', 'notes', 'start_date', 'client_type', 'billing_type', 'inactive_date']) {
+        if (!cols.includes(col)) clientColumnsMissing.push(col);
+      }
     }
   }
 
@@ -44,9 +40,6 @@ export async function checkSchema(): Promise<{ missing: string[]; clientColumnsM
   return { missing, clientColumnsMissing, postColumnsMissing };
 }
 
-/**
- * Returns the SQL needed to fix the schema.
- */
 export function getMigrationSQL(missing: string[], clientColumnsMissing: string[], postColumnsMissing: string[] = []): string {
   const parts: string[] = [];
 
@@ -97,6 +90,30 @@ alter table client_expenses disable row level security;`);
 alter table client_month_exclusions disable row level security;`);
   }
 
+  if (missing.includes('consulting_calls')) {
+    parts.push(`create table if not exists consulting_calls (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid references clients(id) on delete cascade,
+  date date,
+  duration_minutes integer default 0,
+  amount numeric default 0,
+  notes text,
+  created_at timestamptz default now()
+);
+alter table consulting_calls disable row level security;`);
+  }
+
+  if (missing.includes('consulting_ideas')) {
+    parts.push(`create table if not exists consulting_ideas (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid references clients(id) on delete cascade,
+  text text not null,
+  status text default 'Pending',
+  created_at timestamptz default now()
+);
+alter table consulting_ideas disable row level security;`);
+  }
+
   if (clientColumnsMissing.includes('status')) {
     parts.push(`alter table clients add column if not exists status text default 'Active';`);
   }
@@ -108,6 +125,15 @@ alter table client_month_exclusions disable row level security;`);
   }
   if (clientColumnsMissing.includes('start_date')) {
     parts.push(`alter table clients add column if not exists start_date date;`);
+  }
+  if (clientColumnsMissing.includes('client_type')) {
+    parts.push(`alter table clients add column if not exists client_type text;`);
+  }
+  if (clientColumnsMissing.includes('billing_type')) {
+    parts.push(`alter table clients add column if not exists billing_type text default 'Retainer';`);
+  }
+  if (clientColumnsMissing.includes('inactive_date')) {
+    parts.push(`alter table clients add column if not exists inactive_date date;`);
   }
 
   if (postColumnsMissing.includes('post_url')) {

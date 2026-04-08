@@ -124,6 +124,26 @@ create table if not exists client_month_exclusions (
   unique(client_id, month)
 );
 
+-- Consulting calls (for consulting-type clients)
+create table if not exists consulting_calls (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid references clients(id) on delete cascade,
+  date date,
+  duration_minutes integer default 0,
+  amount numeric default 0,
+  notes text,
+  created_at timestamptz default now()
+);
+
+-- Consulting ideas/action items
+create table if not exists consulting_ideas (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid references clients(id) on delete cascade,
+  text text not null,
+  status text default 'Pending',
+  created_at timestamptz default now()
+);
+
 -- Subscriber snapshots (populated by external Google Apps Script every 12h)
 -- This table should already exist if you use the follower tracking script
 create table if not exists subscriber_snapshots (
@@ -150,6 +170,18 @@ begin
   if not exists (select 1 from information_schema.columns where table_name='posts' and column_name='post_url') then
     alter table posts add column post_url text;
   end if;
+  if not exists (select 1 from information_schema.columns where table_name='clients' and column_name='client_type') then
+    alter table clients add column client_type text;
+  end if;
+  if not exists (select 1 from information_schema.columns where table_name='clients' and column_name='billing_type') then
+    alter table clients add column billing_type text default 'Retainer';
+  end if;
+  if not exists (select 1 from information_schema.columns where table_name='clients' and column_name='inactive_date') then
+    alter table clients add column inactive_date date;
+  end if;
+  if not exists (select 1 from information_schema.columns where table_name='clients' and column_name='start_date') then
+    alter table clients add column start_date date;
+  end if;
 end $$;
 
 -- Disable RLS for simplicity (enable and add policies for production)
@@ -166,3 +198,5 @@ alter table monthly_expenses disable row level security;
 alter table client_expenses disable row level security;
 alter table client_month_exclusions disable row level security;
 alter table subscriber_snapshots disable row level security;
+alter table consulting_calls disable row level security;
+alter table consulting_ideas disable row level security;

@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { checkSchema, getMigrationSQL } from '@/lib/setup-db';
-import { Client, Post, Goal, Hook, Format, Pillar, DriveFolder, Expense, MonthlyRevenue, MonthlyExpense, ClientExpense, ClientMonthExclusion, SubscriberSnapshot, MainPage, ClientTab } from '@/lib/types';
+import { Client, Post, Goal, Hook, Format, Pillar, DriveFolder, Expense, MonthlyRevenue, MonthlyExpense, ClientExpense, ClientMonthExclusion, SubscriberSnapshot, ConsultingCall, ConsultingIdea, MainPage, ClientTab } from '@/lib/types';
 
 import Sidebar from '@/components/Sidebar';
 import Overview from '@/components/Overview';
@@ -19,6 +19,7 @@ import ClientModal from '@/components/modals/ClientModal';
 import ClientSidebar from '@/components/ClientSidebar';
 import ClientsPage from '@/components/ClientsPage';
 import PlatformIcon from '@/components/PlatformIcon';
+import ConsultingDashboard from '@/components/sub/ConsultingDashboard';
 
 // Helper: query a table, return [] if the table doesn't exist
 async function safeSelect(table: string, orderCol: string, ascending = true) {
@@ -68,6 +69,8 @@ export default function Home() {
   const [clientExpenses, setClientExpenses] = useState<ClientExpense[]>([]);
   const [clientMonthExclusions, setClientMonthExclusions] = useState<ClientMonthExclusion[]>([]);
   const [subscriberSnapshots, setSubscriberSnapshots] = useState<SubscriberSnapshot[]>([]);
+  const [consultingCalls, setConsultingCalls] = useState<ConsultingCall[]>([]);
+  const [consultingIdeas, setConsultingIdeas] = useState<ConsultingIdea[]>([]);
   const [loading, setLoading] = useState(true);
   const [schemaMissing, setSchemaMissing] = useState<{ missing: string[]; clientColumnsMissing: string[]; postColumnsMissing: string[] } | null>(null);
   const [showMigrationSQL, setShowMigrationSQL] = useState(false);
@@ -88,7 +91,7 @@ export default function Home() {
   const [sidebarMonth, setSidebarMonth] = useState<string | undefined>(undefined);
 
   const loadData = useCallback(async () => {
-    const [c, p, g, h, f, pl, d, e, mr, me, ce, cme, ss] = await Promise.all([
+    const [c, p, g, h, f, pl, d, e, mr, me, ce, cme, ss, cc, ci] = await Promise.all([
       safeSelect('clients', 'name'),
       safeSelect('posts', 'date', false),
       safeSelect('goals', 'created_at'),
@@ -102,6 +105,8 @@ export default function Home() {
       safeSelect('client_expenses', 'month'),
       safeSelect('client_month_exclusions', 'month'),
       safeSelect('subscriber_snapshots', 'date'),
+      safeSelect('consulting_calls', 'date', false),
+      safeSelect('consulting_ideas', 'created_at'),
     ]);
     setClients(c as Client[]);
     setPosts(p as Post[]);
@@ -116,6 +121,8 @@ export default function Home() {
     setClientExpenses(ce as ClientExpense[]);
     setClientMonthExclusions(cme as ClientMonthExclusion[]);
     setSubscriberSnapshots(ss as SubscriberSnapshot[]);
+    setConsultingCalls(cc as ConsultingCall[]);
+    setConsultingIdeas(ci as ConsultingIdea[]);
     setLoading(false);
   }, []);
 
@@ -153,6 +160,7 @@ export default function Home() {
   }
 
   const activeClient = clients.find(c => c.id === activeClientId) || null;
+  const isConsultingClient = activeClient?.client_type === 'Consulting';
   const clientPlatforms = activeClient?.platforms?.length ? ['All', ...activeClient.platforms] : ['All', 'Instagram', 'TikTok', 'YouTube'];
 
   async function handleDeleteClient() {
@@ -166,6 +174,9 @@ export default function Home() {
 
   function renderClientContent() {
     if (!activeClient) return null;
+    if (isConsultingClient) {
+      return <ConsultingDashboard client={activeClient} calls={consultingCalls} ideas={consultingIdeas} onReload={loadData} />;
+    }
     switch (clientTab) {
       case 'overview':
         return <ClientOverview client={activeClient} posts={posts} goals={goals} pillars={pillars} formats={formats} subscriberSnapshots={subscriberSnapshots} activePlat={activePlat} showCmp={showCmp} timePeriod={timePeriod} />;
@@ -280,6 +291,11 @@ export default function Home() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ fontSize: 16, fontWeight: 700 }}>{activeClient.name}</div>
+                {activeClient.client_type && (
+                  <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: '#6366f122', color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {activeClient.client_type === 'DFY — Agency' ? 'DFY' : activeClient.client_type}
+                  </span>
+                )}
                 {activeClient.niche && (
                   <span style={{ fontSize: 11, color: '#444', padding: '2px 8px', border: '0.5px solid #2a2a2a', borderRadius: 4 }}>{activeClient.niche}</span>
                 )}
@@ -302,57 +318,61 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Platform filter + Time period + Comparison toggle */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', gap: 4 }}>
-                {clientPlatforms.map(p => (
-                  <button
-                    key={p}
-                    className={`subtab${activePlat === p ? ' active' : ''}`}
-                    onClick={() => setActivePlat(p)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 4 }}
-                  >
-                    {p !== 'All' && <PlatformIcon platform={p} size={14} />}
-                    {p}
-                  </button>
-                ))}
-              </div>
-              {clientTab === 'overview' && (
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <select
-                    className="form-input"
-                    style={{ width: 'auto', padding: '4px 8px', fontSize: 11, background: '#111', border: '0.5px solid #2a2a2a', borderRadius: 6, color: '#ccc' }}
-                    value={timePeriod}
-                    onChange={e => setTimePeriod(e.target.value as TimePeriod)}
-                  >
-                    {(Object.entries(TIME_PERIOD_LABELS) as [TimePeriod, string][]).map(([key, label]) => (
-                      <option key={key} value={key}>{label}</option>
+            {/* Platform filter + Time period + Comparison toggle — hide for consulting */}
+            {!isConsultingClient && (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {clientPlatforms.map(p => (
+                      <button
+                        key={p}
+                        className={`subtab${activePlat === p ? ' active' : ''}`}
+                        onClick={() => setActivePlat(p)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+                      >
+                        {p !== 'All' && <PlatformIcon platform={p} size={14} />}
+                        {p}
+                      </button>
                     ))}
-                  </select>
-                  <button
-                    className={`btn-compare${showCmp ? ' active' : ''}`}
-                    onClick={() => setShowCmp(v => !v)}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                    vs Previous Period
-                  </button>
+                  </div>
+                  {clientTab === 'overview' && (
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <select
+                        className="form-input"
+                        style={{ width: 'auto', padding: '4px 8px', fontSize: 11, background: '#111', border: '0.5px solid #2a2a2a', borderRadius: 6, color: '#ccc' }}
+                        value={timePeriod}
+                        onChange={e => setTimePeriod(e.target.value as TimePeriod)}
+                      >
+                        {(Object.entries(TIME_PERIOD_LABELS) as [TimePeriod, string][]).map(([key, label]) => (
+                          <option key={key} value={key}>{label}</option>
+                        ))}
+                      </select>
+                      <button
+                        className={`btn-compare${showCmp ? ' active' : ''}`}
+                        onClick={() => setShowCmp(v => !v)}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                        vs Previous Period
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* Client tabs */}
-            <div style={{ display: 'flex', gap: 2, marginBottom: -1 }}>
-              {CLIENT_TABS.map(tab => (
-                <button
-                  key={tab.key}
-                  className={`subtab${clientTab === tab.key ? ' active' : ''}`}
-                  onClick={() => setClientTab(tab.key)}
-                  style={{ borderRadius: '6px 6px 0 0', padding: '6px 12px' }}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+                {/* Client tabs */}
+                <div style={{ display: 'flex', gap: 2, marginBottom: -1 }}>
+                  {CLIENT_TABS.map(tab => (
+                    <button
+                      key={tab.key}
+                      className={`subtab${clientTab === tab.key ? ' active' : ''}`}
+                      onClick={() => setClientTab(tab.key)}
+                      style={{ borderRadius: '6px 6px 0 0', padding: '6px 12px' }}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
 

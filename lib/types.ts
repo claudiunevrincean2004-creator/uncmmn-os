@@ -1,3 +1,6 @@
+export type ClientType = 'DFY — Agency' | 'Consulting' | 'Coaching' | 'Partnership' | 'Other';
+export type BillingType = 'Retainer' | 'One-time';
+
 export interface Client {
   id: string;
   name: string;
@@ -6,8 +9,11 @@ export interface Client {
   cost: number;
   platforms: string[];
   status?: 'Active' | 'Inactive' | 'Paused';
+  client_type?: ClientType;
+  billing_type?: BillingType;
   renewal_date?: string;
   start_date?: string;
+  inactive_date?: string;
   notes?: string;
   created_at?: string;
 }
@@ -125,6 +131,24 @@ export interface ClientMonthExclusion {
   id: string;
   client_id: string;
   month: string; // YYYY-MM
+  created_at?: string;
+}
+
+export interface ConsultingCall {
+  id: string;
+  client_id: string;
+  date: string;
+  duration_minutes: number;
+  amount: number;
+  notes: string;
+  created_at?: string;
+}
+
+export interface ConsultingIdea {
+  id: string;
+  client_id: string;
+  text: string;
+  status: 'Pending' | 'Discussed' | 'Implemented';
   created_at?: string;
 }
 
