@@ -21,7 +21,7 @@ const CLIENT_TYPE_COLORS: Record<string, { bg: string; text: string; border: str
   Consulting: { bg: '#8b5cf622', text: '#8b5cf6', border: '#8b5cf6' },
   Coaching: { bg: '#10b98122', text: '#10b981', border: '#10b981' },
   Partnership: { bg: '#f59e0b22', text: '#f59e0b', border: '#f59e0b' },
-  'One-Off Project': { bg: '#06b6d422', text: '#06b6d4', border: '#06b6d4' },
+  'One-Off Project': { bg: '#00B8A922', text: '#00B8A9', border: '#00B8A9' },
   Other: { bg: '#6b728022', text: '#6b7280', border: '#6b7280' },
 };
 
