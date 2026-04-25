@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { checkSchema, getMigrationSQL } from '@/lib/setup-db';
-import { Client, Post, Goal, Hook, Format, Pillar, DriveFolder, Expense, MonthlyRevenue, MonthlyExpense, ClientExpense, ClientMonthExclusion, SubscriberSnapshot, ConsultingCall, ConsultingIdea, MainPage, ClientTab } from '@/lib/types';
+import { Client, Post, Goal, Hook, Format, Pillar, DriveFolder, Expense, MonthlyRevenue, MonthlyExpense, ClientExpense, ClientMonthExclusion, SubscriberSnapshot, ConsultingCall, ConsultingIdea, ProjectTask, ProjectNote, MainPage, ClientTab } from '@/lib/types';
 
 import Sidebar from '@/components/Sidebar';
 import Overview from '@/components/Overview';
@@ -20,6 +20,7 @@ import ClientSidebar from '@/components/ClientSidebar';
 import ClientsPage from '@/components/ClientsPage';
 import PlatformIcon from '@/components/PlatformIcon';
 import ConsultingDashboard from '@/components/sub/ConsultingDashboard';
+import OneOffProjectDashboard from '@/components/sub/OneOffProjectDashboard';
 
 // Helper: query a table, return [] if the table doesn't exist
 async function safeSelect(table: string, orderCol: string, ascending = true) {
@@ -71,6 +72,8 @@ export default function Home() {
   const [subscriberSnapshots, setSubscriberSnapshots] = useState<SubscriberSnapshot[]>([]);
   const [consultingCalls, setConsultingCalls] = useState<ConsultingCall[]>([]);
   const [consultingIdeas, setConsultingIdeas] = useState<ConsultingIdea[]>([]);
+  const [projectTasks, setProjectTasks] = useState<ProjectTask[]>([]);
+  const [projectNotes, setProjectNotes] = useState<ProjectNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [schemaMissing, setSchemaMissing] = useState<{ missing: string[]; clientColumnsMissing: string[]; postColumnsMissing: string[] } | null>(null);
   const [showMigrationSQL, setShowMigrationSQL] = useState(false);
@@ -91,7 +94,7 @@ export default function Home() {
   const [sidebarMonth, setSidebarMonth] = useState<string | undefined>(undefined);
 
   const loadData = useCallback(async () => {
-    const [c, p, g, h, f, pl, d, e, mr, me, ce, cme, ss, cc, ci] = await Promise.all([
+    const [c, p, g, h, f, pl, d, e, mr, me, ce, cme, ss, cc, ci, pt, pn] = await Promise.all([
       safeSelect('clients', 'name'),
       safeSelect('posts', 'date', false),
       safeSelect('goals', 'created_at'),
@@ -107,6 +110,8 @@ export default function Home() {
       safeSelect('subscriber_snapshots', 'date'),
       safeSelect('consulting_calls', 'date', false),
       safeSelect('consulting_ideas', 'created_at'),
+      safeSelect('project_tasks', 'created_at'),
+      safeSelect('project_notes', 'created_at', false),
     ]);
     setClients(c as Client[]);
     setPosts(p as Post[]);
@@ -123,6 +128,8 @@ export default function Home() {
     setSubscriberSnapshots(ss as SubscriberSnapshot[]);
     setConsultingCalls(cc as ConsultingCall[]);
     setConsultingIdeas(ci as ConsultingIdea[]);
+    setProjectTasks(pt as ProjectTask[]);
+    setProjectNotes(pn as ProjectNote[]);
     setLoading(false);
   }, []);
 
@@ -161,6 +168,8 @@ export default function Home() {
 
   const activeClient = clients.find(c => c.id === activeClientId) || null;
   const isConsultingClient = activeClient?.client_type === 'Consulting';
+  const isOneOffClient = activeClient?.client_type === 'One-Off Project';
+  const useSpecializedDashboard = isConsultingClient || isOneOffClient;
   const clientPlatforms = activeClient?.platforms?.length ? ['All', ...activeClient.platforms] : ['All', 'Instagram', 'TikTok', 'YouTube'];
 
   async function handleDeleteClient() {
@@ -176,6 +185,9 @@ export default function Home() {
     if (!activeClient) return null;
     if (isConsultingClient) {
       return <ConsultingDashboard client={activeClient} calls={consultingCalls} ideas={consultingIdeas} onReload={loadData} />;
+    }
+    if (isOneOffClient) {
+      return <OneOffProjectDashboard client={activeClient} tasks={projectTasks} notes={projectNotes} onReload={loadData} />;
     }
     switch (clientTab) {
       case 'overview':
@@ -319,12 +331,13 @@ export default function Home() {
                     Consulting: { bg: '#8b5cf622', text: '#8b5cf6' },
                     Coaching: { bg: '#10b98122', text: '#10b981' },
                     Partnership: { bg: '#f59e0b22', text: '#f59e0b' },
+                    'One-Off Project': { bg: '#06b6d422', text: '#06b6d4' },
                     Other: { bg: '#6b728022', text: '#6b7280' },
                   };
                   const c = tc[activeClient.client_type] || tc.Other;
                   return (
                     <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: c.bg, color: c.text, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      {activeClient.client_type === 'DFY — Agency' ? 'DFY' : activeClient.client_type}
+                      {activeClient.client_type === 'DFY — Agency' ? 'DFY' : activeClient.client_type === 'One-Off Project' ? 'PROJECT' : activeClient.client_type}
                     </span>
                   );
                 })()}
@@ -350,8 +363,8 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Platform filter + Time period + Comparison toggle — hide for consulting */}
-            {!isConsultingClient && (
+            {/* Platform filter + Time period + Comparison toggle — hide for specialized dashboards */}
+            {!useSpecializedDashboard && (
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', gap: 4 }}>

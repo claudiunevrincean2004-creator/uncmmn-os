@@ -116,6 +116,7 @@ export default function ExpenseModal({ expense, month, existingNames = [], onClo
                 'Admin & Compliance',
                 'Banking & Fees',
                 'Equipment',
+                'Tax & Dividends',
               ].map(c => (
                 <option key={c} value={c}>{c}</option>
               ))}

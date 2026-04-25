@@ -21,10 +21,11 @@ const CLIENT_TYPE_COLORS: Record<string, { bg: string; text: string; border: str
   Consulting: { bg: '#8b5cf622', text: '#8b5cf6', border: '#8b5cf6' },
   Coaching: { bg: '#10b98122', text: '#10b981', border: '#10b981' },
   Partnership: { bg: '#f59e0b22', text: '#f59e0b', border: '#f59e0b' },
+  'One-Off Project': { bg: '#06b6d422', text: '#06b6d4', border: '#06b6d4' },
   Other: { bg: '#6b728022', text: '#6b7280', border: '#6b7280' },
 };
 
-const CLIENT_TYPE_OPTIONS: (ClientType | 'All')[] = ['All', 'DFY — Agency', 'Consulting', 'Coaching', 'Partnership', 'Other'];
+const CLIENT_TYPE_OPTIONS: (ClientType | 'All')[] = ['All', 'DFY — Agency', 'Consulting', 'Coaching', 'Partnership', 'One-Off Project', 'Other'];
 const BILLING_TYPE_OPTIONS: (BillingType | 'All')[] = ['All', 'Retainer', 'One-time'];
 const STATUS_OPTIONS = ['All', 'Active', 'Inactive', 'Paused'];
 
@@ -103,7 +104,7 @@ export default function ClientsPage({ clients, onSelectClient, onAddClient }: Pr
                     background: typeColors.bg, color: typeColors.text,
                     textTransform: 'uppercase', letterSpacing: '0.05em',
                   }}>
-                    {client.client_type === 'DFY — Agency' ? 'DFY' : client.client_type}
+                    {client.client_type === 'DFY — Agency' ? 'DFY' : client.client_type === 'One-Off Project' ? 'PROJECT' : client.client_type}
                   </span>
                 )}
               </div>
@@ -218,7 +219,7 @@ export default function ClientsPage({ clients, onSelectClient, onAddClient }: Pr
           <span style={{ fontSize: 10, color: '#444', fontWeight: 600, marginRight: 4 }}>Type:</span>
           {CLIENT_TYPE_OPTIONS.map(ct => (
             <button key={ct} className={`subtab${typeFilter === ct ? ' active' : ''}`} onClick={() => setTypeFilter(ct)} style={{ fontSize: 10, padding: '3px 8px' }}>
-              {ct === 'DFY — Agency' ? 'DFY' : ct}
+              {ct === 'DFY — Agency' ? 'DFY' : ct === 'One-Off Project' ? 'Project' : ct}
             </button>
           ))}
         </div>

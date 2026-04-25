@@ -1,5 +1,8 @@
-export type ClientType = 'DFY — Agency' | 'Consulting' | 'Coaching' | 'Partnership' | 'Other';
+export type ClientType = 'DFY — Agency' | 'Consulting' | 'Coaching' | 'Partnership' | 'One-Off Project' | 'Other';
 export type BillingType = 'Retainer' | 'One-time';
+export type ProjectStatus = 'Planning' | 'In Progress' | 'In Review' | 'Completed';
+export type PaymentStatus = 'Unpaid' | 'Deposit Paid' | 'Paid in Full';
+export type ProjectTaskStatus = 'todo' | 'inprogress' | 'done';
 
 export interface Client {
   id: string;
@@ -13,7 +16,11 @@ export interface Client {
   billing_type?: BillingType;
   renewal_date?: string;
   start_date?: string;
+  deadline?: string;
   inactive_date?: string;
+  project_status?: ProjectStatus;
+  payment_status?: PaymentStatus;
+  project_description?: string;
   notes?: string;
   created_at?: string;
 }
@@ -149,6 +156,22 @@ export interface ConsultingIdea {
   client_id: string;
   text: string;
   status: 'Pending' | 'Discussed' | 'Implemented';
+  created_at?: string;
+}
+
+export interface ProjectTask {
+  id: string;
+  client_id: string;
+  title: string;
+  status: ProjectTaskStatus;
+  notes?: string;
+  created_at?: string;
+}
+
+export interface ProjectNote {
+  id: string;
+  client_id: string;
+  text: string;
   created_at?: string;
 }
 

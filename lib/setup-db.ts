@@ -5,6 +5,7 @@ export async function checkSchema(): Promise<{ missing: string[]; clientColumnsM
     'clients', 'posts', 'goals', 'hooks', 'formats', 'pillars',
     'drive_folders', 'expenses', 'monthly_revenue', 'monthly_expenses',
     'client_expenses', 'client_month_exclusions', 'consulting_calls', 'consulting_ideas',
+    'project_tasks', 'project_notes',
   ];
 
   const missing: string[] = [];
@@ -21,7 +22,7 @@ export async function checkSchema(): Promise<{ missing: string[]; clientColumnsM
     const { data } = await supabase.from('clients').select('*').limit(1);
     if (data && data.length > 0) {
       const cols = Object.keys(data[0]);
-      for (const col of ['status', 'renewal_date', 'notes', 'start_date', 'client_type', 'billing_type', 'inactive_date']) {
+      for (const col of ['status', 'renewal_date', 'notes', 'start_date', 'client_type', 'billing_type', 'inactive_date', 'deadline', 'project_status', 'payment_status', 'project_description']) {
         if (!cols.includes(col)) clientColumnsMissing.push(col);
       }
     }
@@ -114,6 +115,28 @@ alter table consulting_calls disable row level security;`);
 alter table consulting_ideas disable row level security;`);
   }
 
+  if (missing.includes('project_tasks')) {
+    parts.push(`create table if not exists project_tasks (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid references clients(id) on delete cascade,
+  title text not null,
+  status text default 'todo',
+  notes text,
+  created_at timestamptz default now()
+);
+alter table project_tasks disable row level security;`);
+  }
+
+  if (missing.includes('project_notes')) {
+    parts.push(`create table if not exists project_notes (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid references clients(id) on delete cascade,
+  text text not null,
+  created_at timestamptz default now()
+);
+alter table project_notes disable row level security;`);
+  }
+
   if (clientColumnsMissing.includes('status')) {
     parts.push(`alter table clients add column if not exists status text default 'Active';`);
   }
@@ -134,6 +157,18 @@ alter table consulting_ideas disable row level security;`);
   }
   if (clientColumnsMissing.includes('inactive_date')) {
     parts.push(`alter table clients add column if not exists inactive_date date;`);
+  }
+  if (clientColumnsMissing.includes('deadline')) {
+    parts.push(`alter table clients add column if not exists deadline date;`);
+  }
+  if (clientColumnsMissing.includes('project_status')) {
+    parts.push(`alter table clients add column if not exists project_status text;`);
+  }
+  if (clientColumnsMissing.includes('payment_status')) {
+    parts.push(`alter table clients add column if not exists payment_status text;`);
+  }
+  if (clientColumnsMissing.includes('project_description')) {
+    parts.push(`alter table clients add column if not exists project_description text;`);
   }
 
   if (postColumnsMissing.includes('post_url')) {

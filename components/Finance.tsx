@@ -45,6 +45,9 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   Paused: { bg: '#f59e0b22', text: '#f59e0b' },
 };
 
+const TAX_DIVIDENDS_CATEGORY = 'Tax & Dividends';
+const TAX_DIVIDENDS_NAME = 'Tax & Dividends';
+
 function monthKey(year: number, month: number): string {
   return `${year}-${String(month + 1).padStart(2, '0')}`;
 }
@@ -63,6 +66,8 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
   const [editClientExpense, setEditClientExpense] = useState<ClientExpense | null>(null);
   const [expandedClient, setExpandedClient] = useState<string | null>(null);
   const [showAddClientModal, setShowAddClientModal] = useState(false);
+  const [editingTax, setEditingTax] = useState(false);
+  const [taxInput, setTaxInput] = useState('');
 
   const mk = monthKey(selectedYear, selectedMonth);
 
@@ -125,7 +130,6 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
 
   function computeTotals(months: string[]) {
     let totalRevenue = 0;
-    let totalExpenses = 0;
     const clientBreakdown: { client: Client; revenue: number; expenses: ClientExpense[]; totalClientExpenses: number; netProfit: number; margin: number }[] = [];
 
     clients.filter(c => clientVisibleInMonths(c, months)).forEach(c => {
@@ -140,28 +144,31 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
     });
     clientBreakdown.sort((a, b) => b.revenue - a.revenue);
 
-    const allExpenses: MonthlyExpense[] = [];
-    months.forEach(m => { allExpenses.push(...getMonthExpenses(m)); });
-    totalExpenses = allExpenses.reduce((s, e) => s + (e.cost || 0), 0);
+    const allMonthlyExpenses: MonthlyExpense[] = [];
+    months.forEach(m => { allMonthlyExpenses.push(...getMonthExpenses(m)); });
+
+    // Separate Tax & Dividends entries from operating expenses
+    const taxEntries = allMonthlyExpenses.filter(e => e.category === TAX_DIVIDENDS_CATEGORY);
+    const opExpenses = allMonthlyExpenses.filter(e => e.category !== TAX_DIVIDENDS_CATEGORY);
+
+    const taxDividends = taxEntries.reduce((s, e) => s + (e.cost || 0), 0);
+    const operationalExpenses = opExpenses.reduce((s, e) => s + (e.cost || 0), 0);
 
     const totalClientExp = clientBreakdown.reduce((s, c) => s + c.totalClientExpenses, 0);
-    const grandTotalExpenses = totalExpenses + totalClientExp;
-    const netProfit = totalRevenue - grandTotalExpenses;
-    const margin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+    const grandTotalExpenses = operationalExpenses + totalClientExp + taxDividends;
 
     const expenseCategories: Record<string, MonthlyExpense[]> = {};
-    allExpenses.forEach(e => {
+    opExpenses.forEach(e => {
       const cat = e.category || 'Uncategorized';
       if (!expenseCategories[cat]) expenseCategories[cat] = [];
       expenseCategories[cat].push(e);
     });
 
     const grossProfit = totalRevenue - totalClientExp;
-    const taxEstimate = Math.max(0, grossProfit * 0.16);
-    const realNetProfit = grossProfit - totalExpenses - taxEstimate;
+    const realNetProfit = grossProfit - operationalExpenses - taxDividends;
     const realMargin = totalRevenue > 0 ? (realNetProfit / totalRevenue) * 100 : 0;
 
-    return { totalRevenue, totalExpenses: grandTotalExpenses, netProfit: realNetProfit, margin: realMargin, grossProfit, taxEstimate, clientBreakdown, expenseCategories, allExpenses, operationalExpenses: totalExpenses, totalClientExpenses: totalClientExp };
+    return { totalRevenue, totalExpenses: grandTotalExpenses, netProfit: realNetProfit, margin: realMargin, grossProfit, taxDividends, taxEntries, clientBreakdown, expenseCategories, allExpenses: opExpenses, operationalExpenses, totalClientExpenses: totalClientExp };
   }
 
   const viewData = useMemo(() => {
@@ -200,6 +207,23 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
   async function deleteClientExpense(id: string) {
     if (!confirm('Delete this client expense?')) return;
     await supabase.from('client_expenses').delete().eq('id', id);
+    onReload();
+  }
+
+  async function saveTaxDividends() {
+    const amount = parseFloat(taxInput) || 0;
+    const existingEntries = monthlyExpenses.filter(e => e.month === mk && e.category === TAX_DIVIDENDS_CATEGORY);
+    if (existingEntries.length > 0) {
+      const [first, ...rest] = existingEntries;
+      await supabase.from('monthly_expenses').update({ cost: amount, name: first.name || TAX_DIVIDENDS_NAME }).eq('id', first.id);
+      if (rest.length > 0) {
+        await supabase.from('monthly_expenses').delete().in('id', rest.map(r => r.id));
+      }
+    } else {
+      await supabase.from('monthly_expenses').insert([{ name: TAX_DIVIDENDS_NAME, cost: amount, category: TAX_DIVIDENDS_CATEGORY, month: mk }]);
+    }
+    setEditingTax(false);
+    setTaxInput('');
     onReload();
   }
 
@@ -290,12 +314,13 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
     Consulting: { bg: '#8b5cf622', text: '#8b5cf6' },
     Coaching: { bg: '#10b98122', text: '#10b981' },
     Partnership: { bg: '#f59e0b22', text: '#f59e0b' },
+    'One-Off Project': { bg: '#06b6d422', text: '#06b6d4' },
     Other: { bg: '#6b728022', text: '#6b7280' },
   };
 
   function renderTypeBadge(clientType?: string) {
     if (!clientType) return null;
-    const short = clientType === 'DFY — Agency' ? 'DFY' : clientType;
+    const short = clientType === 'DFY — Agency' ? 'DFY' : clientType === 'One-Off Project' ? 'Project' : clientType;
     const tc = TYPE_COLORS[clientType] || TYPE_COLORS.Other;
     return (
       <span style={{
@@ -363,20 +388,68 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
 
       {/* Metrics */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10, marginBottom: 16 }}>
-        {[
-          { label: 'Total Revenue', value: fm(viewData.totalRevenue), sub: viewLabel, color: '#10b981' },
-          { label: 'Fulfillment Costs', value: fm(viewData.totalClientExpenses), sub: `${viewData.clientBreakdown.length} clients`, color: '#f59e0b' },
-          { label: 'Gross Profit', value: fm(viewData.grossProfit), sub: `revenue − fulfillment`, color: '#3b82f6' },
-          { label: 'Operating Expenses', value: fm(viewData.operationalExpenses), sub: `${viewData.allExpenses.length} items`, color: '#ef4444' },
-          { label: 'Tax Estimate', value: fm(viewData.taxEstimate), sub: '~16% of gross profit', color: '#eab308' },
-          { label: 'Net Profit', value: fm(viewData.netProfit), sub: `${viewData.margin.toFixed(1)}% margin`, color: viewData.netProfit >= 0 ? '#10b981' : '#ef4444' },
-        ].map(m => (
-          <div key={m.label} className="metric-chip">
-            <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>{m.label}</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: m.color, marginBottom: 3 }}>{m.value}</div>
-            <div style={{ fontSize: 11, color: '#444' }}>{m.sub}</div>
+        <div className="metric-chip">
+          <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>Total Revenue</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#10b981', marginBottom: 3 }}>{fm(viewData.totalRevenue)}</div>
+          <div style={{ fontSize: 11, color: '#444' }}>{viewLabel}</div>
+        </div>
+        <div className="metric-chip">
+          <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>Fulfillment Costs</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#f59e0b', marginBottom: 3 }}>{fm(viewData.totalClientExpenses)}</div>
+          <div style={{ fontSize: 11, color: '#444' }}>{viewData.clientBreakdown.length} clients</div>
+        </div>
+        <div className="metric-chip">
+          <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>Gross Profit</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#3b82f6', marginBottom: 3 }}>{fm(viewData.grossProfit)}</div>
+          <div style={{ fontSize: 11, color: '#444' }}>revenue − fulfillment</div>
+        </div>
+        <div className="metric-chip">
+          <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>Operating Expenses</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#ef4444', marginBottom: 3 }}>{fm(viewData.operationalExpenses)}</div>
+          <div style={{ fontSize: 11, color: '#444' }}>{viewData.allExpenses.length} items</div>
+        </div>
+        <div className="metric-chip">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Tax / Dividends</div>
+            {viewMode === 'month' && !editingTax && (
+              <button
+                style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', fontSize: 11, padding: 0, lineHeight: 1 }}
+                onClick={() => { setEditingTax(true); setTaxInput(String(viewData.taxDividends || 0)); }}
+                title="Edit tax / dividends amount"
+              >
+                ✎
+              </button>
+            )}
           </div>
-        ))}
+          {editingTax && viewMode === 'month' ? (
+            <div>
+              <input
+                className="form-input"
+                type="number"
+                value={taxInput}
+                onChange={e => setTaxInput(e.target.value)}
+                style={{ width: '100%', padding: '4px 6px', fontSize: 13, fontWeight: 700 }}
+                placeholder="0"
+                autoFocus
+                onKeyDown={e => { if (e.key === 'Enter') saveTaxDividends(); if (e.key === 'Escape') { setEditingTax(false); setTaxInput(''); } }}
+              />
+              <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                <button className="btn-primary" style={{ fontSize: 10, padding: '2px 6px', flex: 1 }} onClick={saveTaxDividends}>Save</button>
+                <button className="btn-ghost" style={{ fontSize: 10, padding: '2px 6px' }} onClick={() => { setEditingTax(false); setTaxInput(''); }}>✕</button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#eab308', marginBottom: 3 }}>{fm(viewData.taxDividends)}</div>
+              <div style={{ fontSize: 11, color: '#444' }}>{viewMode === 'month' ? 'editable per month' : 'manual entries'}</div>
+            </>
+          )}
+        </div>
+        <div className="metric-chip">
+          <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>Net Profit</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: viewData.netProfit >= 0 ? '#10b981' : '#ef4444', marginBottom: 3 }}>{fm(viewData.netProfit)}</div>
+          <div style={{ fontSize: 11, color: '#444' }}>{viewData.margin.toFixed(1)}% margin</div>
+        </div>
       </div>
 
       {/* Revenue vs Net Profit Chart */}

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Client, ClientType, BillingType } from '@/lib/types';
+import { Client, ClientType, BillingType, ProjectStatus, PaymentStatus } from '@/lib/types';
 import PlatformIcon from '@/components/PlatformIcon';
 
 interface Props {
@@ -12,8 +12,10 @@ interface Props {
 }
 
 const PLATFORM_OPTIONS = ['Instagram', 'TikTok', 'YouTube'];
-const CLIENT_TYPE_OPTIONS: ClientType[] = ['DFY — Agency', 'Consulting', 'Coaching', 'Partnership', 'Other'];
+const CLIENT_TYPE_OPTIONS: ClientType[] = ['DFY — Agency', 'Consulting', 'Coaching', 'Partnership', 'One-Off Project', 'Other'];
 const BILLING_TYPE_OPTIONS: BillingType[] = ['Retainer', 'One-time'];
+const PROJECT_STATUS_OPTIONS: ProjectStatus[] = ['Planning', 'In Progress', 'In Review', 'Completed'];
+const PAYMENT_STATUS_OPTIONS: PaymentStatus[] = ['Unpaid', 'Deposit Paid', 'Paid in Full'];
 
 export default function ClientModal({ client, defaultStartDate, onClose, onSaved }: Props) {
   const [name, setName] = useState('');
@@ -26,6 +28,10 @@ export default function ClientModal({ client, defaultStartDate, onClose, onSaved
   const [billingType, setBillingType] = useState<BillingType>('Retainer');
   const [renewalDate, setRenewalDate] = useState('');
   const [startDate, setStartDate] = useState(defaultStartDate || '');
+  const [deadline, setDeadline] = useState('');
+  const [projectStatus, setProjectStatus] = useState<ProjectStatus>('Planning');
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('Unpaid');
+  const [projectDescription, setProjectDescription] = useState('');
   const [saving, setSaving] = useState(false);
   const nowDate = new Date();
   const [lastActiveYear, setLastActiveYear] = useState(nowDate.getFullYear());
@@ -43,6 +49,10 @@ export default function ClientModal({ client, defaultStartDate, onClose, onSaved
       setBillingType(client.billing_type || 'Retainer');
       setRenewalDate(client.renewal_date || '');
       setStartDate(client.start_date || '');
+      setDeadline(client.deadline || '');
+      setProjectStatus(client.project_status || 'Planning');
+      setPaymentStatus(client.payment_status || 'Unpaid');
+      setProjectDescription(client.project_description || '');
       if (client.inactive_date) {
         const d = new Date(client.inactive_date);
         setLastActiveYear(d.getFullYear());
@@ -56,6 +66,8 @@ export default function ClientModal({ client, defaultStartDate, onClose, onSaved
   function handleClientTypeChange(ct: ClientType) {
     setClientType(ct);
     if (ct === 'Consulting') {
+      setBillingType('One-time');
+    } else if (ct === 'One-Off Project') {
       setBillingType('One-time');
     }
   }
@@ -80,6 +92,10 @@ export default function ClientModal({ client, defaultStartDate, onClose, onSaved
       billing_type: billingType,
       renewal_date: renewalDate || null,
       start_date: startDate || null,
+      deadline: deadline || null,
+      project_status: clientType === 'One-Off Project' ? projectStatus : null,
+      payment_status: clientType === 'One-Off Project' ? paymentStatus : null,
+      project_description: clientType === 'One-Off Project' ? (projectDescription || null) : null,
     };
 
     const isBecomingInactive = status === 'Inactive' || status === 'Paused';
@@ -105,7 +121,8 @@ export default function ClientModal({ client, defaultStartDate, onClose, onSaved
   }
 
   const isConsulting = clientType === 'Consulting';
-  const billingLocked = isConsulting;
+  const isOneOff = clientType === 'One-Off Project';
+  const billingLocked = isConsulting || isOneOff;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -191,7 +208,7 @@ export default function ClientModal({ client, defaultStartDate, onClose, onSaved
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
-              <label className="form-label">{isConsulting ? 'Fee per Call ($)' : billingType === 'One-time' ? 'Fee ($)' : 'Monthly Retainer ($)'}</label>
+              <label className="form-label">{isOneOff ? 'Project Fee ($)' : isConsulting ? 'Fee per Call ($)' : billingType === 'One-time' ? 'Fee ($)' : 'Monthly Retainer ($)'}</label>
               <input className="form-input" type="number" value={retainer} onChange={e => setRetainer(e.target.value)} placeholder="0" />
             </div>
             {billingType === 'Retainer' && (
@@ -200,7 +217,46 @@ export default function ClientModal({ client, defaultStartDate, onClose, onSaved
                 <input className="form-input" type="date" value={renewalDate} onChange={e => setRenewalDate(e.target.value)} />
               </div>
             )}
+            {isOneOff && (
+              <div>
+                <label className="form-label">Deadline</label>
+                <input className="form-input" type="date" value={deadline} onChange={e => setDeadline(e.target.value)} />
+              </div>
+            )}
           </div>
+
+          {isOneOff && (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label className="form-label">Project Status</label>
+                  <select className="form-input" value={projectStatus} onChange={e => setProjectStatus(e.target.value as ProjectStatus)}>
+                    {PROJECT_STATUS_OPTIONS.map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">Payment Status</label>
+                  <select className="form-input" value={paymentStatus} onChange={e => setPaymentStatus(e.target.value as PaymentStatus)}>
+                    {PAYMENT_STATUS_OPTIONS.map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="form-label">Project Description</label>
+                <textarea
+                  className="form-input"
+                  value={projectDescription}
+                  onChange={e => setProjectDescription(e.target.value)}
+                  placeholder="Briefly describe the project scope, deliverables, etc."
+                  style={{ minHeight: 70, resize: 'vertical', lineHeight: 1.5, fontSize: 12 }}
+                />
+              </div>
+            </>
+          )}
 
           <div>
             <label className="form-label">Niche</label>

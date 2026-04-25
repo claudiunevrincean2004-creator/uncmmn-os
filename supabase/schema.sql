@@ -144,6 +144,24 @@ create table if not exists consulting_ideas (
   created_at timestamptz default now()
 );
 
+-- Project deliverables (for One-Off Project clients)
+create table if not exists project_tasks (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid references clients(id) on delete cascade,
+  title text not null,
+  status text default 'todo',
+  notes text,
+  created_at timestamptz default now()
+);
+
+-- Project communication log / notes (for One-Off Project clients)
+create table if not exists project_notes (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid references clients(id) on delete cascade,
+  text text not null,
+  created_at timestamptz default now()
+);
+
 -- Subscriber snapshots (populated by external Google Apps Script every 12h)
 -- This table should already exist if you use the follower tracking script
 create table if not exists subscriber_snapshots (
@@ -182,6 +200,18 @@ begin
   if not exists (select 1 from information_schema.columns where table_name='clients' and column_name='start_date') then
     alter table clients add column start_date date;
   end if;
+  if not exists (select 1 from information_schema.columns where table_name='clients' and column_name='deadline') then
+    alter table clients add column deadline date;
+  end if;
+  if not exists (select 1 from information_schema.columns where table_name='clients' and column_name='project_status') then
+    alter table clients add column project_status text;
+  end if;
+  if not exists (select 1 from information_schema.columns where table_name='clients' and column_name='payment_status') then
+    alter table clients add column payment_status text;
+  end if;
+  if not exists (select 1 from information_schema.columns where table_name='clients' and column_name='project_description') then
+    alter table clients add column project_description text;
+  end if;
 end $$;
 
 -- Disable RLS for simplicity (enable and add policies for production)
@@ -200,3 +230,5 @@ alter table client_month_exclusions disable row level security;
 alter table subscriber_snapshots disable row level security;
 alter table consulting_calls disable row level security;
 alter table consulting_ideas disable row level security;
+alter table project_tasks disable row level security;
+alter table project_notes disable row level security;
