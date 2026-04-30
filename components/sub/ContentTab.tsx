@@ -5,6 +5,7 @@ import { Post, Client, Pillar, Format } from '@/lib/types';
 import { fn, er } from '@/lib/utils';
 import PlatformIcon from '@/components/PlatformIcon';
 import PostModal from '@/components/modals/PostModal';
+import { usePersistedState } from '@/lib/use-persisted-state';
 
 interface Props {
   client: Client;
@@ -21,10 +22,10 @@ type SortDir = 'asc' | 'desc';
 export default function ContentTab({ client, posts, pillars, formats, activePlat, onReload }: Props) {
   const [showModal, setShowModal] = useState(false);
   const [editPost, setEditPost] = useState<Post | null>(null);
-  const [sortKey, setSortKey] = useState<SortKey>('date');
-  const [sortDir, setSortDir] = useState<SortDir>('desc');
-  const [filterPillar, setFilterPillar] = useState('All');
-  const [filterFormat, setFilterFormat] = useState('All');
+  const [sortKey, setSortKey] = usePersistedState<SortKey>('content_sort_key', 'date');
+  const [sortDir, setSortDir] = usePersistedState<SortDir>('content_sort_dir', 'desc');
+  const [filterPillar, setFilterPillar] = usePersistedState<string>('content_filter_pillar', 'All');
+  const [filterFormat, setFilterFormat] = usePersistedState<string>('content_filter_format', 'All');
 
   async function deletePost(id: string) {
     if (!confirm('Delete this post?')) return;

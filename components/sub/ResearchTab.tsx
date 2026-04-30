@@ -2,6 +2,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Client, ResearchItem, ResearchStatus } from '@/lib/types';
+import { usePersistedState } from '@/lib/use-persisted-state';
 
 interface Props {
   client: Client;
@@ -60,7 +61,7 @@ export default function ResearchTab({ client, items, onReload }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Filters / view
-  const [view, setView] = useState<View>('grid');
+  const [view, setView] = usePersistedState<View>('research_view_mode', 'grid');
   const [query, setQuery] = useState('');
   const [reasonFilter, setReasonFilter] = useState<string>('All');
 

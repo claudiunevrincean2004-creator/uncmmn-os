@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Client, MonthlyRevenue, MonthlyExpense, ClientExpense, ClientMonthExclusion } from '@/lib/types';
 import { fm, getColor } from '@/lib/utils';
+import { usePersistedState } from '@/lib/use-persisted-state';
 import ExpenseModal from '@/components/modals/ExpenseModal';
 import ClientExpenseModal from '@/components/modals/ClientExpenseModal';
 import ClientModal from '@/components/modals/ClientModal';
@@ -54,9 +55,9 @@ function monthKey(year: number, month: number): string {
 
 export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clientExpenses, clientMonthExclusions, onReload, onOpenSidebar }: Props) {
   const now = new Date();
-  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
-  const [viewMode, setViewMode] = useState<ViewMode>('month');
+  const [selectedYear, setSelectedYear] = usePersistedState<number>('finance_year', now.getFullYear());
+  const [selectedMonth, setSelectedMonth] = usePersistedState<number>('finance_month', now.getMonth());
+  const [viewMode, setViewMode] = usePersistedState<ViewMode>('finance_view_mode', 'month');
   const [showModal, setShowModal] = useState(false);
   const [editExpense, setEditExpense] = useState<MonthlyExpense | null>(null);
   const [showRevenueEdit, setShowRevenueEdit] = useState<string | null>(null);

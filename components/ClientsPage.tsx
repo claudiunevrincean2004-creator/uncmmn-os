@@ -1,8 +1,9 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Client, ClientType, BillingType } from '@/lib/types';
 import { fm } from '@/lib/utils';
 import PlatformIcon from '@/components/PlatformIcon';
+import { usePersistedState } from '@/lib/use-persisted-state';
 
 interface Props {
   clients: Client[];
@@ -34,10 +35,10 @@ function getTypeColors(ct?: string) {
 }
 
 export default function ClientsPage({ clients, onSelectClient, onAddClient }: Props) {
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [typeFilter, setTypeFilter] = useState<string>('All');
-  const [billingFilter, setBillingFilter] = useState<string>('All');
+  const [search, setSearch] = usePersistedState<string>('clients_search', '');
+  const [statusFilter, setStatusFilter] = usePersistedState<string>('clients_filter_status', 'All');
+  const [typeFilter, setTypeFilter] = usePersistedState<string>('clients_filter_type', 'All');
+  const [billingFilter, setBillingFilter] = usePersistedState<string>('clients_filter_billing', 'All');
 
   const activeClients = clients.filter(c => c.status === 'Active');
   const highestPaying = activeClients.length > 0

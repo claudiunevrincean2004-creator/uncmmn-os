@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { checkSchema, getMigrationSQL } from '@/lib/setup-db';
 import { Client, Post, Goal, Format, Pillar, DriveFolder, Expense, MonthlyRevenue, MonthlyExpense, ClientExpense, ClientMonthExclusion, SubscriberSnapshot, ConsultingCall, ConsultingIdea, ProjectTask, ProjectNote, ResearchItem, MainPage, ClientTab } from '@/lib/types';
+import { usePersistedState } from '@/lib/use-persisted-state';
 
 import Sidebar from '@/components/Sidebar';
 import Overview from '@/components/Overview';
@@ -81,7 +82,7 @@ export default function Home() {
   const [activePlat, setActivePlat] = useState('All');
   const [showCmp, setShowCmp] = useState(false);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('30d');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = usePersistedState<boolean>('sidebar_collapsed', false);
 
   // Modal state
   const [showClientModal, setShowClientModal] = useState(false);
