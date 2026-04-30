@@ -176,4 +176,4 @@ export interface ProjectNote {
 }
 
 export type MainPage = 'overview' | 'finance' | 'clients' | 'client';
-export type ClientTab = 'overview' | 'content' | 'outliers' | 'goals' | 'hooks' | 'formats' | 'pillars' | 'drive';
+export type ClientTab = 'overview' | 'content' | 'outliers' | 'goals' | 'drive';

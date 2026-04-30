@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { checkSchema, getMigrationSQL } from '@/lib/setup-db';
-import { Client, Post, Goal, Hook, Format, Pillar, DriveFolder, Expense, MonthlyRevenue, MonthlyExpense, ClientExpense, ClientMonthExclusion, SubscriberSnapshot, ConsultingCall, ConsultingIdea, ProjectTask, ProjectNote, MainPage, ClientTab } from '@/lib/types';
+import { Client, Post, Goal, Format, Pillar, DriveFolder, Expense, MonthlyRevenue, MonthlyExpense, ClientExpense, ClientMonthExclusion, SubscriberSnapshot, ConsultingCall, ConsultingIdea, ProjectTask, ProjectNote, MainPage, ClientTab } from '@/lib/types';
 
 import Sidebar from '@/components/Sidebar';
 import Overview from '@/components/Overview';
@@ -11,9 +11,6 @@ import ClientOverview from '@/components/sub/ClientOverview';
 import ContentTab from '@/components/sub/ContentTab';
 import OutliersTab from '@/components/sub/OutliersTab';
 import GoalsTab from '@/components/sub/GoalsTab';
-import HooksTab from '@/components/sub/HooksTab';
-import FormatsTab from '@/components/sub/FormatsTab';
-import PillarsTab from '@/components/sub/PillarsTab';
 import DriveTab from '@/components/sub/DriveTab';
 import ClientModal from '@/components/modals/ClientModal';
 import ClientSidebar from '@/components/ClientSidebar';
@@ -49,9 +46,6 @@ const CLIENT_TABS: { key: ClientTab; label: string }[] = [
   { key: 'content', label: 'Content' },
   { key: 'outliers', label: 'Outliers' },
   { key: 'goals', label: 'Goals' },
-  { key: 'hooks', label: 'Hooks' },
-  { key: 'formats', label: 'Formats' },
-  { key: 'pillars', label: 'Pillars' },
   { key: 'drive', label: 'Drive' },
 ];
 
@@ -60,7 +54,6 @@ export default function Home() {
   const [clients, setClients] = useState<Client[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
-  const [hooks, setHooks] = useState<Hook[]>([]);
   const [formats, setFormats] = useState<Format[]>([]);
   const [pillars, setPillars] = useState<Pillar[]>([]);
   const [driveFolders, setDriveFolders] = useState<DriveFolder[]>([]);
@@ -94,11 +87,10 @@ export default function Home() {
   const [sidebarMonth, setSidebarMonth] = useState<string | undefined>(undefined);
 
   const loadData = useCallback(async () => {
-    const [c, p, g, h, f, pl, d, e, mr, me, ce, cme, ss, cc, ci, pt, pn] = await Promise.all([
+    const [c, p, g, f, pl, d, e, mr, me, ce, cme, ss, cc, ci, pt, pn] = await Promise.all([
       safeSelect('clients', 'name'),
       safeSelect('posts', 'date', false),
       safeSelect('goals', 'created_at'),
-      safeSelect('hooks', 'rating', false),
       safeSelect('formats', 'name'),
       safeSelect('pillars', 'name'),
       safeSelect('drive_folders', 'category'),
@@ -116,7 +108,6 @@ export default function Home() {
     setClients(c as Client[]);
     setPosts(p as Post[]);
     setGoals(g as Goal[]);
-    setHooks(h as Hook[]);
     setFormats(f as Format[]);
     setPillars(pl as Pillar[]);
     setDriveFolders(d as DriveFolder[]);
@@ -198,12 +189,6 @@ export default function Home() {
         return <OutliersTab client={activeClient} posts={posts} activePlat={activePlat} />;
       case 'goals':
         return <GoalsTab client={activeClient} goals={goals} onReload={loadData} />;
-      case 'hooks':
-        return <HooksTab client={activeClient} hooks={hooks} onReload={loadData} />;
-      case 'formats':
-        return <FormatsTab client={activeClient} formats={formats} onReload={loadData} />;
-      case 'pillars':
-        return <PillarsTab client={activeClient} pillars={pillars} posts={posts} onReload={loadData} />;
       case 'drive':
         return <DriveTab client={activeClient} driveFolders={driveFolders} onReload={loadData} />;
     }
