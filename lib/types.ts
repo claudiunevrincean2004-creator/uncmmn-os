@@ -176,4 +176,17 @@ export interface ProjectNote {
 }
 
 export type MainPage = 'overview' | 'finance' | 'clients' | 'client';
-export type ClientTab = 'overview' | 'content' | 'outliers' | 'goals' | 'drive';
+export type ClientTab = 'overview' | 'content' | 'outliers' | 'goals' | 'research' | 'drive';
+
+export type ResearchStatus = 'unused' | 'progress' | 'used';
+
+export interface ResearchItem {
+  id: string;
+  client_id: string;
+  content: string;
+  note?: string;
+  reason?: string;
+  hot: boolean;
+  status: ResearchStatus;
+  created_at?: string;
+}

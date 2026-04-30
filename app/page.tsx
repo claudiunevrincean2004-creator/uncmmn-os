@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { checkSchema, getMigrationSQL } from '@/lib/setup-db';
-import { Client, Post, Goal, Format, Pillar, DriveFolder, Expense, MonthlyRevenue, MonthlyExpense, ClientExpense, ClientMonthExclusion, SubscriberSnapshot, ConsultingCall, ConsultingIdea, ProjectTask, ProjectNote, MainPage, ClientTab } from '@/lib/types';
+import { Client, Post, Goal, Format, Pillar, DriveFolder, Expense, MonthlyRevenue, MonthlyExpense, ClientExpense, ClientMonthExclusion, SubscriberSnapshot, ConsultingCall, ConsultingIdea, ProjectTask, ProjectNote, ResearchItem, MainPage, ClientTab } from '@/lib/types';
 
 import Sidebar from '@/components/Sidebar';
 import Overview from '@/components/Overview';
@@ -11,6 +11,7 @@ import ClientOverview from '@/components/sub/ClientOverview';
 import ContentTab from '@/components/sub/ContentTab';
 import OutliersTab from '@/components/sub/OutliersTab';
 import GoalsTab from '@/components/sub/GoalsTab';
+import ResearchTab from '@/components/sub/ResearchTab';
 import DriveTab from '@/components/sub/DriveTab';
 import ClientModal from '@/components/modals/ClientModal';
 import ClientSidebar from '@/components/ClientSidebar';
@@ -46,6 +47,7 @@ const CLIENT_TABS: { key: ClientTab; label: string }[] = [
   { key: 'content', label: 'Content' },
   { key: 'outliers', label: 'Outliers' },
   { key: 'goals', label: 'Goals' },
+  { key: 'research', label: 'Research' },
   { key: 'drive', label: 'Drive' },
 ];
 
@@ -67,6 +69,7 @@ export default function Home() {
   const [consultingIdeas, setConsultingIdeas] = useState<ConsultingIdea[]>([]);
   const [projectTasks, setProjectTasks] = useState<ProjectTask[]>([]);
   const [projectNotes, setProjectNotes] = useState<ProjectNote[]>([]);
+  const [researchItems, setResearchItems] = useState<ResearchItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [schemaMissing, setSchemaMissing] = useState<{ missing: string[]; clientColumnsMissing: string[]; postColumnsMissing: string[] } | null>(null);
   const [showMigrationSQL, setShowMigrationSQL] = useState(false);
@@ -87,7 +90,7 @@ export default function Home() {
   const [sidebarMonth, setSidebarMonth] = useState<string | undefined>(undefined);
 
   const loadData = useCallback(async () => {
-    const [c, p, g, f, pl, d, e, mr, me, ce, cme, ss, cc, ci, pt, pn] = await Promise.all([
+    const [c, p, g, f, pl, d, e, mr, me, ce, cme, ss, cc, ci, pt, pn, ri] = await Promise.all([
       safeSelect('clients', 'name'),
       safeSelect('posts', 'date', false),
       safeSelect('goals', 'created_at'),
@@ -104,6 +107,7 @@ export default function Home() {
       safeSelect('consulting_ideas', 'created_at'),
       safeSelect('project_tasks', 'created_at'),
       safeSelect('project_notes', 'created_at', false),
+      safeSelect('research_items', 'created_at', false),
     ]);
     setClients(c as Client[]);
     setPosts(p as Post[]);
@@ -121,6 +125,7 @@ export default function Home() {
     setConsultingIdeas(ci as ConsultingIdea[]);
     setProjectTasks(pt as ProjectTask[]);
     setProjectNotes(pn as ProjectNote[]);
+    setResearchItems(ri as ResearchItem[]);
     setLoading(false);
   }, []);
 
@@ -189,6 +194,8 @@ export default function Home() {
         return <OutliersTab client={activeClient} posts={posts} activePlat={activePlat} />;
       case 'goals':
         return <GoalsTab client={activeClient} goals={goals} onReload={loadData} />;
+      case 'research':
+        return <ResearchTab client={activeClient} items={researchItems} onReload={loadData} />;
       case 'drive':
         return <DriveTab client={activeClient} driveFolders={driveFolders} onReload={loadData} />;
     }

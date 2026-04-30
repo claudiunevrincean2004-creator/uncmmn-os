@@ -162,6 +162,18 @@ create table if not exists project_notes (
   created_at timestamptz default now()
 );
 
+-- Research items: saved content references for AI generation (Research tab)
+create table if not exists research_items (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid references clients(id) on delete cascade,
+  content text not null,
+  note text,
+  reason text,
+  hot boolean default false,
+  status text default 'unused',
+  created_at timestamptz default now()
+);
+
 -- Subscriber snapshots (populated by external Google Apps Script every 12h)
 -- This table should already exist if you use the follower tracking script
 create table if not exists subscriber_snapshots (
@@ -232,3 +244,4 @@ alter table consulting_calls disable row level security;
 alter table consulting_ideas disable row level security;
 alter table project_tasks disable row level security;
 alter table project_notes disable row level security;
+alter table research_items disable row level security;

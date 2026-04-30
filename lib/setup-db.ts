@@ -5,7 +5,7 @@ export async function checkSchema(): Promise<{ missing: string[]; clientColumnsM
     'clients', 'posts', 'goals', 'hooks', 'formats', 'pillars',
     'drive_folders', 'expenses', 'monthly_revenue', 'monthly_expenses',
     'client_expenses', 'client_month_exclusions', 'consulting_calls', 'consulting_ideas',
-    'project_tasks', 'project_notes',
+    'project_tasks', 'project_notes', 'research_items',
   ];
 
   const missing: string[] = [];
@@ -135,6 +135,20 @@ alter table project_tasks disable row level security;`);
   created_at timestamptz default now()
 );
 alter table project_notes disable row level security;`);
+  }
+
+  if (missing.includes('research_items')) {
+    parts.push(`create table if not exists research_items (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid references clients(id) on delete cascade,
+  content text not null,
+  note text,
+  reason text,
+  hot boolean default false,
+  status text default 'unused',
+  created_at timestamptz default now()
+);
+alter table research_items disable row level security;`);
   }
 
   if (clientColumnsMissing.includes('status')) {
