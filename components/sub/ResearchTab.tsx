@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Client, ResearchItem, ResearchStatus } from '@/lib/types';
 
@@ -9,20 +9,20 @@ interface Props {
   onReload: () => void;
 }
 
-type TypeFilter = 'all' | 'hot';
-type StatusFilter = 'all' | ResearchStatus;
+type View = 'grid' | 'kanban';
 
 const REASONS = ['Hook', 'Editing Style', 'Format', 'Concept', 'Caption', 'Song / Audio', 'Trend', 'Transition', 'Other'];
 
+// Status display: internal value → user-facing label
 const STATUS_LABELS: Record<ResearchStatus, string> = {
   unused: 'Unused',
-  progress: 'In Progress',
+  progress: 'Saved',
   used: 'Used',
 };
 
 const STATUS_COLORS: Record<ResearchStatus, { color: string; bg: string; border: string }> = {
   unused: { color: '#888', bg: '#1a1a1a', border: '#2a2a2a' },
-  progress: { color: '#f59e0b', bg: '#f59e0b15', border: '#f59e0b40' },
+  progress: { color: '#3b82f6', bg: '#3b82f615', border: '#3b82f640' },
   used: { color: '#10b981', bg: '#10b98115', border: '#10b98140' },
 };
 
@@ -32,29 +32,53 @@ const NEXT_STATUS: Record<ResearchStatus, ResearchStatus> = {
   used: 'unused',
 };
 
+const KANBAN_ORDER: ResearchStatus[] = ['unused', 'progress', 'used'];
+
+function isUrl(s: string): boolean {
+  return s.startsWith('http://') || s.startsWith('https://');
+}
+
+function safeDomain(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}
+
 export default function ResearchTab({ client, items, onReload }: Props) {
   const clientItems = useMemo(() => items.filter(i => i.client_id === client.id), [items, client.id]);
 
-  // Form state
+  // Form state (used for both Add and Edit)
   const [formOpen, setFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [content, setContent] = useState('');
   const [note, setNote] = useState('');
   const [reason, setReason] = useState(REASONS[0]);
   const [newHot, setNewHot] = useState(false);
   const [saving, setSaving] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Filters
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  // Filters / view
+  const [view, setView] = useState<View>('grid');
+  const [query, setQuery] = useState('');
+  const [reasonFilter, setReasonFilter] = useState<string>('All');
+
+  // Per-card UI state
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   // Toast
   const [toast, setToast] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
     return clientItems
       .filter(i => {
-        if (typeFilter === 'hot' && !i.hot) return false;
-        if (statusFilter !== 'all' && i.status !== statusFilter) return false;
+        if (reasonFilter !== 'All' && i.reason !== reasonFilter) return false;
+        if (q) {
+          const hay = `${i.content} ${i.note || ''} ${i.reason || ''}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
         return true;
       })
       .sort((a, b) => {
@@ -63,9 +87,7 @@ export default function ResearchTab({ client, items, onReload }: Props) {
         if (aPriority !== bPriority) return bPriority - aPriority;
         return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       });
-  }, [clientItems, typeFilter, statusFilter]);
-
-  const hotCount = useMemo(() => clientItems.filter(i => i.hot && i.status === 'unused').length, [clientItems]);
+  }, [clientItems, query, reasonFilter]);
 
   function showToast(msg: string) {
     setToast(msg);
@@ -77,34 +99,61 @@ export default function ResearchTab({ client, items, onReload }: Props) {
     setNote('');
     setReason(REASONS[0]);
     setNewHot(false);
+    setEditingId(null);
   }
 
-  async function addItem() {
+  function openAddForm() {
+    resetForm();
+    setFormOpen(true);
+    setTimeout(() => textareaRef.current?.focus(), 0);
+  }
+
+  function openEditForm(item: ResearchItem) {
+    setEditingId(item.id);
+    setContent(item.content);
+    setNote(item.note || '');
+    setReason(item.reason || REASONS[0]);
+    setNewHot(item.hot);
+    setFormOpen(true);
+    setTimeout(() => textareaRef.current?.focus(), 0);
+  }
+
+  function closeForm() {
+    setFormOpen(false);
+    resetForm();
+  }
+
+  async function saveItem() {
     const trimmed = content.trim();
     if (!trimmed || saving) return;
     setSaving(true);
-    const { error: err } = await supabase.from('research_items').insert([{
-      client_id: client.id,
+    const payload = {
       content: trimmed,
       note: note.trim() || null,
       reason,
       hot: newHot,
-      status: 'unused',
-    }]);
-    setSaving(false);
-    if (err) {
-      showToast('Save failed');
-      return;
+    };
+    if (editingId) {
+      const { error: err } = await supabase.from('research_items').update(payload).eq('id', editingId);
+      setSaving(false);
+      if (err) { showToast('Update failed'); return; }
+      closeForm();
+      onReload();
+      showToast('Updated');
+    } else {
+      const { error: err } = await supabase.from('research_items').insert([{ ...payload, client_id: client.id, status: 'unused' }]);
+      setSaving(false);
+      if (err) { showToast('Save failed'); return; }
+      closeForm();
+      onReload();
+      showToast('Saved');
     }
-    resetForm();
-    setFormOpen(false);
-    onReload();
-    showToast('Saved');
   }
 
   async function deleteItem(id: string) {
-    if (!confirm('Delete this saved item?')) return;
+    if (!confirm('Delete this idea?')) return;
     await supabase.from('research_items').delete().eq('id', id);
+    if (editingId === id) closeForm();
     onReload();
   }
 
@@ -114,37 +163,82 @@ export default function ResearchTab({ client, items, onReload }: Props) {
     onReload();
   }
 
-  async function toggleHot(id: string, current: boolean) {
-    await supabase.from('research_items').update({ hot: !current }).eq('id', id);
-    onReload();
+  function toggleExpanded(id: string) {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  const totalCount = clientItems.length;
+
+  // Empty state — no ideas at all yet
+  if (totalCount === 0 && !formOpen) {
+    return (
+      <div>
+        <EmptyState onAdd={openAddForm} />
+        {toast && <Toast msg={toast} />}
+      </div>
+    );
   }
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+      {/* Toolbar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 12, color: '#555' }}>
-          {clientItems.length} saved
-          {hotCount > 0 && <span style={{ color: '#ef4444', marginLeft: 6 }}>· {hotCount} hot</span>}
+          {totalCount} idea{totalCount === 1 ? '' : 's'}
+          {filtered.length !== totalCount && <span style={{ color: '#444', marginLeft: 6 }}>· {filtered.length} shown</span>}
         </span>
-        <button
-          className="btn-primary"
-          style={{ fontSize: 11, padding: '5px 10px' }}
-          onClick={() => { setFormOpen(v => !v); if (formOpen) resetForm(); }}
-        >
-          {formOpen ? '✕ Cancel' : '+ Add Idea'}
-        </button>
+
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            className="form-input"
+            placeholder="Search ideas…"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            style={{ width: 180, fontSize: 11, padding: '5px 9px' }}
+          />
+          <select
+            className="form-input"
+            value={reasonFilter}
+            onChange={e => setReasonFilter(e.target.value)}
+            style={{ width: 'auto', fontSize: 11, padding: '5px 9px' }}
+          >
+            <option value="All">All reasons</option>
+            {REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+          <ViewToggle view={view} onChange={setView} />
+          <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px' }} onClick={openAddForm}>
+            + Add Idea
+          </button>
+        </div>
       </div>
 
+      {/* Form (collapsible, shared between Add and Edit) */}
       {formOpen && (
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12, marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
+              {editingId ? 'Edit idea' : 'New idea'}
+            </span>
+            <button
+              onClick={closeForm}
+              style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: 0, lineHeight: 1 }}
+              title="Cancel"
+            >
+              ✕
+            </button>
+          </div>
           <textarea
+            ref={textareaRef}
             className="form-input"
             placeholder="Idea, hook, link, caption… (Cmd+Enter to save)"
             value={content}
             onChange={e => setContent(e.target.value)}
-            onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') addItem(); }}
+            onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') saveItem(); }}
             style={{ minHeight: 60, resize: 'vertical', fontSize: 12, lineHeight: 1.4 }}
-            autoFocus
           />
           <input
             className="form-input"
@@ -180,216 +274,346 @@ export default function ResearchTab({ client, items, onReload }: Props) {
             <button
               className="btn-primary"
               style={{ fontSize: 11, padding: '5px 12px', marginLeft: 'auto' }}
-              onClick={addItem}
+              onClick={saveItem}
               disabled={saving || !content.trim()}
             >
-              {saving ? 'Saving…' : 'Save idea'}
+              {saving ? 'Saving…' : editingId ? 'Save changes' : 'Save idea'}
             </button>
           </div>
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
-        <span style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Type:</span>
-        <FilterChip active={typeFilter === 'all'} onClick={() => setTypeFilter('all')}>All</FilterChip>
-        <FilterChip active={typeFilter === 'hot'} onClick={() => setTypeFilter('hot')} hot>🔥 Hot</FilterChip>
-        <span style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginLeft: 8 }}>Status:</span>
-        <FilterChip active={statusFilter === 'all'} onClick={() => setStatusFilter('all')}>All</FilterChip>
-        <FilterChip active={statusFilter === 'unused'} onClick={() => setStatusFilter('unused')}>Unused</FilterChip>
-        <FilterChip active={statusFilter === 'progress'} onClick={() => setStatusFilter('progress')}>In Progress</FilterChip>
-        <FilterChip active={statusFilter === 'used'} onClick={() => setStatusFilter('used')}>Used</FilterChip>
-      </div>
-
-      {filtered.length === 0 ? (
+      {/* Results — empty after filtering */}
+      {filtered.length === 0 && totalCount > 0 && (
         <div style={{ textAlign: 'center', color: '#333', padding: '40px 0', fontSize: 12 }}>
-          {clientItems.length === 0 ? 'No ideas yet. Click + Add Idea to log one.' : 'No matches. Adjust filters.'}
+          No matches. Adjust search or reason filter.
         </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      )}
+
+      {/* Grid view */}
+      {view === 'grid' && filtered.length > 0 && (
+        <div className="research-grid">
           {filtered.map(item => (
-            <ItemCard
+            <IdeaCard
               key={item.id}
               item={item}
+              expanded={expanded.has(item.id)}
+              onToggleExpand={() => toggleExpanded(item.id)}
               onCycleStatus={() => cycleStatus(item.id, item.status)}
-              onToggleHot={() => toggleHot(item.id, item.hot)}
+              onEdit={() => openEditForm(item)}
               onDelete={() => deleteItem(item.id)}
             />
           ))}
         </div>
       )}
 
-      {toast && (
-        <div style={{
-          position: 'fixed',
-          bottom: 20,
-          right: 20,
-          background: '#fff',
-          color: '#000',
-          padding: '8px 14px',
-          borderRadius: 6,
-          fontSize: 11,
-          fontWeight: 600,
-          zIndex: 999,
-        }}>{toast}</div>
+      {/* Kanban view */}
+      {view === 'kanban' && filtered.length > 0 && (
+        <div className="research-kanban">
+          {KANBAN_ORDER.map(status => {
+            const colItems = filtered.filter(i => i.status === status);
+            const sc = STATUS_COLORS[status];
+            return (
+              <div key={status} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '6px 10px',
+                  background: sc.bg,
+                  border: `0.5px solid ${sc.border}`,
+                  borderRadius: 6,
+                }}>
+                  <span style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: '0.07em',
+                    textTransform: 'uppercase',
+                    color: sc.color,
+                  }}>
+                    {STATUS_LABELS[status]}
+                  </span>
+                  <span style={{ fontSize: 10, color: sc.color, fontWeight: 600 }}>{colItems.length}</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {colItems.length === 0 ? (
+                    <div style={{ fontSize: 11, color: '#333', textAlign: 'center', padding: '16px 0' }}>
+                      Empty
+                    </div>
+                  ) : colItems.map(item => (
+                    <IdeaCard
+                      key={item.id}
+                      item={item}
+                      expanded={expanded.has(item.id)}
+                      onToggleExpand={() => toggleExpanded(item.id)}
+                      onCycleStatus={() => cycleStatus(item.id, item.status)}
+                      onEdit={() => openEditForm(item)}
+                      onDelete={() => deleteItem(item.id)}
+                      compact
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
+
+      {toast && <Toast msg={toast} />}
     </div>
   );
 }
 
-function FilterChip({ children, active, onClick, hot }: { children: React.ReactNode; active: boolean; onClick: () => void; hot?: boolean }) {
-  const accent = hot ? '#ef4444' : '#fff';
+function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => void }) {
+  const btn = (active: boolean): React.CSSProperties => ({
+    fontSize: 10,
+    fontWeight: 600,
+    letterSpacing: '0.05em',
+    textTransform: 'uppercase',
+    padding: '5px 10px',
+    cursor: 'pointer',
+    background: active ? '#fff' : 'transparent',
+    color: active ? '#000' : '#666',
+    border: 'none',
+    fontFamily: 'inherit',
+    transition: 'all 0.15s',
+  });
   return (
-    <button
-      onClick={onClick}
-      style={{
-        padding: '3px 9px',
-        borderRadius: 20,
-        fontSize: 10,
-        fontWeight: 600,
-        textTransform: 'uppercase',
-        letterSpacing: '0.04em',
-        cursor: 'pointer',
-        border: `0.5px solid ${active ? accent : '#1a1a1a'}`,
-        background: active ? `${hot ? '#ef444415' : '#ffffff10'}` : 'transparent',
-        color: active ? accent : '#666',
-        fontFamily: 'inherit',
-        transition: 'all 0.15s',
-      }}
-    >
-      {children}
-    </button>
+    <div style={{ display: 'inline-flex', border: '0.5px solid #2a2a2a', borderRadius: 6, overflow: 'hidden' }}>
+      <button onClick={() => onChange('grid')} style={btn(view === 'grid')}>Grid</button>
+      <button onClick={() => onChange('kanban')} style={btn(view === 'kanban')}>Kanban</button>
+    </div>
   );
 }
 
-function ItemCard({
-  item,
-  onCycleStatus,
-  onToggleHot,
-  onDelete,
-}: {
+function EmptyState({ onAdd }: { onAdd: () => void }) {
+  return (
+    <div style={{
+      textAlign: 'center',
+      padding: '80px 24px',
+      border: '0.5px dashed #2a2a2a',
+      borderRadius: 12,
+      background: '#0a0a0a',
+    }}>
+      <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.4 }}>💡</div>
+      <div style={{ fontSize: 14, color: '#ccc', marginBottom: 6, fontWeight: 600 }}>No ideas yet</div>
+      <div style={{ fontSize: 12, color: '#555', marginBottom: 20, lineHeight: 1.5 }}>
+        Capture hooks, formats, references, or anything else worth coming back to.
+      </div>
+      <button className="btn-primary" style={{ fontSize: 12, padding: '8px 18px' }} onClick={onAdd}>
+        + Add Idea
+      </button>
+    </div>
+  );
+}
+
+function Toast({ msg }: { msg: string }) {
+  return (
+    <div style={{
+      position: 'fixed',
+      bottom: 20,
+      right: 20,
+      background: '#fff',
+      color: '#000',
+      padding: '8px 14px',
+      borderRadius: 6,
+      fontSize: 11,
+      fontWeight: 600,
+      zIndex: 999,
+    }}>{msg}</div>
+  );
+}
+
+interface CardProps {
   item: ResearchItem;
+  expanded: boolean;
+  onToggleExpand: () => void;
   onCycleStatus: () => void;
-  onToggleHot: () => void;
+  onEdit: () => void;
   onDelete: () => void;
-}) {
-  const isUrl = item.content.startsWith('http://') || item.content.startsWith('https://');
+  compact?: boolean;
+}
+
+function IdeaCard({ item, expanded, onToggleExpand, onCycleStatus, onEdit, onDelete, compact }: CardProps) {
   const stColors = STATUS_COLORS[item.status];
-  const dim = item.status === 'used' ? 0.5 : 1;
+  const dim = item.status === 'used' ? 0.55 : 1;
   const dateStr = item.created_at
     ? new Date(item.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
     : '';
+  const contentIsUrl = isUrl(item.content);
+
+  // Truncated style for content (3 lines, ellipsis)
+  const clampStyle: React.CSSProperties = expanded
+    ? {}
+    : {
+        display: '-webkit-box',
+        WebkitLineClamp: 3,
+        WebkitBoxOrient: 'vertical',
+        overflow: 'hidden',
+      };
 
   return (
     <div
+      className="research-card"
       style={{
         background: '#0d0d0d',
         border: `0.5px solid ${item.hot ? '#ef444440' : '#1a1a1a'}`,
-        borderRadius: 8,
-        padding: '10px 12px',
+        borderRadius: 10,
+        padding: compact ? 10 : 12,
         opacity: dim,
-        transition: 'border-color 0.15s, background 0.15s',
         position: 'relative',
+        transition: 'border-color 0.15s, background 0.15s',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
       }}
     >
-      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12, lineHeight: 1.45, color: '#ccc', wordBreak: 'break-word' }}>
-            {isUrl ? (
-              <a href={item.content} target="_blank" rel="noopener noreferrer" style={{ color: '#fff', textDecoration: 'underline' }}>
-                {item.content}
-              </a>
-            ) : item.content}
-          </div>
-          {item.note && (
-            <div style={{ fontSize: 10, color: '#666', fontStyle: 'italic', marginTop: 3, lineHeight: 1.4 }}>
-              💬 {item.note}
-            </div>
-          )}
-          <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginTop: 7, flexWrap: 'wrap' }}>
-            {item.hot ? (
-              <span
-                onClick={onToggleHot}
-                style={{
-                  fontSize: 9,
-                  fontWeight: 700,
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                  padding: '1px 6px',
-                  borderRadius: 3,
-                  background: '#ef444420',
-                  color: '#ef4444',
-                  border: '0.5px solid #ef444455',
-                  cursor: 'pointer',
-                }}
-                title="Click to unmark hot"
-              >
-                🔥 Hot
-              </span>
-            ) : (
-              <span
-                onClick={onToggleHot}
-                style={{
-                  fontSize: 9,
-                  fontWeight: 600,
-                  letterSpacing: '0.04em',
-                  textTransform: 'uppercase',
-                  padding: '1px 6px',
-                  borderRadius: 3,
-                  color: '#444',
-                  border: '0.5px dashed #2a2a2a',
-                  cursor: 'pointer',
-                }}
-                title="Mark as hot"
-              >
-                + Hot
-              </span>
-            )}
-            {item.reason && (
-              <span style={{
-                fontSize: 9,
-                fontWeight: 600,
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
-                padding: '1px 6px',
-                borderRadius: 3,
-                background: '#ffffff05',
-                color: '#666',
-                border: '0.5px solid #1a1a1a',
-              }}>
-                {item.reason}
-              </span>
-            )}
-            <span
-              onClick={onCycleStatus}
-              style={{
-                fontSize: 9,
-                fontWeight: 700,
-                letterSpacing: '0.05em',
-                textTransform: 'uppercase',
-                padding: '1px 6px',
-                borderRadius: 3,
-                marginLeft: 'auto',
-                background: stColors.bg,
-                color: stColors.color,
-                border: `0.5px solid ${stColors.border}`,
-                cursor: 'pointer',
-              }}
-              title="Click to cycle status"
-            >
-              {STATUS_LABELS[item.status]}
-            </span>
-          </div>
-          {dateStr && (
-            <div style={{ fontSize: 9, color: '#444', marginTop: 4 }}>{dateStr}</div>
-          )}
-        </div>
+      {/* Hot badge — top-right corner */}
+      {item.hot && (
+        <span
+          title="Hot"
+          style={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            fontSize: 14,
+            lineHeight: 1,
+          }}
+        >
+          🔥
+        </span>
+      )}
+
+      {/* Hover-revealed actions — top-right (offset to clear the flame) */}
+      <div
+        className="research-card-actions"
+        style={{
+          position: 'absolute',
+          top: 6,
+          right: item.hot ? 28 : 6,
+          display: 'flex',
+          gap: 4,
+        }}
+      >
+        <button
+          onClick={onEdit}
+          title="Edit"
+          style={{
+            background: '#1a1a1a',
+            border: '0.5px solid #2a2a2a',
+            borderRadius: 4,
+            color: '#aaa',
+            cursor: 'pointer',
+            fontSize: 11,
+            padding: '2px 7px',
+            fontFamily: 'inherit',
+          }}
+        >
+          ✎
+        </button>
         <button
           onClick={onDelete}
-          style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1, flexShrink: 0 }}
           title="Delete"
+          style={{
+            background: '#1a0a0a',
+            border: '0.5px solid #3a1a1a',
+            borderRadius: 4,
+            color: '#ef4444',
+            cursor: 'pointer',
+            fontSize: 11,
+            padding: '2px 7px',
+            fontFamily: 'inherit',
+          }}
         >
-          ×
+          ✕
         </button>
+      </div>
+
+      {/* Content body */}
+      <div style={{ paddingRight: item.hot ? 22 : 0 }}>
+        {contentIsUrl ? (
+          <a
+            href={item.content}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              color: '#fff',
+              textDecoration: 'none',
+              fontSize: 13,
+              fontWeight: 600,
+              borderBottom: '0.5px solid #2a2a2a',
+              paddingBottom: 2,
+            }}
+          >
+            {safeDomain(item.content)}
+            <span style={{ fontSize: 10, color: '#888' }}>↗</span>
+          </a>
+        ) : (
+          <div
+            onClick={onToggleExpand}
+            style={{
+              fontSize: 12,
+              lineHeight: 1.5,
+              color: '#ddd',
+              cursor: 'pointer',
+              wordBreak: 'break-word',
+              ...clampStyle,
+            }}
+            title={expanded ? 'Click to collapse' : 'Click to expand'}
+          >
+            {item.content}
+          </div>
+        )}
+      </div>
+
+      {/* Note */}
+      {item.note && (
+        <div style={{ fontSize: 11, color: '#666', fontStyle: 'italic', lineHeight: 1.45, wordBreak: 'break-word' }}>
+          {item.note}
+        </div>
+      )}
+
+      {/* Footer: reason tag, status pill, date */}
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 'auto' }}>
+        {item.reason && (
+          <span style={{
+            fontSize: 9,
+            fontWeight: 600,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            padding: '2px 7px',
+            borderRadius: 3,
+            background: '#161616',
+            color: '#888',
+            border: '0.5px solid #1f1f1f',
+          }}>
+            {item.reason}
+          </span>
+        )}
+        <span
+          onClick={onCycleStatus}
+          style={{
+            fontSize: 9,
+            fontWeight: 700,
+            letterSpacing: '0.05em',
+            textTransform: 'uppercase',
+            padding: '2px 7px',
+            borderRadius: 3,
+            background: stColors.bg,
+            color: stColors.color,
+            border: `0.5px solid ${stColors.border}`,
+            cursor: 'pointer',
+          }}
+          title="Click to advance status"
+        >
+          {STATUS_LABELS[item.status]}
+        </span>
+        {dateStr && (
+          <span style={{ fontSize: 9, color: '#444', marginLeft: 'auto' }}>{dateStr}</span>
+        )}
       </div>
     </div>
   );

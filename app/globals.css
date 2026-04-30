@@ -339,3 +339,29 @@ html, body {
   color: #a5b4fc;
   border-color: #6366f1;
 }
+
+/* Research tab — responsive grid + hover-reveal actions */
+.research-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+@media (min-width: 720px) {
+  .research-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.research-kanban {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+.research-card-actions {
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+.research-card:hover .research-card-actions,
+.research-card:focus-within .research-card-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
