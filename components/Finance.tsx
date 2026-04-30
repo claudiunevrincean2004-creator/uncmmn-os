@@ -402,7 +402,7 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
         <div className="metric-chip">
           <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>Gross Profit</div>
           <div style={{ fontSize: 18, fontWeight: 700, color: '#3b82f6', marginBottom: 3 }}>{fm(viewData.grossProfit)}</div>
-          <div style={{ display: 'inline-block', fontSize: 10, fontWeight: 600, color: '#3b82f6', background: 'rgba(59, 130, 246, 0.12)', border: '0.5px solid rgba(59, 130, 246, 0.35)', padding: '2px 6px', borderRadius: 999 }}>{viewData.grossMargin.toFixed(1)}% margin</div>
+          <div style={{ fontSize: 11, color: '#3b82f6', fontWeight: 600 }}>{viewData.grossMargin.toFixed(1)}% margin</div>
         </div>
         <div className="metric-chip">
           <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>Operating Expenses</div>
@@ -449,7 +449,7 @@ export default function Finance({ clients, monthlyRevenue, monthlyExpenses, clie
         <div className="metric-chip">
           <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>Net Profit</div>
           <div style={{ fontSize: 18, fontWeight: 700, color: viewData.netProfit >= 0 ? '#10b981' : '#ef4444', marginBottom: 3 }}>{fm(viewData.netProfit)}</div>
-          <div style={{ display: 'inline-block', fontSize: 10, fontWeight: 600, color: viewData.netProfit >= 0 ? '#10b981' : '#ef4444', background: viewData.netProfit >= 0 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)', border: viewData.netProfit >= 0 ? '0.5px solid rgba(16, 185, 129, 0.35)' : '0.5px solid rgba(239, 68, 68, 0.35)', padding: '2px 6px', borderRadius: 999 }}>{viewData.margin.toFixed(1)}% margin</div>
+          <div style={{ fontSize: 11, color: viewData.netProfit >= 0 ? '#10b981' : '#ef4444', fontWeight: 600 }}>{viewData.margin.toFixed(1)}% margin</div>
         </div>
       </div>
 
