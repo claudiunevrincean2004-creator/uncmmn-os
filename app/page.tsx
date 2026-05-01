@@ -72,7 +72,7 @@ export default function Home() {
   const [projectNotes, setProjectNotes] = useState<ProjectNote[]>([]);
   const [researchItems, setResearchItems] = useState<ResearchItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [schemaMissing, setSchemaMissing] = useState<{ missing: string[]; clientColumnsMissing: string[]; postColumnsMissing: string[] } | null>(null);
+  const [schemaMissing, setSchemaMissing] = useState<{ missing: string[]; clientColumnsMissing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[] } | null>(null);
   const [showMigrationSQL, setShowMigrationSQL] = useState(false);
 
   // Navigation state
@@ -133,7 +133,7 @@ export default function Home() {
   useEffect(() => {
     // Check schema on mount, then load data
     checkSchema().then(result => {
-      if (result.missing.length > 0 || result.clientColumnsMissing.length > 0 || result.postColumnsMissing.length > 0) {
+      if (result.missing.length > 0 || result.clientColumnsMissing.length > 0 || result.postColumnsMissing.length > 0 || result.researchColumnsMissing.length > 0) {
         setSchemaMissing(result);
       }
     });
@@ -224,13 +224,13 @@ export default function Home() {
 
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {/* Schema migration banner */}
-        {schemaMissing && (schemaMissing.missing.length > 0 || schemaMissing.clientColumnsMissing.length > 0 || schemaMissing.postColumnsMissing.length > 0) && (
+        {schemaMissing && (schemaMissing.missing.length > 0 || schemaMissing.clientColumnsMissing.length > 0 || schemaMissing.postColumnsMissing.length > 0 || schemaMissing.researchColumnsMissing.length > 0) && (
           <div style={{ background: '#1a1000', borderBottom: '1px solid #3a2a00', padding: '10px 24px', flexShrink: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <span style={{ color: '#f59e0b', fontWeight: 600, fontSize: 12 }}>Database setup required</span>
                 <span style={{ color: '#888', fontSize: 11, marginLeft: 8 }}>
-                  Missing: {[...schemaMissing.missing, ...schemaMissing.clientColumnsMissing.map(c => `clients.${c}`), ...schemaMissing.postColumnsMissing.map(c => `posts.${c}`)].join(', ')}
+                  Missing: {[...schemaMissing.missing, ...schemaMissing.clientColumnsMissing.map(c => `clients.${c}`), ...schemaMissing.postColumnsMissing.map(c => `posts.${c}`), ...schemaMissing.researchColumnsMissing.map(c => `research_items.${c}`)].join(', ')}
                 </span>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
@@ -246,7 +246,7 @@ export default function Home() {
                   style={{ fontSize: 10, padding: '4px 10px' }}
                   onClick={() => {
                     checkSchema().then(result => {
-                      if (result.missing.length === 0 && result.clientColumnsMissing.length === 0 && result.postColumnsMissing.length === 0) {
+                      if (result.missing.length === 0 && result.clientColumnsMissing.length === 0 && result.postColumnsMissing.length === 0 && result.researchColumnsMissing.length === 0) {
                         setSchemaMissing(null);
                         setShowMigrationSQL(false);
                         loadData();
@@ -277,11 +277,11 @@ export default function Home() {
                     cursor: 'pointer',
                   }}
                   onClick={() => {
-                    navigator.clipboard.writeText(getMigrationSQL(schemaMissing.missing, schemaMissing.clientColumnsMissing, schemaMissing.postColumnsMissing));
+                    navigator.clipboard.writeText(getMigrationSQL(schemaMissing.missing, schemaMissing.clientColumnsMissing, schemaMissing.postColumnsMissing, schemaMissing.researchColumnsMissing));
                   }}
                   title="Click to copy"
                 >
-                  {getMigrationSQL(schemaMissing.missing, schemaMissing.clientColumnsMissing, schemaMissing.postColumnsMissing)}
+                  {getMigrationSQL(schemaMissing.missing, schemaMissing.clientColumnsMissing, schemaMissing.postColumnsMissing, schemaMissing.researchColumnsMissing)}
                 </pre>
                 <div style={{ fontSize: 9, color: '#555', marginTop: 4 }}>Click the SQL block to copy. After running it, click "Re-check" above.</div>
               </div>

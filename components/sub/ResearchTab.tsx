@@ -53,12 +53,13 @@ export default function ResearchTab({ client, items, onReload }: Props) {
   // Form state (used for both Add and Edit)
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [note, setNote] = useState('');
   const [reason, setReason] = useState(REASONS[0]);
   const [newHot, setNewHot] = useState(false);
   const [saving, setSaving] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   // Filters / view
   const [view, setView] = usePersistedState<View>('research_view_mode', 'grid');
@@ -77,7 +78,7 @@ export default function ResearchTab({ client, items, onReload }: Props) {
       .filter(i => {
         if (reasonFilter !== 'All' && i.reason !== reasonFilter) return false;
         if (q) {
-          const hay = `${i.content} ${i.note || ''} ${i.reason || ''}`.toLowerCase();
+          const hay = `${i.title || ''} ${i.content || ''} ${i.note || ''} ${i.reason || ''}`.toLowerCase();
           if (!hay.includes(q)) return false;
         }
         return true;
@@ -96,6 +97,7 @@ export default function ResearchTab({ client, items, onReload }: Props) {
   }
 
   function resetForm() {
+    setTitle('');
     setContent('');
     setNote('');
     setReason(REASONS[0]);
@@ -106,17 +108,18 @@ export default function ResearchTab({ client, items, onReload }: Props) {
   function openAddForm() {
     resetForm();
     setFormOpen(true);
-    setTimeout(() => textareaRef.current?.focus(), 0);
+    setTimeout(() => titleInputRef.current?.focus(), 0);
   }
 
   function openEditForm(item: ResearchItem) {
     setEditingId(item.id);
-    setContent(item.content);
+    setTitle(item.title || '');
+    setContent(item.content || '');
     setNote(item.note || '');
     setReason(item.reason || REASONS[0]);
     setNewHot(item.hot);
     setFormOpen(true);
-    setTimeout(() => textareaRef.current?.focus(), 0);
+    setTimeout(() => titleInputRef.current?.focus(), 0);
   }
 
   function closeForm() {
@@ -125,11 +128,13 @@ export default function ResearchTab({ client, items, onReload }: Props) {
   }
 
   async function saveItem() {
-    const trimmed = content.trim();
-    if (!trimmed || saving) return;
+    const trimmedTitle = title.trim();
+    const trimmedContent = content.trim();
+    if (!trimmedTitle || saving) return;
     setSaving(true);
     const payload = {
-      content: trimmed,
+      title: trimmedTitle,
+      content: trimmedContent || null,
       note: note.trim() || null,
       reason,
       hot: newHot,
@@ -232,10 +237,18 @@ export default function ResearchTab({ client, items, onReload }: Props) {
               ✕
             </button>
           </div>
-          <textarea
-            ref={textareaRef}
+          <input
+            ref={titleInputRef}
             className="form-input"
-            placeholder="Idea, hook, link, caption… (Cmd+Enter to save)"
+            placeholder="Title (required) — short, distinctive name"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') saveItem(); }}
+            style={{ fontSize: 13, fontWeight: 600 }}
+          />
+          <textarea
+            className="form-input"
+            placeholder="Content / URL or idea text (optional) — Cmd+Enter to save"
             value={content}
             onChange={e => setContent(e.target.value)}
             onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') saveItem(); }}
@@ -276,7 +289,7 @@ export default function ResearchTab({ client, items, onReload }: Props) {
               className="btn-primary"
               style={{ fontSize: 11, padding: '5px 12px', marginLeft: 'auto' }}
               onClick={saveItem}
-              disabled={saving || !content.trim()}
+              disabled={saving || !title.trim()}
             >
               {saving ? 'Saving…' : editingId ? 'Save changes' : 'Save idea'}
             </button>
@@ -441,14 +454,23 @@ function IdeaCard({ item, expanded, onToggleExpand, onCycleStatus, onEdit, onDel
   const dateStr = item.created_at
     ? new Date(item.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
     : '';
-  const contentIsUrl = isUrl(item.content);
+  const content = item.content?.trim() || '';
+  const contentIsUrl = !!content && isUrl(content);
 
-  // Truncated style for content (3 lines, ellipsis)
-  const clampStyle: React.CSSProperties = expanded
+  // Title clamp (always 2 lines max, no expand)
+  const titleClampStyle: React.CSSProperties = {
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
+    overflow: 'hidden',
+  };
+
+  // Content clamp — 2 lines by default per spec, expandable on click for non-URL text
+  const contentClampStyle: React.CSSProperties = expanded
     ? {}
     : {
         display: '-webkit-box',
-        WebkitLineClamp: 3,
+        WebkitLineClamp: 2,
         WebkitBoxOrient: 'vertical',
         overflow: 'hidden',
       };
@@ -469,33 +491,34 @@ function IdeaCard({ item, expanded, onToggleExpand, onCycleStatus, onEdit, onDel
         gap: 8,
       }}
     >
-      {/* Hot badge — top-right corner */}
-      {item.hot && (
-        <span
-          title="Hot"
-          style={{
-            position: 'absolute',
-            top: 8,
-            right: 8,
-            fontSize: 14,
-            lineHeight: 1,
-          }}
-        >
-          🔥
-        </span>
-      )}
-
-      {/* Hover-revealed actions — top-right (offset to clear the flame) */}
+      {/* Hover-revealed actions — top-right */}
       <div
         className="research-card-actions"
         style={{
           position: 'absolute',
           top: 6,
-          right: item.hot ? 28 : 6,
+          right: 6,
           display: 'flex',
           gap: 4,
+          zIndex: 2,
         }}
       >
+        <button
+          onClick={onCycleStatus}
+          title="Change status"
+          style={{
+            background: stColors.bg,
+            border: `0.5px solid ${stColors.border}`,
+            borderRadius: 4,
+            color: stColors.color,
+            cursor: 'pointer',
+            fontSize: 11,
+            padding: '2px 7px',
+            fontFamily: 'inherit',
+          }}
+        >
+          ↻
+        </button>
         <button
           onClick={onEdit}
           title="Edit"
@@ -530,70 +553,64 @@ function IdeaCard({ item, expanded, onToggleExpand, onCycleStatus, onEdit, onDel
         </button>
       </div>
 
-      {/* Content body */}
-      <div style={{ paddingRight: item.hot ? 22 : 0 }}>
-        {contentIsUrl ? (
+      {/* Title — prominent, bold, white */}
+      <div
+        style={{
+          fontSize: 14,
+          fontWeight: 700,
+          color: '#fff',
+          lineHeight: 1.3,
+          letterSpacing: '-0.01em',
+          wordBreak: 'break-word',
+          paddingRight: 70,
+          ...titleClampStyle,
+        }}
+        title={item.title}
+      >
+        {item.title || 'Untitled'}
+      </div>
+
+      {/* Content / URL — smaller muted text, 2-line clamp */}
+      {content && (
+        contentIsUrl ? (
           <a
-            href={item.content}
+            href={content}
             target="_blank"
             rel="noopener noreferrer"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: 4,
-              color: '#fff',
+              color: '#888',
               textDecoration: 'none',
-              fontSize: 13,
-              fontWeight: 600,
-              borderBottom: '0.5px solid #2a2a2a',
-              paddingBottom: 2,
+              fontSize: 11,
+              wordBreak: 'break-all',
             }}
+            title={content}
           >
-            {safeDomain(item.content)}
-            <span style={{ fontSize: 10, color: '#888' }}>↗</span>
+            <span style={{ borderBottom: '0.5px solid #2a2a2a', paddingBottom: 1 }}>{safeDomain(content)}</span>
+            <span style={{ fontSize: 9, color: '#666' }}>↗</span>
           </a>
         ) : (
           <div
             onClick={onToggleExpand}
             style={{
-              fontSize: 12,
-              lineHeight: 1.5,
-              color: '#ddd',
+              fontSize: 11,
+              lineHeight: 1.45,
+              color: '#888',
               cursor: 'pointer',
               wordBreak: 'break-word',
-              ...clampStyle,
+              ...contentClampStyle,
             }}
             title={expanded ? 'Click to collapse' : 'Click to expand'}
           >
-            {item.content}
+            {content}
           </div>
-        )}
-      </div>
-
-      {/* Note */}
-      {item.note && (
-        <div style={{ fontSize: 11, color: '#666', fontStyle: 'italic', lineHeight: 1.45, wordBreak: 'break-word' }}>
-          {item.note}
-        </div>
+        )
       )}
 
-      {/* Footer: reason tag, status pill, date */}
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 'auto' }}>
-        {item.reason && (
-          <span style={{
-            fontSize: 9,
-            fontWeight: 600,
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-            padding: '2px 7px',
-            borderRadius: 3,
-            background: '#161616',
-            color: '#888',
-            border: '0.5px solid #1f1f1f',
-          }}>
-            {item.reason}
-          </span>
-        )}
+      {/* Status + reason + hot badges */}
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
         <span
           onClick={onCycleStatus}
           style={{
@@ -612,10 +629,57 @@ function IdeaCard({ item, expanded, onToggleExpand, onCycleStatus, onEdit, onDel
         >
           {STATUS_LABELS[item.status]}
         </span>
-        {dateStr && (
-          <span style={{ fontSize: 9, color: '#444', marginLeft: 'auto' }}>{dateStr}</span>
+        {item.reason && (
+          <span style={{
+            fontSize: 9,
+            fontWeight: 600,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            padding: '2px 7px',
+            borderRadius: 3,
+            background: '#161616',
+            color: '#888',
+            border: '0.5px solid #1f1f1f',
+          }}>
+            {item.reason}
+          </span>
+        )}
+        {item.hot && (
+          <span
+            title="Hot"
+            style={{
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase',
+              padding: '2px 7px',
+              borderRadius: 3,
+              background: '#ef444418',
+              color: '#ef4444',
+              border: '0.5px solid #ef444440',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 3,
+            }}
+          >
+            🔥 Hot
+          </span>
         )}
       </div>
+
+      {/* Note */}
+      {item.note && (
+        <div style={{ fontSize: 11, color: '#666', fontStyle: 'italic', lineHeight: 1.45, wordBreak: 'break-word' }}>
+          {item.note}
+        </div>
+      )}
+
+      {/* Date — bottom */}
+      {dateStr && (
+        <div style={{ fontSize: 9, color: '#444', marginTop: 'auto', textAlign: 'right' }}>
+          {dateStr}
+        </div>
+      )}
     </div>
   );
 }

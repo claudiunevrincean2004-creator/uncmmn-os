@@ -183,7 +183,8 @@ export type ResearchStatus = 'unused' | 'progress' | 'used';
 export interface ResearchItem {
   id: string;
   client_id: string;
-  content: string;
+  title: string;
+  content?: string;
   note?: string;
   reason?: string;
   hot: boolean;

@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 
-export async function checkSchema(): Promise<{ missing: string[]; clientColumnsMissing: string[]; postColumnsMissing: string[] }> {
+export async function checkSchema(): Promise<{ missing: string[]; clientColumnsMissing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[] }> {
   const requiredTables = [
     'clients', 'posts', 'goals', 'hooks', 'formats', 'pillars',
     'drive_folders', 'expenses', 'monthly_revenue', 'monthly_expenses',
@@ -38,10 +38,20 @@ export async function checkSchema(): Promise<{ missing: string[]; clientColumnsM
     }
   }
 
-  return { missing, clientColumnsMissing, postColumnsMissing };
+  // Check if research_items table has title column
+  const researchColumnsMissing: string[] = [];
+  if (!missing.includes('research_items')) {
+    const { data } = await supabase.from('research_items').select('*').limit(1);
+    if (data && data.length > 0) {
+      const cols = Object.keys(data[0]);
+      if (!cols.includes('title')) researchColumnsMissing.push('title');
+    }
+  }
+
+  return { missing, clientColumnsMissing, postColumnsMissing, researchColumnsMissing };
 }
 
-export function getMigrationSQL(missing: string[], clientColumnsMissing: string[], postColumnsMissing: string[] = []): string {
+export function getMigrationSQL(missing: string[], clientColumnsMissing: string[], postColumnsMissing: string[] = [], researchColumnsMissing: string[] = []): string {
   const parts: string[] = [];
 
   if (missing.includes('monthly_revenue')) {
@@ -141,7 +151,8 @@ alter table project_notes disable row level security;`);
     parts.push(`create table if not exists research_items (
   id uuid primary key default gen_random_uuid(),
   client_id uuid references clients(id) on delete cascade,
-  content text not null,
+  title text not null,
+  content text,
   note text,
   reason text,
   hot boolean default false,
@@ -149,6 +160,11 @@ alter table project_notes disable row level security;`);
   created_at timestamptz default now()
 );
 alter table research_items disable row level security;`);
+  }
+
+  if (researchColumnsMissing.includes('title')) {
+    parts.push(`alter table research_items add column if not exists title text;
+update research_items set title = coalesce(nullif(title, ''), left(coalesce(content, 'Untitled'), 80)) where title is null or title = '';`);
   }
 
   if (clientColumnsMissing.includes('status')) {
