@@ -199,7 +199,12 @@ export default function Home() {
           )}
           {client && mainPage === 'content' && (
             <div style={{ padding: '16px 24px' }}>
-              <ContentTab client={client} posts={posts} onReload={loadData} />
+              <ContentTab
+                client={client}
+                posts={posts}
+                subscriberSnapshots={subscriberSnapshots}
+                onReload={loadData}
+              />
             </div>
           )}
           {client && mainPage === 'research' && (
