@@ -1,10 +1,25 @@
 'use client';
+import { MainPage } from '@/lib/types';
+
+interface NavItem {
+  key: MainPage;
+  label: string;
+  icon: string;
+}
+
+const NAV: NavItem[] = [
+  { key: 'dashboard', label: 'Dashboard', icon: '◎' },
+  { key: 'content', label: 'Content', icon: '▦' },
+  { key: 'research', label: 'Research', icon: '✦' },
+  { key: 'goals', label: 'Goals', icon: '◉' },
+  { key: 'drive', label: 'Drive', icon: '▤' },
+];
 
 interface Props {
-  activeMP: string;
+  activeMP: MainPage;
   collapsed: boolean;
   onToggleCollapse: () => void;
-  onSelectMain: (page: string) => void;
+  onSelectMain: (page: MainPage) => void;
 }
 
 export default function Sidebar({ activeMP, collapsed, onToggleCollapse, onSelectMain }: Props) {
@@ -23,7 +38,6 @@ export default function Sidebar({ activeMP, collapsed, onToggleCollapse, onSelec
       position: 'relative',
       transition: 'width 0.2s ease, min-width 0.2s ease',
     }}>
-      {/* Toggle button */}
       <button
         onClick={onToggleCollapse}
         style={{
@@ -51,50 +65,32 @@ export default function Sidebar({ activeMP, collapsed, onToggleCollapse, onSelec
         {collapsed ? '›' : '‹'}
       </button>
 
-      {/* Logo */}
       <div style={{ padding: collapsed ? '18px 8px 14px' : '18px 14px 14px', borderBottom: '0.5px solid #111', overflow: 'hidden', whiteSpace: 'nowrap' }}>
         {collapsed ? (
-          <div style={{ fontSize: 16, fontWeight: 800, textAlign: 'center', letterSpacing: '-0.5px', lineHeight: 1 }}>U</div>
+          <div style={{ fontSize: 16, fontWeight: 800, textAlign: 'center', letterSpacing: '-0.5px', lineHeight: 1 }}>N</div>
         ) : (
           <>
-            <div style={{ fontSize: 19, fontWeight: 800, letterSpacing: '-0.5px', lineHeight: 1 }}>UNCMMN</div>
-            <div style={{ fontSize: 9, color: '#333', marginTop: 3, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Agency OS</div>
+            <div style={{ fontSize: 19, fontWeight: 800, letterSpacing: '-0.5px', lineHeight: 1 }}>NATHAN</div>
+            <div style={{ fontSize: 9, color: '#333', marginTop: 3, letterSpacing: '0.1em', textTransform: 'uppercase' }}>OS</div>
           </>
         )}
       </div>
 
-      {/* Main nav */}
       <div style={{ padding: collapsed ? '10px 4px' : '10px 8px', flex: 1 }}>
-        <div
-          className={`nav-item${activeMP === 'overview' ? ' active' : ''}`}
-          onClick={() => onSelectMain('overview')}
-          title="Overview"
-          style={collapsed ? { justifyContent: 'center', padding: '8px 0' } : undefined}
-        >
-          <span style={{ fontSize: 13 }}>◎</span>
-          {!collapsed && <span>Overview</span>}
-        </div>
-        <div
-          className={`nav-item${activeMP === 'finance' ? ' active' : ''}`}
-          onClick={() => onSelectMain('finance')}
-          title="Finance"
-          style={collapsed ? { justifyContent: 'center', padding: '8px 0' } : undefined}
-        >
-          <span style={{ fontSize: 13 }}>$</span>
-          {!collapsed && <span>Finance</span>}
-        </div>
-        <div
-          className={`nav-item${activeMP === 'clients' ? ' active' : ''}`}
-          onClick={() => onSelectMain('clients')}
-          title="Clients"
-          style={collapsed ? { justifyContent: 'center', padding: '8px 0' } : undefined}
-        >
-          <span style={{ fontSize: 13 }}>☷</span>
-          {!collapsed && <span>Clients</span>}
-        </div>
+        {NAV.map(item => (
+          <div
+            key={item.key}
+            className={`nav-item${activeMP === item.key ? ' active' : ''}`}
+            onClick={() => onSelectMain(item.key)}
+            title={item.label}
+            style={collapsed ? { justifyContent: 'center', padding: '8px 0' } : undefined}
+          >
+            <span style={{ fontSize: 13 }}>{item.icon}</span>
+            {!collapsed && <span>{item.label}</span>}
+          </div>
+        ))}
       </div>
 
-      {/* Footer */}
       <div style={{ padding: collapsed ? '10px 4px' : '10px 14px', borderTop: '0.5px solid #111' }}>
         <div style={{ fontSize: 10, color: '#222', textAlign: collapsed ? 'center' : undefined }}>v1.0.0</div>
       </div>

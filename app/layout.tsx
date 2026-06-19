@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "UNCMMN OS",
-  description: "Agency Operating System",
+  title: "NATHAN OS",
+  description: "Nathan Nazareth — Creator Operating System",
 };
 
 export default function RootLayout({

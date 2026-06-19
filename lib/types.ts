@@ -1,27 +1,8 @@
-export type ClientType = 'DFY — Agency' | 'Consulting' | 'Coaching' | 'Partnership' | 'One-Off Project' | 'Other';
-export type BillingType = 'Retainer' | 'One-time';
-export type ProjectStatus = 'Planning' | 'In Progress' | 'In Review' | 'Completed';
-export type PaymentStatus = 'Unpaid' | 'Deposit Paid' | 'Paid in Full';
-export type ProjectTaskStatus = 'todo' | 'inprogress' | 'done';
-
 export interface Client {
   id: string;
   name: string;
-  niche: string;
-  retainer: number;
-  cost: number;
+  niche?: string;
   platforms: string[];
-  status?: 'Active' | 'Inactive' | 'Paused';
-  client_type?: ClientType;
-  billing_type?: BillingType;
-  renewal_date?: string;
-  start_date?: string;
-  deadline?: string;
-  inactive_date?: string;
-  project_status?: ProjectStatus;
-  payment_status?: PaymentStatus;
-  project_description?: string;
-  notes?: string;
   created_at?: string;
 }
 
@@ -62,34 +43,6 @@ export interface Goal {
   created_at?: string;
 }
 
-export interface Hook {
-  id: string;
-  client_id: string;
-  text: string;
-  category: string;
-  rating: number;
-  created_at?: string;
-}
-
-export interface Format {
-  id: string;
-  client_id: string;
-  name: string;
-  platform: string;
-  avg_views: number;
-  avg_eng: number;
-  notes: string;
-  created_at?: string;
-}
-
-export interface Pillar {
-  id: string;
-  client_id: string;
-  name: string;
-  description: string;
-  created_at?: string;
-}
-
 export interface DriveFolder {
   id: string;
   client_id: string;
@@ -99,84 +52,16 @@ export interface DriveFolder {
   created_at?: string;
 }
 
-export interface Expense {
+export interface RevenueEntry {
   id: string;
-  name: string;
-  cost: number;
-  category: string;
-  created_at?: string;
-}
-
-export interface MonthlyRevenue {
-  id: string;
-  client_id: string;
-  month: string; // YYYY-MM
-  amount: number;
-  created_at?: string;
-}
-
-export interface MonthlyExpense {
-  id: string;
-  name: string;
-  cost: number;
-  category: string;
-  month: string; // YYYY-MM
-  created_at?: string;
-}
-
-export interface ClientExpense {
-  id: string;
-  client_id: string;
-  name: string;
-  amount: number;
-  category: string;
-  month: string; // YYYY-MM
-  created_at?: string;
-}
-
-export interface ClientMonthExclusion {
-  id: string;
-  client_id: string;
-  month: string; // YYYY-MM
-  created_at?: string;
-}
-
-export interface ConsultingCall {
-  id: string;
-  client_id: string;
   date: string;
-  duration_minutes: number;
   amount: number;
-  notes: string;
-  created_at?: string;
-}
-
-export interface ConsultingIdea {
-  id: string;
-  client_id: string;
-  text: string;
-  status: 'Pending' | 'Discussed' | 'Implemented';
-  created_at?: string;
-}
-
-export interface ProjectTask {
-  id: string;
-  client_id: string;
-  title: string;
-  status: ProjectTaskStatus;
+  source?: string;
   notes?: string;
   created_at?: string;
 }
 
-export interface ProjectNote {
-  id: string;
-  client_id: string;
-  text: string;
-  created_at?: string;
-}
-
-export type MainPage = 'overview' | 'finance' | 'clients' | 'client';
-export type ClientTab = 'overview' | 'content' | 'outliers' | 'goals' | 'research' | 'drive';
+export type MainPage = 'dashboard' | 'content' | 'research' | 'goals' | 'drive';
 
 export type ResearchStatus = 'unused' | 'progress' | 'used';
 

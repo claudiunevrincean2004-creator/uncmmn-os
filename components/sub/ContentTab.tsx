@@ -1,8 +1,8 @@
 'use client';
 import { useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Post, Client, Pillar, Format } from '@/lib/types';
-import { fn, er } from '@/lib/utils';
+import { Post, Client } from '@/lib/types';
+import { fn, er, avg } from '@/lib/utils';
 import PlatformIcon from '@/components/PlatformIcon';
 import PostModal from '@/components/modals/PostModal';
 import { usePersistedState } from '@/lib/use-persisted-state';
@@ -10,22 +10,21 @@ import { usePersistedState } from '@/lib/use-persisted-state';
 interface Props {
   client: Client;
   posts: Post[];
-  pillars: Pillar[];
-  formats: Format[];
-  activePlat: string;
   onReload: () => void;
 }
 
 type SortKey = 'date' | 'views' | 'likes' | 'comments' | 'shares' | 'saves' | 'follows' | 'er';
 type SortDir = 'asc' | 'desc';
 
-export default function ContentTab({ client, posts, pillars, formats, activePlat, onReload }: Props) {
+export default function ContentTab({ client, posts, onReload }: Props) {
   const [showModal, setShowModal] = useState(false);
   const [editPost, setEditPost] = useState<Post | null>(null);
   const [sortKey, setSortKey] = usePersistedState<SortKey>('content_sort_key', 'date');
   const [sortDir, setSortDir] = usePersistedState<SortDir>('content_sort_dir', 'desc');
   const [filterPillar, setFilterPillar] = usePersistedState<string>('content_filter_pillar', 'All');
   const [filterFormat, setFilterFormat] = usePersistedState<string>('content_filter_format', 'All');
+  const [activePlat, setActivePlat] = usePersistedState<string>('content_platform', 'All');
+  const [outliersOnly, setOutliersOnly] = usePersistedState<boolean>('content_outliers_only', false);
 
   async function deletePost(id: string) {
     if (!confirm('Delete this post?')) return;
@@ -33,18 +32,24 @@ export default function ContentTab({ client, posts, pillars, formats, activePlat
     onReload();
   }
 
-  const clientPosts = posts.filter(p => p.client_id === client.id);
-  const clientPillars = pillars.filter(p => p.client_id === client.id);
-  const clientFormats = formats.filter(f => f.client_id === client.id);
+  const clientPosts = useMemo(() => posts.filter(p => p.client_id === client.id), [posts, client.id]);
+
+  const clientPlatforms = useMemo(() => {
+    const fromClient = client.platforms?.length ? client.platforms : ['TikTok', 'YouTube'];
+    return ['All', ...fromClient];
+  }, [client.platforms]);
 
   const pillarsOptions = ['All', ...Array.from(new Set(clientPosts.map(p => p.pillar).filter(Boolean)))];
   const formatsOptions = ['All', ...Array.from(new Set(clientPosts.map(p => p.format).filter(Boolean)))];
+
+  const avgViews = avg(clientPosts.map(p => p.views));
 
   const filtered = useMemo(() => {
     let result = clientPosts;
     if (activePlat !== 'All') result = result.filter(p => p.platform.toLowerCase() === activePlat.toLowerCase());
     if (filterPillar !== 'All') result = result.filter(p => p.pillar === filterPillar);
     if (filterFormat !== 'All') result = result.filter(p => p.format === filterFormat);
+    if (outliersOnly && avgViews > 0) result = result.filter(p => p.views >= avgViews * 1.5);
     return result.sort((a, b) => {
       let av = 0, bv = 0;
       if (sortKey === 'date') {
@@ -57,7 +62,7 @@ export default function ContentTab({ client, posts, pillars, formats, activePlat
       }
       return sortDir === 'desc' ? bv - av : av - bv;
     });
-  }, [clientPosts, activePlat, filterPillar, filterFormat, sortKey, sortDir]);
+  }, [clientPosts, activePlat, filterPillar, filterFormat, outliersOnly, avgViews, sortKey, sortDir]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir(d => d === 'desc' ? 'asc' : 'desc');
@@ -75,8 +80,22 @@ export default function ContentTab({ client, posts, pillars, formats, activePlat
 
   return (
     <div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+        {clientPlatforms.map(p => (
+          <button
+            key={p}
+            className={`subtab${activePlat === p ? ' active' : ''}`}
+            onClick={() => setActivePlat(p)}
+            style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+          >
+            {p !== 'All' && <PlatformIcon platform={p} size={14} />}
+            {p}
+          </button>
+        ))}
+      </div>
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 10, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <select
             className="form-input"
             style={{ width: 'auto', padding: '4px 8px', fontSize: 11 }}
@@ -118,13 +137,20 @@ export default function ContentTab({ client, posts, pillars, formats, activePlat
               </optgroup>
             ))}
           </select>
-          <span style={{ fontSize: 11, color: '#555' }}>{filtered.length} posts</span>
+          <button
+            className={`subtab${outliersOnly ? ' active' : ''}`}
+            onClick={() => setOutliersOnly(v => !v)}
+            title="Show only posts with views ≥ 1.5x average"
+          >
+            ✦ Outliers only
+          </button>
+          <span style={{ fontSize: 11, color: '#555' }}>{filtered.length} posts · avg {fn(avgViews)} views</span>
         </div>
         <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px' }} onClick={() => { setEditPost(null); setShowModal(true); }}>+ Add Post</button>
       </div>
 
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#333', padding: '40px 0', fontSize: 12 }}>No posts yet. Add your first post.</div>
+        <div style={{ textAlign: 'center', color: '#333', padding: '40px 0', fontSize: 12 }}>No posts match. Add a post or adjust filters.</div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table className="data-table">
@@ -147,40 +173,48 @@ export default function ContentTab({ client, posts, pillars, formats, activePlat
               </tr>
             </thead>
             <tbody>
-              {filtered.map(post => (
-                <tr key={post.id}>
-                  <td style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#fff' }}>{post.title}</td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <PlatformIcon platform={post.platform} size={14} />
-                      <span style={{ fontSize: 11, color: '#888' }}>{post.platform}</span>
-                    </div>
-                  </td>
-                  <td style={{ color: '#666', fontSize: 11 }}>{post.format || '—'}</td>
-                  <td style={{ color: '#666', fontSize: 11 }}>{post.pillar || '—'}</td>
-                  <td style={{ color: '#555', fontSize: 11 }}>{post.date ? post.date.slice(0, 10) : '—'}</td>
-                  <td style={{ fontWeight: 600 }}>{fn(post.views)}</td>
-                  <td>{fn(post.likes)}</td>
-                  <td>{fn(post.comments)}</td>
-                  <td>{fn(post.shares)}</td>
-                  <td>{fn(post.saves)}</td>
-                  <td>{fn(post.follows)}</td>
-                  <td style={{ color: '#6366f1' }}>{er(post).toFixed(1)}%</td>
-                  <td>
-                    {post.post_url ? (
-                      <a href={post.post_url} target="_blank" rel="noopener noreferrer" style={{ color: '#6366f1', fontSize: 11, textDecoration: 'none' }}>↗ Post</a>
-                    ) : post.drive_link ? (
-                      <a href={post.drive_link} target="_blank" rel="noopener noreferrer" style={{ color: '#6366f1', fontSize: 11, textDecoration: 'none' }}>↗</a>
-                    ) : <span style={{ color: '#333' }}>—</span>}
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      <button style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', fontSize: 11, padding: '2px 4px' }} onClick={() => { setEditPost(post); setShowModal(true); }}>✎</button>
-                      <button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deletePost(post.id)}>✕</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {filtered.map(post => {
+                const isOutlier = avgViews > 0 && post.views >= avgViews * 1.5;
+                return (
+                  <tr key={post.id}>
+                    <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#fff' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {isOutlier && <span className="badge badge-outlier" style={{ fontSize: 9 }}>{(post.views / avgViews).toFixed(1)}x</span>}
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{post.title}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <PlatformIcon platform={post.platform} size={14} />
+                        <span style={{ fontSize: 11, color: '#888' }}>{post.platform}</span>
+                      </div>
+                    </td>
+                    <td style={{ color: '#666', fontSize: 11 }}>{post.format || '—'}</td>
+                    <td style={{ color: '#666', fontSize: 11 }}>{post.pillar || '—'}</td>
+                    <td style={{ color: '#555', fontSize: 11 }}>{post.date ? post.date.slice(0, 10) : '—'}</td>
+                    <td style={{ fontWeight: 600 }}>{fn(post.views)}</td>
+                    <td>{fn(post.likes)}</td>
+                    <td>{fn(post.comments)}</td>
+                    <td>{fn(post.shares)}</td>
+                    <td>{fn(post.saves)}</td>
+                    <td>{fn(post.follows)}</td>
+                    <td style={{ color: '#6366f1' }}>{er(post).toFixed(1)}%</td>
+                    <td>
+                      {post.post_url ? (
+                        <a href={post.post_url} target="_blank" rel="noopener noreferrer" style={{ color: '#6366f1', fontSize: 11, textDecoration: 'none' }}>↗ Post</a>
+                      ) : post.drive_link ? (
+                        <a href={post.drive_link} target="_blank" rel="noopener noreferrer" style={{ color: '#6366f1', fontSize: 11, textDecoration: 'none' }}>↗</a>
+                      ) : <span style={{ color: '#333' }}>—</span>}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', fontSize: 11, padding: '2px 4px' }} onClick={() => { setEditPost(post); setShowModal(true); }}>✎</button>
+                        <button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deletePost(post.id)}>✕</button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -190,8 +224,6 @@ export default function ContentTab({ client, posts, pillars, formats, activePlat
         <PostModal
           post={editPost}
           client={client}
-          pillars={clientPillars}
-          formats={clientFormats}
           onClose={() => setShowModal(false)}
           onSaved={onReload}
         />

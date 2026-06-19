@@ -1,18 +1,18 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Post, Client, Pillar, Format } from '@/lib/types';
+import { Post, Client } from '@/lib/types';
 
 interface Props {
   post?: Post | null;
   client: Client;
-  pillars: Pillar[];
-  formats: Format[];
   onClose: () => void;
   onSaved: () => void;
 }
 
-export default function PostModal({ post, client, pillars, formats, onClose, onSaved }: Props) {
+const DEFAULT_FORMATS = ['Short', 'Long-form', 'Reel', 'Carousel', 'Static', 'Story'];
+
+export default function PostModal({ post, client, onClose, onSaved }: Props) {
   const [title, setTitle] = useState('');
   const [platform, setPlatform] = useState('');
   const [format, setFormat] = useState('');
@@ -46,9 +46,7 @@ export default function PostModal({ post, client, pillars, formats, onClose, onS
     }
   }, [post]);
 
-  const clientPlatforms = client.platforms?.length ? client.platforms : ['Instagram', 'TikTok', 'YouTube'];
-  const clientFormats = formats.filter(f => !platform || f.platform === platform || !f.platform);
-  const clientPillars = pillars;
+  const clientPlatforms = client.platforms?.length ? client.platforms : ['TikTok', 'YouTube'];
 
   async function handleSave() {
     if (!title.trim()) return;
@@ -57,8 +55,8 @@ export default function PostModal({ post, client, pillars, formats, onClose, onS
       client_id: client.id,
       title: title.trim(),
       platform,
-      format,
-      pillar,
+      format: format.trim(),
+      pillar: pillar.trim(),
       date: date || null,
       views: parseFloat(views) || 0,
       likes: parseFloat(likes) || 0,
@@ -105,23 +103,27 @@ export default function PostModal({ post, client, pillars, formats, onClose, onS
             </div>
             <div>
               <label className="form-label">Format</label>
-              <select className="form-input" value={format} onChange={e => setFormat(e.target.value)} style={inputStyle}>
-                <option value="">Select...</option>
-                {clientFormats.map(f => <option key={f.id} value={f.name}>{f.name}</option>)}
-                <option value="Reel">Reel</option>
-                <option value="Carousel">Carousel</option>
-                <option value="Static">Static</option>
-                <option value="Story">Story</option>
-                <option value="Short">Short</option>
-                <option value="Long-form">Long-form</option>
-              </select>
+              <input
+                className="form-input"
+                list="format-options"
+                value={format}
+                onChange={e => setFormat(e.target.value)}
+                placeholder="Short, Long-form..."
+                style={inputStyle}
+              />
+              <datalist id="format-options">
+                {DEFAULT_FORMATS.map(f => <option key={f} value={f} />)}
+              </datalist>
             </div>
             <div>
               <label className="form-label">Pillar</label>
-              <select className="form-input" value={pillar} onChange={e => setPillar(e.target.value)} style={inputStyle}>
-                <option value="">Select...</option>
-                {clientPillars.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
-              </select>
+              <input
+                className="form-input"
+                value={pillar}
+                onChange={e => setPillar(e.target.value)}
+                placeholder="Content pillar"
+                style={inputStyle}
+              />
             </div>
           </div>
 
@@ -141,7 +143,7 @@ export default function PostModal({ post, client, pillars, formats, onClose, onS
 
           <div>
             <label className="form-label">Post URL</label>
-            <input className="form-input" value={postUrl} onChange={e => setPostUrl(e.target.value)} placeholder="https://tiktok.com/... or https://instagram.com/..." style={inputStyle} />
+            <input className="form-input" value={postUrl} onChange={e => setPostUrl(e.target.value)} placeholder="https://tiktok.com/... or https://youtube.com/..." style={inputStyle} />
           </div>
 
           <div>

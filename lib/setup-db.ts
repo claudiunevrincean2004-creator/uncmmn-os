@@ -1,11 +1,9 @@
 import { supabase } from './supabase';
 
-export async function checkSchema(): Promise<{ missing: string[]; clientColumnsMissing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[] }> {
+export async function checkSchema(): Promise<{ missing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[] }> {
   const requiredTables = [
-    'clients', 'posts', 'goals', 'hooks', 'formats', 'pillars',
-    'drive_folders', 'expenses', 'monthly_revenue', 'monthly_expenses',
-    'client_expenses', 'client_month_exclusions', 'consulting_calls', 'consulting_ideas',
-    'project_tasks', 'project_notes', 'research_items',
+    'clients', 'posts', 'goals', 'drive_folders',
+    'subscriber_snapshots', 'research_items', 'revenue_entries',
   ];
 
   const missing: string[] = [];
@@ -16,19 +14,6 @@ export async function checkSchema(): Promise<{ missing: string[]; clientColumnsM
     }
   }
 
-  // Check if clients table has required columns
-  const clientColumnsMissing: string[] = [];
-  if (!missing.includes('clients')) {
-    const { data } = await supabase.from('clients').select('*').limit(1);
-    if (data && data.length > 0) {
-      const cols = Object.keys(data[0]);
-      for (const col of ['status', 'renewal_date', 'notes', 'start_date', 'client_type', 'billing_type', 'inactive_date', 'deadline', 'project_status', 'payment_status', 'project_description']) {
-        if (!cols.includes(col)) clientColumnsMissing.push(col);
-      }
-    }
-  }
-
-  // Check if posts table has post_url column
   const postColumnsMissing: string[] = [];
   if (!missing.includes('posts')) {
     const { data } = await supabase.from('posts').select('*').limit(1);
@@ -38,7 +23,6 @@ export async function checkSchema(): Promise<{ missing: string[]; clientColumnsM
     }
   }
 
-  // Check if research_items table has title column
   const researchColumnsMissing: string[] = [];
   if (!missing.includes('research_items')) {
     const { data } = await supabase.from('research_items').select('*').limit(1);
@@ -48,103 +32,80 @@ export async function checkSchema(): Promise<{ missing: string[]; clientColumnsM
     }
   }
 
-  return { missing, clientColumnsMissing, postColumnsMissing, researchColumnsMissing };
+  return { missing, postColumnsMissing, researchColumnsMissing };
 }
 
-export function getMigrationSQL(missing: string[], clientColumnsMissing: string[], postColumnsMissing: string[] = [], researchColumnsMissing: string[] = []): string {
+export function getMigrationSQL(missing: string[], postColumnsMissing: string[] = [], researchColumnsMissing: string[] = []): string {
   const parts: string[] = [];
 
-  if (missing.includes('monthly_revenue')) {
-    parts.push(`create table if not exists monthly_revenue (
-  id uuid primary key default gen_random_uuid(),
-  client_id uuid references clients(id) on delete cascade,
-  month text not null,
-  amount numeric default 0,
-  created_at timestamptz default now()
-);
-alter table monthly_revenue disable row level security;`);
-  }
-
-  if (missing.includes('monthly_expenses')) {
-    parts.push(`create table if not exists monthly_expenses (
+  if (missing.includes('clients')) {
+    parts.push(`create table if not exists clients (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  cost numeric default 0,
-  category text,
-  month text not null,
+  niche text,
+  platforms text[] default '{}',
   created_at timestamptz default now()
 );
-alter table monthly_expenses disable row level security;`);
+alter table clients disable row level security;`);
   }
 
-  if (missing.includes('client_expenses')) {
-    parts.push(`create table if not exists client_expenses (
-  id uuid primary key default gen_random_uuid(),
-  client_id uuid references clients(id) on delete cascade,
-  name text not null,
-  amount numeric default 0,
-  category text,
-  month text not null,
-  created_at timestamptz default now()
-);
-alter table client_expenses disable row level security;`);
-  }
-
-  if (missing.includes('client_month_exclusions')) {
-    parts.push(`create table if not exists client_month_exclusions (
-  id uuid primary key default gen_random_uuid(),
-  client_id uuid references clients(id) on delete cascade,
-  month text not null,
-  created_at timestamptz default now(),
-  unique(client_id, month)
-);
-alter table client_month_exclusions disable row level security;`);
-  }
-
-  if (missing.includes('consulting_calls')) {
-    parts.push(`create table if not exists consulting_calls (
-  id uuid primary key default gen_random_uuid(),
-  client_id uuid references clients(id) on delete cascade,
-  date date,
-  duration_minutes integer default 0,
-  amount numeric default 0,
-  notes text,
-  created_at timestamptz default now()
-);
-alter table consulting_calls disable row level security;`);
-  }
-
-  if (missing.includes('consulting_ideas')) {
-    parts.push(`create table if not exists consulting_ideas (
-  id uuid primary key default gen_random_uuid(),
-  client_id uuid references clients(id) on delete cascade,
-  text text not null,
-  status text default 'Pending',
-  created_at timestamptz default now()
-);
-alter table consulting_ideas disable row level security;`);
-  }
-
-  if (missing.includes('project_tasks')) {
-    parts.push(`create table if not exists project_tasks (
+  if (missing.includes('posts')) {
+    parts.push(`create table if not exists posts (
   id uuid primary key default gen_random_uuid(),
   client_id uuid references clients(id) on delete cascade,
   title text not null,
-  status text default 'todo',
-  notes text,
+  platform text,
+  format text,
+  pillar text,
+  date date,
+  views numeric default 0,
+  likes numeric default 0,
+  comments numeric default 0,
+  shares numeric default 0,
+  saves numeric default 0,
+  follows numeric default 0,
+  drive_link text,
+  post_url text,
   created_at timestamptz default now()
 );
-alter table project_tasks disable row level security;`);
+alter table posts disable row level security;`);
   }
 
-  if (missing.includes('project_notes')) {
-    parts.push(`create table if not exists project_notes (
+  if (missing.includes('goals')) {
+    parts.push(`create table if not exists goals (
   id uuid primary key default gen_random_uuid(),
   client_id uuid references clients(id) on delete cascade,
-  text text not null,
+  name text not null,
+  current_val numeric default 0,
+  target_val numeric default 0,
+  platform text default 'All',
   created_at timestamptz default now()
 );
-alter table project_notes disable row level security;`);
+alter table goals disable row level security;`);
+  }
+
+  if (missing.includes('drive_folders')) {
+    parts.push(`create table if not exists drive_folders (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid references clients(id) on delete cascade,
+  name text not null,
+  url text,
+  category text,
+  created_at timestamptz default now()
+);
+alter table drive_folders disable row level security;`);
+  }
+
+  if (missing.includes('subscriber_snapshots')) {
+    parts.push(`create table if not exists subscriber_snapshots (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid references clients(id) on delete cascade,
+  platform text not null,
+  subscriber_count numeric default 0,
+  date date not null,
+  created_at timestamptz default now()
+);
+alter table subscriber_snapshots disable row level security;`);
   }
 
   if (missing.includes('research_items')) {
@@ -162,43 +123,21 @@ alter table project_notes disable row level security;`);
 alter table research_items disable row level security;`);
   }
 
+  if (missing.includes('revenue_entries')) {
+    parts.push(`create table if not exists revenue_entries (
+  id uuid primary key default gen_random_uuid(),
+  date date not null,
+  amount numeric default 0,
+  source text,
+  notes text,
+  created_at timestamptz default now()
+);
+alter table revenue_entries disable row level security;`);
+  }
+
   if (researchColumnsMissing.includes('title')) {
     parts.push(`alter table research_items add column if not exists title text;
 update research_items set title = coalesce(nullif(title, ''), left(coalesce(content, 'Untitled'), 80)) where title is null or title = '';`);
-  }
-
-  if (clientColumnsMissing.includes('status')) {
-    parts.push(`alter table clients add column if not exists status text default 'Active';`);
-  }
-  if (clientColumnsMissing.includes('renewal_date')) {
-    parts.push(`alter table clients add column if not exists renewal_date date;`);
-  }
-  if (clientColumnsMissing.includes('notes')) {
-    parts.push(`alter table clients add column if not exists notes text;`);
-  }
-  if (clientColumnsMissing.includes('start_date')) {
-    parts.push(`alter table clients add column if not exists start_date date;`);
-  }
-  if (clientColumnsMissing.includes('client_type')) {
-    parts.push(`alter table clients add column if not exists client_type text;`);
-  }
-  if (clientColumnsMissing.includes('billing_type')) {
-    parts.push(`alter table clients add column if not exists billing_type text default 'Retainer';`);
-  }
-  if (clientColumnsMissing.includes('inactive_date')) {
-    parts.push(`alter table clients add column if not exists inactive_date date;`);
-  }
-  if (clientColumnsMissing.includes('deadline')) {
-    parts.push(`alter table clients add column if not exists deadline date;`);
-  }
-  if (clientColumnsMissing.includes('project_status')) {
-    parts.push(`alter table clients add column if not exists project_status text;`);
-  }
-  if (clientColumnsMissing.includes('payment_status')) {
-    parts.push(`alter table clients add column if not exists payment_status text;`);
-  }
-  if (clientColumnsMissing.includes('project_description')) {
-    parts.push(`alter table clients add column if not exists project_description text;`);
   }
 
   if (postColumnsMissing.includes('post_url')) {

@@ -2,29 +2,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { checkSchema, getMigrationSQL } from '@/lib/setup-db';
-import { Client, Post, Goal, Format, Pillar, DriveFolder, Expense, MonthlyRevenue, MonthlyExpense, ClientExpense, ClientMonthExclusion, SubscriberSnapshot, ConsultingCall, ConsultingIdea, ProjectTask, ProjectNote, ResearchItem, MainPage, ClientTab } from '@/lib/types';
+import { Client, Post, Goal, DriveFolder, SubscriberSnapshot, ResearchItem, RevenueEntry, MainPage } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 
 import Sidebar from '@/components/Sidebar';
-import Overview from '@/components/Overview';
-import Finance from '@/components/Finance';
-import ClientOverview from '@/components/sub/ClientOverview';
+import Dashboard from '@/components/Dashboard';
 import ContentTab from '@/components/sub/ContentTab';
-import OutliersTab from '@/components/sub/OutliersTab';
 import GoalsTab from '@/components/sub/GoalsTab';
 import ResearchTab from '@/components/sub/ResearchTab';
 import DriveTab from '@/components/sub/DriveTab';
-import ClientModal from '@/components/modals/ClientModal';
-import ClientSidebar from '@/components/ClientSidebar';
-import ClientsPage from '@/components/ClientsPage';
-import PlatformIcon from '@/components/PlatformIcon';
-import ConsultingDashboard from '@/components/sub/ConsultingDashboard';
-import OneOffProjectDashboard from '@/components/sub/OneOffProjectDashboard';
 
-// Helper: query a table, return [] if the table doesn't exist
 async function safeSelect(table: string, orderCol: string, ascending = true) {
   const { data, error } = await supabase.from(table).select('*').order(orderCol, { ascending });
-  if (error && error.code === 'PGRST205') return []; // table doesn't exist
+  if (error && error.code === 'PGRST205') return [];
   if (error) {
     console.warn(`[safeSelect] Error querying "${table}":`, error.message, error.code);
     return [];
@@ -32,181 +22,82 @@ async function safeSelect(table: string, orderCol: string, ascending = true) {
   return data || [];
 }
 
-export type TimePeriod = '30d' | '3m' | 'quarter' | '6m' | 'year' | 'all';
-
-const TIME_PERIOD_LABELS: Record<TimePeriod, string> = {
-  '30d': 'Last 30 days',
-  '3m': 'Last 3 months',
-  'quarter': 'Last quarter',
-  '6m': 'Last 6 months',
-  'year': 'Last year',
-  'all': 'All time',
+const PAGE_LABELS: Record<MainPage, string> = {
+  dashboard: 'Dashboard',
+  content: 'Content',
+  research: 'Research',
+  goals: 'Goals',
+  drive: 'Drive',
 };
 
-const CLIENT_TABS: { key: ClientTab; label: string }[] = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'content', label: 'Content' },
-  { key: 'outliers', label: 'Outliers' },
-  { key: 'goals', label: 'Goals' },
-  { key: 'research', label: 'Research' },
-  { key: 'drive', label: 'Drive' },
-];
-
 export default function Home() {
-  // Data state
-  const [clients, setClients] = useState<Client[]>([]);
+  const [client, setClient] = useState<Client | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
-  const [formats, setFormats] = useState<Format[]>([]);
-  const [pillars, setPillars] = useState<Pillar[]>([]);
   const [driveFolders, setDriveFolders] = useState<DriveFolder[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [monthlyRevenue, setMonthlyRevenue] = useState<MonthlyRevenue[]>([]);
-  const [monthlyExpenses, setMonthlyExpenses] = useState<MonthlyExpense[]>([]);
-  const [clientExpenses, setClientExpenses] = useState<ClientExpense[]>([]);
-  const [clientMonthExclusions, setClientMonthExclusions] = useState<ClientMonthExclusion[]>([]);
   const [subscriberSnapshots, setSubscriberSnapshots] = useState<SubscriberSnapshot[]>([]);
-  const [consultingCalls, setConsultingCalls] = useState<ConsultingCall[]>([]);
-  const [consultingIdeas, setConsultingIdeas] = useState<ConsultingIdea[]>([]);
-  const [projectTasks, setProjectTasks] = useState<ProjectTask[]>([]);
-  const [projectNotes, setProjectNotes] = useState<ProjectNote[]>([]);
   const [researchItems, setResearchItems] = useState<ResearchItem[]>([]);
+  const [revenueEntries, setRevenueEntries] = useState<RevenueEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [schemaMissing, setSchemaMissing] = useState<{ missing: string[]; clientColumnsMissing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[] } | null>(null);
+  const [schemaMissing, setSchemaMissing] = useState<{ missing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[] } | null>(null);
   const [showMigrationSQL, setShowMigrationSQL] = useState(false);
 
-  // Navigation state
-  const [mainPage, setMainPage] = useState<MainPage>('overview');
-  const [activeClientId, setActiveClientId] = useState<string | null>(null);
-  const [clientTab, setClientTab] = useState<ClientTab>('overview');
-  const [activePlat, setActivePlat] = useState('All');
-  const [showCmp, setShowCmp] = useState(false);
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>('30d');
+  const [mainPage, setMainPage] = usePersistedState<MainPage>('main_page', 'dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = usePersistedState<boolean>('sidebar_collapsed', false);
 
-  // Modal state
-  const [showClientModal, setShowClientModal] = useState(false);
-  const [editClient, setEditClient] = useState<Client | null>(null);
-  const [sidebarClientId, setSidebarClientId] = useState<string | null>(null);
-  const [sidebarMonth, setSidebarMonth] = useState<string | undefined>(undefined);
+  // Migrate stale persisted page values from prior builds
+  useEffect(() => {
+    if (!(['dashboard', 'content', 'research', 'goals', 'drive'] as const).includes(mainPage)) {
+      setMainPage('dashboard');
+    }
+  }, [mainPage, setMainPage]);
 
   const loadData = useCallback(async () => {
-    const [c, p, g, f, pl, d, e, mr, me, ce, cme, ss, cc, ci, pt, pn, ri] = await Promise.all([
-      safeSelect('clients', 'name'),
+    const [c, p, g, d, ss, ri, re] = await Promise.all([
+      safeSelect('clients', 'created_at'),
       safeSelect('posts', 'date', false),
       safeSelect('goals', 'created_at'),
-      safeSelect('formats', 'name'),
-      safeSelect('pillars', 'name'),
       safeSelect('drive_folders', 'category'),
-      safeSelect('expenses', 'category'),
-      safeSelect('monthly_revenue', 'month'),
-      safeSelect('monthly_expenses', 'month'),
-      safeSelect('client_expenses', 'month'),
-      safeSelect('client_month_exclusions', 'month'),
       safeSelect('subscriber_snapshots', 'date'),
-      safeSelect('consulting_calls', 'date', false),
-      safeSelect('consulting_ideas', 'created_at'),
-      safeSelect('project_tasks', 'created_at'),
-      safeSelect('project_notes', 'created_at', false),
       safeSelect('research_items', 'created_at', false),
+      safeSelect('revenue_entries', 'date', false),
     ]);
-    setClients(c as Client[]);
+
+    let active = (c as Client[])[0] || null;
+    // Auto-provision Nathan if no client exists
+    if (!active && (c as Client[]).length === 0) {
+      const { data: created } = await supabase.from('clients').insert([{
+        name: 'Nathan Nazareth',
+        niche: 'Creator',
+        platforms: ['TikTok', 'YouTube'],
+      }]).select().single();
+      if (created) active = created as Client;
+    }
+
+    setClient(active);
     setPosts(p as Post[]);
     setGoals(g as Goal[]);
-    setFormats(f as Format[]);
-    setPillars(pl as Pillar[]);
     setDriveFolders(d as DriveFolder[]);
-    setExpenses(e as Expense[]);
-    setMonthlyRevenue(mr as MonthlyRevenue[]);
-    setMonthlyExpenses(me as MonthlyExpense[]);
-    setClientExpenses(ce as ClientExpense[]);
-    setClientMonthExclusions(cme as ClientMonthExclusion[]);
     setSubscriberSnapshots(ss as SubscriberSnapshot[]);
-    setConsultingCalls(cc as ConsultingCall[]);
-    setConsultingIdeas(ci as ConsultingIdea[]);
-    setProjectTasks(pt as ProjectTask[]);
-    setProjectNotes(pn as ProjectNote[]);
     setResearchItems(ri as ResearchItem[]);
+    setRevenueEntries(re as RevenueEntry[]);
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    // Check schema on mount, then load data
     checkSchema().then(result => {
-      if (result.missing.length > 0 || result.clientColumnsMissing.length > 0 || result.postColumnsMissing.length > 0 || result.researchColumnsMissing.length > 0) {
+      if (result.missing.length > 0 || result.postColumnsMissing.length > 0 || result.researchColumnsMissing.length > 0) {
         setSchemaMissing(result);
       }
     });
     loadData();
   }, [loadData]);
 
-  function handleSelectMain(page: string) {
-    setMainPage(page as MainPage);
-    setActiveClientId(null);
-    setClientTab('overview');
-    setActivePlat('All');
-  }
-
-  function handleSelectClient(id: string) {
-    setMainPage('client');
-    setActiveClientId(id);
-    setClientTab('overview');
-    setActivePlat('All');
-  }
-
-  function handleAddClient() {
-    setEditClient(null);
-    setShowClientModal(true);
-  }
-
-  function handleClientSaved() {
-    loadData();
-  }
-
-  const activeClient = clients.find(c => c.id === activeClientId) || null;
-  const isConsultingClient = activeClient?.client_type === 'Consulting';
-  const isOneOffClient = activeClient?.client_type === 'One-Off Project';
-  const useSpecializedDashboard = isConsultingClient || isOneOffClient;
-  const clientPlatforms = activeClient?.platforms?.length ? ['All', ...activeClient.platforms] : ['All', 'Instagram', 'TikTok', 'YouTube'];
-
-  async function handleDeleteClient() {
-    if (!activeClient) return;
-    if (!confirm(`Delete "${activeClient.name}" and all associated data?`)) return;
-    await supabase.from('clients').delete().eq('id', activeClient.id);
-    setActiveClientId(null);
-    setMainPage('overview');
-    loadData();
-  }
-
-  function renderClientContent() {
-    if (!activeClient) return null;
-    if (isConsultingClient) {
-      return <ConsultingDashboard client={activeClient} calls={consultingCalls} ideas={consultingIdeas} onReload={loadData} />;
-    }
-    if (isOneOffClient) {
-      return <OneOffProjectDashboard client={activeClient} tasks={projectTasks} notes={projectNotes} onReload={loadData} />;
-    }
-    switch (clientTab) {
-      case 'overview':
-        return <ClientOverview client={activeClient} posts={posts} goals={goals} pillars={pillars} formats={formats} subscriberSnapshots={subscriberSnapshots} activePlat={activePlat} showCmp={showCmp} timePeriod={timePeriod} />;
-      case 'content':
-        return <ContentTab client={activeClient} posts={posts} pillars={pillars} formats={formats} activePlat={activePlat} onReload={loadData} />;
-      case 'outliers':
-        return <OutliersTab client={activeClient} posts={posts} activePlat={activePlat} />;
-      case 'goals':
-        return <GoalsTab client={activeClient} goals={goals} onReload={loadData} />;
-      case 'research':
-        return <ResearchTab client={activeClient} items={researchItems} onReload={loadData} />;
-      case 'drive':
-        return <DriveTab client={activeClient} driveFolders={driveFolders} onReload={loadData} />;
-    }
-  }
-
   if (loading) {
     return (
       <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px', marginBottom: 8 }}>UNCMMN</div>
+          <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px', marginBottom: 8 }}>NATHAN</div>
           <div style={{ fontSize: 11, color: '#333', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Loading...</div>
         </div>
       </div>
@@ -219,18 +110,17 @@ export default function Home() {
         activeMP={mainPage}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(v => !v)}
-        onSelectMain={handleSelectMain}
+        onSelectMain={setMainPage}
       />
 
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {/* Schema migration banner */}
-        {schemaMissing && (schemaMissing.missing.length > 0 || schemaMissing.clientColumnsMissing.length > 0 || schemaMissing.postColumnsMissing.length > 0 || schemaMissing.researchColumnsMissing.length > 0) && (
+        {schemaMissing && (schemaMissing.missing.length > 0 || schemaMissing.postColumnsMissing.length > 0 || schemaMissing.researchColumnsMissing.length > 0) && (
           <div style={{ background: '#1a1000', borderBottom: '1px solid #3a2a00', padding: '10px 24px', flexShrink: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <span style={{ color: '#f59e0b', fontWeight: 600, fontSize: 12 }}>Database setup required</span>
                 <span style={{ color: '#888', fontSize: 11, marginLeft: 8 }}>
-                  Missing: {[...schemaMissing.missing, ...schemaMissing.clientColumnsMissing.map(c => `clients.${c}`), ...schemaMissing.postColumnsMissing.map(c => `posts.${c}`), ...schemaMissing.researchColumnsMissing.map(c => `research_items.${c}`)].join(', ')}
+                  Missing: {[...schemaMissing.missing, ...schemaMissing.postColumnsMissing.map(c => `posts.${c}`), ...schemaMissing.researchColumnsMissing.map(c => `research_items.${c}`)].join(', ')}
                 </span>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
@@ -246,7 +136,7 @@ export default function Home() {
                   style={{ fontSize: 10, padding: '4px 10px' }}
                   onClick={() => {
                     checkSchema().then(result => {
-                      if (result.missing.length === 0 && result.clientColumnsMissing.length === 0 && result.postColumnsMissing.length === 0 && result.researchColumnsMissing.length === 0) {
+                      if (result.missing.length === 0 && result.postColumnsMissing.length === 0 && result.researchColumnsMissing.length === 0) {
                         setSchemaMissing(null);
                         setShowMigrationSQL(false);
                         loadData();
@@ -277,11 +167,11 @@ export default function Home() {
                     cursor: 'pointer',
                   }}
                   onClick={() => {
-                    navigator.clipboard.writeText(getMigrationSQL(schemaMissing.missing, schemaMissing.clientColumnsMissing, schemaMissing.postColumnsMissing, schemaMissing.researchColumnsMissing));
+                    navigator.clipboard.writeText(getMigrationSQL(schemaMissing.missing, schemaMissing.postColumnsMissing, schemaMissing.researchColumnsMissing));
                   }}
                   title="Click to copy"
                 >
-                  {getMigrationSQL(schemaMissing.missing, schemaMissing.clientColumnsMissing, schemaMissing.postColumnsMissing, schemaMissing.researchColumnsMissing)}
+                  {getMigrationSQL(schemaMissing.missing, schemaMissing.postColumnsMissing, schemaMissing.researchColumnsMissing)}
                 </pre>
                 <div style={{ fontSize: 9, color: '#555', marginTop: 4 }}>Click the SQL block to copy. After running it, click "Re-check" above.</div>
               </div>
@@ -289,191 +179,46 @@ export default function Home() {
           </div>
         )}
 
-        {/* Client header + tabs */}
-        {mainPage === 'client' && activeClient && (
-          <div style={{ borderBottom: '0.5px solid #1a1a1a', padding: '14px 24px 0', flexShrink: 0 }}>
-            {/* Breadcrumb */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-              <button
-                onClick={() => handleSelectMain('clients')}
-                style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1 }}
-                onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
-                onMouseLeave={e => (e.currentTarget.style.color = '#444')}
-              >
-                ←
-              </button>
-              <span
-                style={{ fontSize: 12, color: '#444', cursor: 'pointer' }}
-                onClick={() => handleSelectMain('clients')}
-                onMouseEnter={e => (e.currentTarget.style.color = '#888')}
-                onMouseLeave={e => (e.currentTarget.style.color = '#444')}
-              >
-                Clients
-              </span>
-              <span style={{ fontSize: 11, color: '#333' }}>&gt;</span>
-              <span style={{ fontSize: 12, color: '#888' }}>{activeClient.name}</span>
-            </div>
-
-            {/* Client name + actions */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ fontSize: 16, fontWeight: 700 }}>{activeClient.name}</div>
-                {activeClient.client_type && (() => {
-                  const tc: Record<string, { bg: string; text: string }> = {
-                    'DFY — Agency': { bg: '#3b82f622', text: '#3b82f6' },
-                    Consulting: { bg: '#8b5cf622', text: '#8b5cf6' },
-                    Coaching: { bg: '#10b98122', text: '#10b981' },
-                    Partnership: { bg: '#f59e0b22', text: '#f59e0b' },
-                    'One-Off Project': { bg: '#00B8A922', text: '#00B8A9' },
-                    Other: { bg: '#6b728022', text: '#6b7280' },
-                  };
-                  const c = tc[activeClient.client_type] || tc.Other;
-                  return (
-                    <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: c.bg, color: c.text, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      {activeClient.client_type === 'DFY — Agency' ? 'DFY' : activeClient.client_type === 'One-Off Project' ? 'PROJECT' : activeClient.client_type}
-                    </span>
-                  );
-                })()}
-                {activeClient.niche && (
-                  <span style={{ fontSize: 11, color: '#444', padding: '2px 8px', border: '0.5px solid #2a2a2a', borderRadius: 4 }}>{activeClient.niche}</span>
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button
-                  className="btn-ghost"
-                  style={{ fontSize: 11, padding: '4px 10px' }}
-                  onClick={() => { setEditClient(activeClient); setShowClientModal(true); }}
-                >
-                  Edit
-                </button>
-                <button
-                  className="btn-danger"
-                  style={{ padding: '4px 10px' }}
-                  onClick={handleDeleteClient}
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-
-            {/* Platform filter + Time period + Comparison toggle — hide for specialized dashboards */}
-            {!useSpecializedDashboard && (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    {clientPlatforms.map(p => (
-                      <button
-                        key={p}
-                        className={`subtab${activePlat === p ? ' active' : ''}`}
-                        onClick={() => setActivePlat(p)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 4 }}
-                      >
-                        {p !== 'All' && <PlatformIcon platform={p} size={14} />}
-                        {p}
-                      </button>
-                    ))}
-                  </div>
-                  {clientTab === 'overview' && (
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <select
-                        className="form-input"
-                        style={{ width: 'auto', padding: '4px 8px', fontSize: 11, background: '#111', border: '0.5px solid #2a2a2a', borderRadius: 6, color: '#ccc' }}
-                        value={timePeriod}
-                        onChange={e => setTimePeriod(e.target.value as TimePeriod)}
-                      >
-                        {(Object.entries(TIME_PERIOD_LABELS) as [TimePeriod, string][]).map(([key, label]) => (
-                          <option key={key} value={key}>{label}</option>
-                        ))}
-                      </select>
-                      <button
-                        className={`btn-compare${showCmp ? ' active' : ''}`}
-                        onClick={() => setShowCmp(v => !v)}
-                      >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                        vs Previous Period
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Client tabs */}
-                <div style={{ display: 'flex', gap: 2, marginBottom: -1 }}>
-                  {CLIENT_TABS.map(tab => (
-                    <button
-                      key={tab.key}
-                      className={`subtab${clientTab === tab.key ? ' active' : ''}`}
-                      onClick={() => setClientTab(tab.key)}
-                      style={{ borderRadius: '6px 6px 0 0', padding: '6px 12px' }}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
+        {/* Page header */}
+        {client && (
+          <div style={{ borderBottom: '0.5px solid #1a1a1a', padding: '14px 24px', flexShrink: 0, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: 13, color: '#888', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{PAGE_LABELS[mainPage]}</div>
+            <div style={{ fontSize: 11, color: '#444' }}>{client.name}</div>
           </div>
         )}
 
-        {/* Main content area */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {mainPage === 'overview' && (
-            <Overview
-              clients={clients}
+          {client && mainPage === 'dashboard' && (
+            <Dashboard
+              client={client}
               posts={posts}
-              onSelectClient={handleSelectClient}
-              onOpenSidebar={(id: string) => { setSidebarClientId(id); setSidebarMonth(undefined); }}
-            />
-          )}
-          {mainPage === 'finance' && (
-            <Finance
-              clients={clients}
-              monthlyRevenue={monthlyRevenue}
-              monthlyExpenses={monthlyExpenses}
-              clientExpenses={clientExpenses}
-              clientMonthExclusions={clientMonthExclusions}
+              subscriberSnapshots={subscriberSnapshots}
+              revenueEntries={revenueEntries}
               onReload={loadData}
-              onOpenSidebar={(id: string, month?: string) => { setSidebarClientId(id); setSidebarMonth(month); }}
             />
           )}
-          {mainPage === 'clients' && (
-            <ClientsPage
-              clients={clients}
-              onSelectClient={handleSelectClient}
-              onAddClient={handleAddClient}
-            />
-          )}
-          {mainPage === 'client' && activeClient && (
+          {client && mainPage === 'content' && (
             <div style={{ padding: '16px 24px' }}>
-              {renderClientContent()}
+              <ContentTab client={client} posts={posts} onReload={loadData} />
+            </div>
+          )}
+          {client && mainPage === 'research' && (
+            <div style={{ padding: '16px 24px' }}>
+              <ResearchTab client={client} items={researchItems} onReload={loadData} />
+            </div>
+          )}
+          {client && mainPage === 'goals' && (
+            <div style={{ padding: '16px 24px' }}>
+              <GoalsTab client={client} goals={goals} onReload={loadData} />
+            </div>
+          )}
+          {client && mainPage === 'drive' && (
+            <div style={{ padding: '16px 24px' }}>
+              <DriveTab client={client} driveFolders={driveFolders} onReload={loadData} />
             </div>
           )}
         </div>
       </div>
-
-      {/* Client modal */}
-      {showClientModal && (
-        <ClientModal
-          client={editClient}
-          onClose={() => setShowClientModal(false)}
-          onSaved={handleClientSaved}
-        />
-      )}
-
-      {/* Client sidebar */}
-      {sidebarClientId && (() => {
-        const sidebarClient = clients.find(c => c.id === sidebarClientId);
-        if (!sidebarClient) return null;
-        return (
-          <ClientSidebar
-            client={sidebarClient}
-            clientExpenses={clientExpenses}
-            monthlyRevenue={monthlyRevenue}
-            month={sidebarMonth}
-            onClose={() => setSidebarClientId(null)}
-            onReload={loadData}
-          />
-        );
-      })()}
     </div>
   );
 }
