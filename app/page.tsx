@@ -30,6 +30,14 @@ const PAGE_LABELS: Record<MainPage, string> = {
   studio: 'Studio',
 };
 
+const PAGE_SUBTITLES: Record<MainPage, string> = {
+  dashboard: 'Performance at a glance',
+  content: 'Posts & analytics',
+  research: 'Ideas & references',
+  drive: 'Files & folders',
+  studio: 'Review & production',
+};
+
 export default function Home() {
   const [client, setClient] = useState<Client | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -50,6 +58,24 @@ export default function Home() {
 
   const [mainPage, setMainPage] = usePersistedState<MainPage>('main_page', 'dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = usePersistedState<boolean>('sidebar_collapsed', false);
+  const [theme, setTheme] = useState<'aurora' | 'midnight'>('aurora');
+
+  // Sync theme from storage on mount (the layout script already applied it pre-paint)
+  useEffect(() => {
+    const stored = typeof window !== 'undefined' ? localStorage.getItem('nathan_theme') : null;
+    const initial = stored === 'midnight' ? 'midnight' : 'aurora';
+    setTheme(initial);
+    document.documentElement.setAttribute('data-theme', initial);
+  }, []);
+
+  function toggleTheme() {
+    setTheme(prev => {
+      const next = prev === 'aurora' ? 'midnight' : 'aurora';
+      try { localStorage.setItem('nathan_theme', next); } catch {}
+      document.documentElement.setAttribute('data-theme', next);
+      return next;
+    });
+  }
 
   // Migrate stale persisted page values from prior builds
   useEffect(() => {
@@ -116,7 +142,7 @@ export default function Home() {
       <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px', marginBottom: 8 }}>NATHAN</div>
-          <div style={{ fontSize: 11, color: '#333', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Loading...</div>
+          <div style={{ fontSize: 11, color: 'var(--text-faint)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Loading...</div>
         </div>
       </div>
     );
@@ -137,7 +163,7 @@ export default function Home() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <span style={{ color: '#f59e0b', fontWeight: 600, fontSize: 12 }}>Database setup required</span>
-                <span style={{ color: '#888', fontSize: 11, marginLeft: 8 }}>
+                <span style={{ color: 'var(--text-dim)', fontSize: 11, marginLeft: 8 }}>
                   Missing: {[...schemaMissing.missing, ...schemaMissing.postColumnsMissing.map(c => `posts.${c}`), ...schemaMissing.researchColumnsMissing.map(c => `research_items.${c}`), ...schemaMissing.adColumnsMissing.map(c => `studio_ad_creatives.${c}`)].join(', ')}
                 </span>
               </div>
@@ -170,15 +196,15 @@ export default function Home() {
             </div>
             {showMigrationSQL && (
               <div style={{ marginTop: 10 }}>
-                <div style={{ fontSize: 10, color: '#888', marginBottom: 6 }}>Run this SQL in your Supabase SQL Editor (supabase.com &gt; SQL Editor):</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Run this SQL in your Supabase SQL Editor (supabase.com &gt; SQL Editor):</div>
                 <pre
                   style={{
-                    background: '#111',
-                    border: '0.5px solid #2a2a2a',
+                    background: 'var(--surface-2)',
+                    border: '0.5px solid var(--border)',
                     borderRadius: 6,
                     padding: 12,
                     fontSize: 11,
-                    color: '#ccc',
+                    color: 'var(--text-dim)',
                     whiteSpace: 'pre-wrap',
                     maxHeight: 300,
                     overflowY: 'auto',
@@ -191,7 +217,7 @@ export default function Home() {
                 >
                   {getMigrationSQL(schemaMissing.missing, schemaMissing.postColumnsMissing, schemaMissing.researchColumnsMissing, schemaMissing.adColumnsMissing)}
                 </pre>
-                <div style={{ fontSize: 9, color: '#555', marginTop: 4 }}>Click the SQL block to copy. After running it, click "Re-check" above.</div>
+                <div style={{ fontSize: 9, color: 'var(--text-faint)', marginTop: 4 }}>Click the SQL block to copy. After running it, click "Re-check" above.</div>
               </div>
             )}
           </div>
@@ -199,9 +225,24 @@ export default function Home() {
 
         {/* Page header */}
         {client && (
-          <div style={{ borderBottom: '0.5px solid #1a1a1a', padding: '14px 24px', flexShrink: 0, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: 13, color: '#888', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{PAGE_LABELS[mainPage]}</div>
-            <div style={{ fontSize: 11, color: '#444' }}>{client.name}</div>
+          <div style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface)', padding: '16px 24px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div>
+              <div className="font-head" style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.15, color: 'var(--text)' }}>{PAGE_LABELS[mainPage]}</div>
+              <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 2 }}>{PAGE_SUBTITLES[mainPage]}</div>
+            </div>
+            <div style={{ flex: 1 }} />
+            <button
+              className="theme-toggle"
+              onClick={toggleTheme}
+              title={theme === 'aurora' ? 'Switch to dark' : 'Switch to light'}
+              aria-label="Toggle theme"
+            >
+              {theme === 'aurora' ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
+              )}
+            </button>
           </div>
         )}
 

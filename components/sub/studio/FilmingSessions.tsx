@@ -94,17 +94,17 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
           <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))} title="Sort by date">
             Date {sortDir === 'asc' ? '↑ oldest' : '↓ newest'}
           </button>
-          <span style={{ fontSize: 10, color: '#444' }}>From</span>
+          <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>From</span>
           <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-          <span style={{ fontSize: 10, color: '#444' }}>To</span>
+          <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>To</span>
           <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
           {(dateFrom || dateTo) && <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>clear</button>}
-          <span style={{ fontSize: 11, color: '#555' }}>{filtered.length} {filtered.length === 1 ? 'session' : 'sessions'}</span>
+          <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{filtered.length} {filtered.length === 1 ? 'session' : 'sessions'}</span>
           <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={addSession}>+ Add Session</button>
         </div>
 
         {filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', color: '#333', padding: '40px 0', fontSize: 12 }}>No sessions match. Add a session or adjust filters.</div>
+          <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>No sessions match. Add a session or adjust filters.</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
@@ -129,9 +129,9 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                   const isPast = s.date && s.date.slice(0, 10) < today;
                   return (
                     <Fragment key={s.id}>
-                      <tr style={{ ...(isPast ? { opacity: 0.6 } : undefined), ...(selectedId === s.id ? { background: '#0f0f0f' } : undefined) }}>
+                      <tr style={{ ...(isPast ? { opacity: 0.6 } : undefined), ...(selectedId === s.id ? { background: 'var(--surface-2)' } : undefined) }}>
                         <td style={{ minWidth: 180 }}>
-                          <button onClick={() => setSelectedId(s.id)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{s.name}</button>
+                          <button onClick={() => setSelectedId(s.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{s.name}</button>
                         </td>
                         <td><UrlCell value={s.script_url} onCommit={u => patch(s.id, { script_url: u })} /></td>
                         <td><InlineDate value={s.date} onCommit={d => patch(s.id, { date: d || undefined })} /></td>
@@ -143,11 +143,11 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                             <div className="progress-bar" style={{ flex: 1, minWidth: 60 }}>
                               <div className={`progress-bar-fill${pct >= 100 ? ' complete' : ''}`} style={{ width: `${pct}%` }} />
                             </div>
-                            <span style={{ fontSize: 10, color: '#666', width: 30, textAlign: 'right' }}>{pct}%</span>
+                            <span style={{ fontSize: 10, color: 'var(--text-faint)', width: 30, textAlign: 'right' }}>{pct}%</span>
                           </div>
                         </td>
                         <td>
-                          <button onClick={() => setExpanded(e => (e === s.id ? null : s.id))} className="btn-ghost" style={{ fontSize: 10, padding: '3px 8px', color: s.notes ? '#a5b4fc' : '#555' }} title="Expand notes">
+                          <button onClick={() => setExpanded(e => (e === s.id ? null : s.id))} className="btn-ghost" style={{ fontSize: 10, padding: '3px 8px', color: s.notes ? 'var(--accent)' : 'var(--text-faint)' }} title="Expand notes">
                             {s.notes ? '📝' : '+'} {expanded === s.id ? '▲' : '▾'}
                           </button>
                         </td>
@@ -155,7 +155,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                       </tr>
                       {expanded === s.id && (
                         <tr>
-                          <td colSpan={9} style={{ background: '#0b0b0b' }}>
+                          <td colSpan={9} style={{ background: 'var(--surface-2)' }}>
                             <div style={{ padding: '4px 2px' }}>
                               <div className="form-label" style={{ marginBottom: 4 }}>Notes</div>
                               <InlineText value={s.notes} onCommit={n => patch(s.id, { notes: n })} placeholder="Add notes…" multiline style={{ width: '100%' }} />

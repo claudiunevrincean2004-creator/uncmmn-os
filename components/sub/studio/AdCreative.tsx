@@ -126,17 +126,17 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
           <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))} title="Sort direction">
             {sortDir === 'asc' ? '↑ asc' : '↓ desc'}
           </button>
-          <span style={{ fontSize: 10, color: '#444' }}>From</span>
+          <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>From</span>
           <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-          <span style={{ fontSize: 10, color: '#444' }}>To</span>
+          <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>To</span>
           <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
           {(dateFrom || dateTo) && <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>clear</button>}
-          <span style={{ fontSize: 11, color: '#555' }}>{filtered.length} {filtered.length === 1 ? 'creative' : 'creatives'}</span>
+          <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{filtered.length} {filtered.length === 1 ? 'creative' : 'creatives'}</span>
           <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={addAd}>+ Add Ad Creative</button>
         </div>
 
         {filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', color: '#333', padding: '40px 0', fontSize: 12 }}>No ad creatives yet. Add one, or set a video&apos;s status to &quot;Ad Variation Needed&quot;.</div>
+          <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>No ad creatives yet. Add one, or set a video&apos;s status to &quot;Ad Variation Needed&quot;.</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
@@ -156,28 +156,28 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
               <tbody>
                 {filtered.map(a => (
                   <Fragment key={a.id}>
-                    <tr style={selectedId === a.id ? { background: '#0f0f0f' } : undefined}>
+                    <tr style={selectedId === a.id ? { background: 'var(--surface-2)' } : undefined}>
                       <td style={{ minWidth: 160 }}>
-                        <button onClick={() => setSelectedId(a.id)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{a.creative_id || 'Untitled'}</button>
+                        <button onClick={() => setSelectedId(a.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{a.creative_id || 'Untitled'}</button>
                       </td>
                       <td><InlineDate value={a.date_added} onCommit={d => patch(a.id, { date_added: d || undefined })} /></td>
                       <td><EditSelect field="ad_format" value={a.ad_format} options={formatOpts} onChange={f => patch(a.id, { ad_format: f })} onAddOption={addOption} placeholder="—" /></td>
                       <td><EditSelect field="ad_angle" value={a.angle} options={angleOpts} onChange={x => patch(a.id, { angle: x })} onAddOption={addOption} placeholder="—" /></td>
                       <td><InlineText value={a.hook} onCommit={t => patch(a.id, { hook: t })} placeholder="—" style={{ width: 110 }} /></td>
                       <td>
-                        <button onClick={() => setExpanded(e => (e === a.id ? null : a.id))} className="btn-ghost" style={{ fontSize: 10, padding: '3px 8px', color: a.buyer_feedback ? '#a5b4fc' : '#555' }} title="Expand feedback">
+                        <button onClick={() => setExpanded(e => (e === a.id ? null : a.id))} className="btn-ghost" style={{ fontSize: 10, padding: '3px 8px', color: a.buyer_feedback ? 'var(--accent)' : 'var(--text-faint)' }} title="Expand feedback">
                           {a.buyer_feedback ? '📝' : '+'} {expanded === a.id ? '▲' : '▾'}
                         </button>
                       </td>
                       <td>
-                        <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px', color: '#a5b4fc' }} onClick={() => handleIterate(a)} title="Trigger iteration">↻ Iterate</button>
+                        <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px', color: 'var(--accent)' }} onClick={() => handleIterate(a)} title="Trigger iteration">↻ Iterate</button>
                       </td>
                       <td><EditPillSelect field="ad_status" value={a.status} options={statusOpts} colors={AD_STATUS_COLORS} onChange={s => changeStatus(a, s)} onAddOption={addOption} /></td>
                       <td><button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteAd(a.id)}>✕</button></td>
                     </tr>
                     {expanded === a.id && (
                       <tr>
-                        <td colSpan={9} style={{ background: '#0b0b0b' }}>
+                        <td colSpan={9} style={{ background: 'var(--surface-2)' }}>
                           <div style={{ padding: '4px 2px' }}>
                             <div className="form-label" style={{ marginBottom: 4 }}>Buyer Feedback</div>
                             <InlineText value={a.buyer_feedback} onCommit={t => patch(a.id, { buyer_feedback: t })} placeholder="Buyer feedback…" multiline style={{ width: '100%' }} />

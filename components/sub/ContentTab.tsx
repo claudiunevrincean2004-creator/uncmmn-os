@@ -234,24 +234,24 @@ export default function ContentTab({ client, posts, subscriberSnapshots, onReloa
       {
         label: 'Views',
         data: chartViews,
-        borderColor: '#fff',
-        backgroundColor: 'rgba(255,255,255,0.04)',
+        borderColor: '#7C83F3',
+        backgroundColor: 'rgba(124,131,243,0.14)',
         tension: 0.4,
         fill: true,
         pointRadius: 3,
-        pointBackgroundColor: '#fff',
+        pointBackgroundColor: '#7C83F3',
         yAxisID: 'y',
         borderWidth: 1.5,
       },
       {
         label: 'Followers',
         data: chartFollows,
-        borderColor: '#6366f1',
-        backgroundColor: 'rgba(99,102,241,0.05)',
+        borderColor: '#22C3A6',
+        backgroundColor: 'rgba(34,195,166,0.12)',
         tension: 0.4,
         fill: true,
         pointRadius: 3,
-        pointBackgroundColor: '#6366f1',
+        pointBackgroundColor: '#22C3A6',
         yAxisID: 'y1',
         borderWidth: 1.5,
       },
@@ -263,21 +263,21 @@ export default function ContentTab({ client, posts, subscriberSnapshots, onReloa
     maintainAspectRatio: false,
     interaction: { mode: 'index' as const, intersect: false },
     plugins: {
-      legend: { labels: { color: '#555', font: { size: 11 }, boxWidth: 12 } },
+      legend: { labels: { color: '#8A90A2', font: { size: 11 }, boxWidth: 12 } },
       tooltip: {
-        backgroundColor: '#0d0d0d',
-        borderColor: '#2a2a2a',
+        backgroundColor: '#12141D',
+        borderColor: '#33394D',
         borderWidth: 1,
-        titleColor: '#fff',
-        bodyColor: '#888',
+        titleColor: '#F1F3F8',
+        bodyColor: '#9AA2B4',
         titleFont: { size: 12 },
         bodyFont: { size: 11 },
       },
     },
     scales: {
-      x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#444', font: { size: 10 } } },
-      y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#444', font: { size: 10 } }, position: 'left' as const },
-      y1: { grid: { display: false }, ticks: { color: '#6366f1', font: { size: 10 } }, position: 'right' as const },
+      x: { grid: { color: 'rgba(127,127,127,0.14)' }, ticks: { color: '#8A90A2', font: { size: 10 } } },
+      y: { grid: { color: 'rgba(127,127,127,0.14)' }, ticks: { color: '#8A90A2', font: { size: 10 } }, position: 'left' as const },
+      y1: { grid: { display: false }, ticks: { color: '#22C3A6', font: { size: 10 } }, position: 'right' as const },
     },
   };
 
@@ -348,7 +348,7 @@ export default function ContentTab({ client, posts, subscriberSnapshots, onReloa
   const followersAvailable = followersGained !== null;
   const followersCanCompare = followersAvailable && prevFollowersGained !== null;
   const followersValueColor =
-    !followersAvailable ? '#555' : followersGained >= 0 ? '#10b981' : '#ef4444';
+    !followersAvailable ? 'var(--text-faint)' : followersGained >= 0 ? '#10b981' : '#ef4444';
   const followersSubLabel = !followersAvailable
     ? 'no data'
     : activePlat === 'Instagram'
@@ -443,15 +443,15 @@ export default function ContentTab({ client, posts, subscriberSnapshots, onReloa
           const showDelta = showCmp && c.hasDelta;
           return (
             <div key={c.label} className="metric-chip">
-              <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>{c.label}</div>
-              <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4, color: c.color || '#fff' }}>{c.value}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>{c.label}</div>
+              <div className="kpi-num" style={{ fontSize: 30, marginBottom: 4, color: c.color || 'var(--text)' }}>{c.value}</div>
               {showDelta ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <span className={`badge ${c.diff >= 0 ? 'badge-up' : 'badge-down'}`}>{c.diff >= 0 ? '+' : ''}{c.diff.toFixed(1)}%</span>
-                  <span style={{ fontSize: 10, color: '#444' }}>vs prev period</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>vs prev period</span>
                 </div>
               ) : (
-                <div style={{ fontSize: 11, color: '#444' }}>{c.sub}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{c.sub}</div>
               )}
             </div>
           );
@@ -460,14 +460,14 @@ export default function ContentTab({ client, posts, subscriberSnapshots, onReloa
 
       {/* Growth chart */}
       <div className="card" style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 11, color: '#555', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <div style={{ fontSize: 11, color: 'var(--text-faint)', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Growth Trend{activePlat !== 'All' ? ` — ${activePlat}` : ''}
         </div>
         <div style={{ height: 220 }}>
           {chartLabels.length > 0 ? (
             <Line data={chartData} options={chartOptions} />
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#333', fontSize: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-faint)', fontSize: 12 }}>
               No data in this period
             </div>
           )}
@@ -476,14 +476,14 @@ export default function ContentTab({ client, posts, subscriberSnapshots, onReloa
 
       {/* Outlier posts */}
       <div className="card" style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 11, color: '#555', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <div style={{ fontSize: 11, color: 'var(--text-faint)', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Outlier Posts
-          <span style={{ color: '#333', fontWeight: 400, letterSpacing: 0, textTransform: 'none', marginLeft: 4 }}>
+          <span style={{ color: 'var(--text-faint)', fontWeight: 400, letterSpacing: 0, textTransform: 'none', marginLeft: 4 }}>
             · 1.5x above {activePlat === 'All' ? '' : activePlat + ' '}avg ({fn(periodAvgViews)})
           </span>
         </div>
         {outliers.length === 0 ? (
-          <div style={{ color: '#333', fontSize: 12 }}>No outlier posts in this period.</div>
+          <div style={{ color: 'var(--text-faint)', fontSize: 12 }}>No outlier posts in this period.</div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
             {outliers.map(p => {
@@ -491,10 +491,10 @@ export default function ContentTab({ client, posts, subscriberSnapshots, onReloa
               return (
                 <div
                   key={p.id}
-                  style={{ background: '#111', border: '0.5px solid #1a1a1a', borderRadius: 8, padding: 12, cursor: link ? 'pointer' : 'default', position: 'relative', transition: 'border-color 0.15s' }}
+                  style={{ background: 'var(--surface-2)', border: '0.5px solid var(--border)', borderRadius: 8, padding: 12, cursor: link ? 'pointer' : 'default', position: 'relative', transition: 'border-color 0.15s' }}
                   onClick={() => { if (link) window.open(link, '_blank', 'noopener,noreferrer'); }}
-                  onMouseEnter={e => { if (link) e.currentTarget.style.borderColor = '#333'; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = '#1a1a1a'; }}
+                  onMouseEnter={e => { if (link) e.currentTarget.style.borderColor = 'var(--text-faint)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                     <span className="badge badge-outlier">{p.multiple.toFixed(1)}x</span>
@@ -508,7 +508,7 @@ export default function ContentTab({ client, posts, subscriberSnapshots, onReloa
                       { l: 'ER%', v: `${er(p).toFixed(1)}%` },
                     ].map(m => (
                       <div key={m.l}>
-                        <div style={{ fontSize: 9, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{m.l}</div>
+                        <div style={{ fontSize: 9, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{m.l}</div>
                         <div style={{ fontWeight: 700, fontSize: 13 }}>{m.v}</div>
                       </div>
                     ))}
@@ -564,13 +564,13 @@ export default function ContentTab({ client, posts, subscriberSnapshots, onReloa
               </optgroup>
             ))}
           </select>
-          <span style={{ fontSize: 11, color: '#555' }}>{filtered.length} posts · avg {fn(avgViewsAllTime)} views</span>
+          <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{filtered.length} posts · avg {fn(avgViewsAllTime)} views</span>
         </div>
         <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px' }} onClick={() => { setEditPost(null); setShowModal(true); }}>+ Add Post</button>
       </div>
 
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#333', padding: '40px 0', fontSize: 12 }}>No posts match. Add a post or adjust filters.</div>
+        <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>No posts match. Add a post or adjust filters.</div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table className="data-table">
@@ -597,7 +597,7 @@ export default function ContentTab({ client, posts, subscriberSnapshots, onReloa
                 const isOutlier = avgViewsAllTime > 0 && post.views >= avgViewsAllTime * 1.5;
                 return (
                   <tr key={post.id}>
-                    <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#fff' }}>
+                    <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         {isOutlier && <span className="badge badge-outlier" style={{ fontSize: 9 }}>{(post.views / avgViewsAllTime).toFixed(1)}x</span>}
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{post.title}</span>
@@ -606,29 +606,29 @@ export default function ContentTab({ client, posts, subscriberSnapshots, onReloa
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                         <PlatformIcon platform={post.platform} size={14} />
-                        <span style={{ fontSize: 11, color: '#888' }}>{post.platform}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{post.platform}</span>
                       </div>
                     </td>
-                    <td style={{ color: '#666', fontSize: 11 }}>{post.format || '—'}</td>
-                    <td style={{ color: '#666', fontSize: 11 }}>{post.pillar || '—'}</td>
-                    <td style={{ color: '#555', fontSize: 11 }}>{post.date ? post.date.slice(0, 10) : '—'}</td>
+                    <td style={{ color: 'var(--text-faint)', fontSize: 11 }}>{post.format || '—'}</td>
+                    <td style={{ color: 'var(--text-faint)', fontSize: 11 }}>{post.pillar || '—'}</td>
+                    <td style={{ color: 'var(--text-faint)', fontSize: 11 }}>{post.date ? post.date.slice(0, 10) : '—'}</td>
                     <td style={{ fontWeight: 600 }}>{fn(post.views)}</td>
                     <td>{fn(post.likes)}</td>
                     <td>{fn(post.comments)}</td>
                     <td>{fn(post.shares)}</td>
                     <td>{fn(post.saves)}</td>
                     <td>{fn(post.follows)}</td>
-                    <td style={{ color: '#6366f1' }}>{er(post).toFixed(1)}%</td>
+                    <td style={{ color: 'var(--accent)' }}>{er(post).toFixed(1)}%</td>
                     <td>
                       {post.post_url ? (
-                        <a href={post.post_url} target="_blank" rel="noopener noreferrer" style={{ color: '#6366f1', fontSize: 11, textDecoration: 'none' }}>↗ Post</a>
+                        <a href={post.post_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', fontSize: 11, textDecoration: 'none' }}>↗ Post</a>
                       ) : post.drive_link ? (
-                        <a href={post.drive_link} target="_blank" rel="noopener noreferrer" style={{ color: '#6366f1', fontSize: 11, textDecoration: 'none' }}>↗</a>
-                      ) : <span style={{ color: '#333' }}>—</span>}
+                        <a href={post.drive_link} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', fontSize: 11, textDecoration: 'none' }}>↗</a>
+                      ) : <span style={{ color: 'var(--text-faint)' }}>—</span>}
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: 4 }}>
-                        <button style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', fontSize: 11, padding: '2px 4px' }} onClick={() => { setEditPost(post); setShowModal(true); }}>✎</button>
+                        <button style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 11, padding: '2px 4px' }} onClick={() => { setEditPost(post); setShowModal(true); }}>✎</button>
                         <button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deletePost(post.id)}>✕</button>
                       </div>
                     </td>
@@ -644,7 +644,7 @@ export default function ContentTab({ client, posts, subscriberSnapshots, onReloa
         <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 12 }}>
           {visibleCount < filtered.length && (
             <button className="btn-ghost" style={{ fontSize: 11, padding: '5px 14px' }} onClick={() => setVisibleCount(c => c + 10)}>
-              Show More <span style={{ color: '#444' }}>({filtered.length - visibleCount} more)</span>
+              Show More <span style={{ color: 'var(--text-faint)' }}>({filtered.length - visibleCount} more)</span>
             </button>
           )}
           {visibleCount > 5 && (

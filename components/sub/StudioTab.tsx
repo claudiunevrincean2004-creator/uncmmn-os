@@ -54,8 +54,8 @@ export default function StudioTab({ videos, sequences, sessions, adCreatives, co
 
   const overviewItems: { label: string; value: string; color?: string }[] = [
     { label: 'Videos in Review', value: String(stats.inReview), color: '#8b5cf6' },
-    { label: 'Awaiting Revision', value: String(stats.awaitingRevision), color: stats.awaitingRevision > 0 ? '#ef4444' : '#fff' },
-    { label: 'Overdue', value: String(stats.overdue), color: stats.overdue > 0 ? '#ef4444' : '#fff' },
+    { label: 'Awaiting Revision', value: String(stats.awaitingRevision), color: stats.awaitingRevision > 0 ? '#ef4444' : 'var(--text)' },
+    { label: 'Overdue', value: String(stats.overdue), color: stats.overdue > 0 ? '#ef4444' : 'var(--text)' },
   ];
 
   return (
@@ -64,14 +64,14 @@ export default function StudioTab({ videos, sequences, sessions, adCreatives, co
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
         {overviewItems.map(item => (
           <div key={item.label} className="metric-chip">
-            <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>{item.label}</div>
-            <div style={{ fontSize: item.value.length > 6 ? 16 : 22, fontWeight: 700, color: item.color || '#fff' }}>{item.value}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>{item.label}</div>
+            <div className="kpi-num" style={{ fontSize: item.value.length > 6 ? 18 : 30, color: item.color || 'var(--text)' }}>{item.value}</div>
           </div>
         ))}
       </div>
 
       {/* Sub-tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '0.5px solid #1a1a1a', paddingBottom: 12 }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '0.5px solid var(--border)', paddingBottom: 12 }}>
         {SUBTABS.map(t => (
           <button key={t.key} className={`subtab${sub === t.key ? ' active' : ''}`} onClick={() => setSub(t.key)}>
             {t.label}
@@ -91,12 +91,12 @@ export default function StudioTab({ videos, sequences, sessions, adCreatives, co
             position: 'fixed',
             bottom: 24,
             right: 24,
-            background: '#0d0d0d',
+            background: 'var(--surface)',
             border: '0.5px solid #ec4899',
             borderRadius: 8,
             padding: '10px 16px',
             fontSize: 12,
-            color: '#fff',
+            color: 'var(--text)',
             boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
             zIndex: 2000,
             display: 'flex',

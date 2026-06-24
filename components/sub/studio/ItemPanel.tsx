@@ -53,16 +53,16 @@ function FieldControl({ field, values, onChangeField, onAddOption }: { field: Fi
       return (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
           <InlineText value={value} onCommit={v => onChangeField(field.key, v)} placeholder="https://…" style={{ flex: 1 }} />
-          {value && <a href={value} target="_blank" rel="noopener noreferrer" style={{ color: '#6366f1', textDecoration: 'none', fontSize: 14 }} title={value}>↗</a>}
+          {value && <a href={value} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontSize: 14 }} title={value}>↗</a>}
         </div>
       );
     case 'readonly-url':
       return value
-        ? <a href={value} target="_blank" rel="noopener noreferrer" style={{ color: '#6366f1', textDecoration: 'none', fontSize: 12, wordBreak: 'break-all' }}>{value} ↗</a>
-        : <span style={{ color: '#444', fontSize: 12 }}>—</span>;
+        ? <a href={value} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontSize: 12, wordBreak: 'break-all' }}>{value} ↗</a>
+        : <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>—</span>;
     case 'readonly':
     default:
-      return <span style={{ color: '#ccc', fontSize: 12 }}>{value != null && value !== '' ? String(value) : '—'}</span>;
+      return <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>{value != null && value !== '' ? String(value) : '—'}</span>;
   }
 }
 
@@ -104,8 +104,8 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
         top: 0,
         maxHeight: 'calc(100vh - 130px)',
         overflowY: 'auto',
-        borderLeft: '0.5px solid #1a1a1a',
-        background: '#0a0a0a',
+        borderLeft: '0.5px solid var(--border)',
+        background: 'var(--surface)',
         borderRadius: 10,
         marginLeft: 16,
         padding: '16px 18px',
@@ -117,9 +117,9 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
         <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.3, wordBreak: 'break-word' }}>{title || 'Untitled'}</div>
         <button
           onClick={onClose}
-          style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0, flexShrink: 0 }}
-          onMouseEnter={e => { e.currentTarget.style.color = '#fff'; }}
-          onMouseLeave={e => { e.currentTarget.style.color = '#666'; }}
+          style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0, flexShrink: 0 }}
+          onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)'; }}
+          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; }}
           title="Close"
         >✕</button>
       </div>
@@ -128,16 +128,16 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 22 }}>
         {fields.filter(f => !f.visibleIf || f.visibleIf(values)).map(f => (
           <div key={f.key} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 10, alignItems: 'start' }}>
-            <div style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, paddingTop: 6 }}>{f.label}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, paddingTop: 6 }}>{f.label}</div>
             <div><FieldControl field={f} values={values} onChangeField={onChangeField} onAddOption={onAddOption} /></div>
           </div>
         ))}
       </div>
 
       {/* Comments */}
-      <div style={{ borderTop: '0.5px solid #1a1a1a', paddingTop: 16, marginBottom: 22 }}>
-        <div style={{ fontSize: 11, color: '#555', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
-          Comments {itemComments.length > 0 && <span style={{ color: '#333' }}>· {itemComments.length}</span>}
+      <div style={{ borderTop: '0.5px solid var(--border)', paddingTop: 16, marginBottom: 22 }}>
+        <div style={{ fontSize: 11, color: 'var(--text-faint)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
+          Comments {itemComments.length > 0 && <span style={{ color: 'var(--text-faint)' }}>· {itemComments.length}</span>}
         </div>
         <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
           <textarea
@@ -154,19 +154,19 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
           </button>
         </div>
         {itemComments.length === 0 ? (
-          <div style={{ fontSize: 11, color: '#333' }}>No comments yet.</div>
+          <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>No comments yet.</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {itemComments.map(c => (
-              <div key={c.id} style={{ background: '#111', border: '0.5px solid #1a1a1a', borderRadius: 8, padding: '8px 10px' }}>
-                <div style={{ fontSize: 12, color: '#ddd', lineHeight: 1.4, whiteSpace: 'pre-wrap', marginBottom: 5 }}>{c.text}</div>
+              <div key={c.id} style={{ background: 'var(--surface-2)', border: '0.5px solid var(--border)', borderRadius: 8, padding: '8px 10px' }}>
+                <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.4, whiteSpace: 'pre-wrap', marginBottom: 5 }}>{c.text}</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 10, color: '#555' }}>{formatActivityTime(c.created_at)}</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{formatActivityTime(c.created_at)}</span>
                   <button
                     onClick={() => deleteComment(c.id)}
-                    style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', fontSize: 10, padding: 0 }}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 10, padding: 0 }}
                     onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; }}
-                    onMouseLeave={e => { e.currentTarget.style.color = '#444'; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; }}
                   >delete</button>
                 </div>
               </div>
@@ -176,21 +176,21 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
       </div>
 
       {/* Activity log */}
-      <div style={{ borderTop: '0.5px solid #1a1a1a', paddingTop: 16 }}>
-        <div style={{ fontSize: 11, color: '#555', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Activity</div>
+      <div style={{ borderTop: '0.5px solid var(--border)', paddingTop: 16 }}>
+        <div style={{ fontSize: 11, color: 'var(--text-faint)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Activity</div>
         {itemActivity.length === 0 ? (
-          <div style={{ fontSize: 11, color: '#333' }}>No activity yet.</div>
+          <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>No activity yet.</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {itemActivity.map(a => (
               <div key={a.id} style={{ display: 'flex', gap: 8, fontSize: 11, lineHeight: 1.4 }}>
                 <span style={{ color: '#8b5cf6', marginTop: 1 }}>•</span>
-                <span style={{ color: '#999' }}>
+                <span style={{ color: 'var(--text-dim)' }}>
                   {a.action}
                   {a.old_value != null && a.new_value != null && (
-                    <> from <span style={{ color: '#ccc' }}>{a.old_value}</span> to <span style={{ color: '#ccc' }}>{a.new_value}</span></>
+                    <> from <span style={{ color: 'var(--text-dim)' }}>{a.old_value}</span> to <span style={{ color: 'var(--text-dim)' }}>{a.new_value}</span></>
                   )}
-                  <span style={{ color: '#444' }}> — {formatActivityTime(a.created_at)}</span>
+                  <span style={{ color: 'var(--text-faint)' }}> — {formatActivityTime(a.created_at)}</span>
                 </span>
               </div>
             ))}

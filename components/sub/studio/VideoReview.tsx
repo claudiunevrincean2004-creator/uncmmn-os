@@ -139,17 +139,17 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
           <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))} title="Sort by deadline">
             Deadline {sortDir === 'asc' ? '↑ oldest' : '↓ newest'}
           </button>
-          <span style={{ fontSize: 10, color: '#444' }}>From</span>
+          <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>From</span>
           <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-          <span style={{ fontSize: 10, color: '#444' }}>To</span>
+          <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>To</span>
           <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
           {(dateFrom || dateTo) && <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>clear</button>}
-          <span style={{ fontSize: 11, color: '#555' }}>{filtered.length} {filtered.length === 1 ? 'video' : 'videos'}</span>
+          <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{filtered.length} {filtered.length === 1 ? 'video' : 'videos'}</span>
           <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={addVideo}>+ Add Video</button>
         </div>
 
         {filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', color: '#333', padding: '40px 0', fontSize: 12 }}>No videos match. Add a video or adjust filters.</div>
+          <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>No videos match. Add a video or adjust filters.</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
@@ -174,9 +174,9 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                   const overdue = isOverdue(v.deadline, v.status, DONE);
                   return (
                     <Fragment key={v.id}>
-                      <tr style={overdue ? { background: 'rgba(239,68,68,0.06)', boxShadow: 'inset 3px 0 0 #ef4444' } : (selectedId === v.id ? { background: '#0f0f0f' } : undefined)}>
+                      <tr style={overdue ? { background: 'rgba(239,68,68,0.06)', boxShadow: 'inset 3px 0 0 #ef4444' } : (selectedId === v.id ? { background: 'var(--surface-2)' } : undefined)}>
                         <td style={{ minWidth: 180 }}>
-                          <button onClick={() => setSelectedId(v.id)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{v.title}</button>
+                          <button onClick={() => setSelectedId(v.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{v.title}</button>
                         </td>
                         <td><EditSelect field="video_format" value={v.format} options={formatOpts} onChange={f => patch(v.id, { format: f })} onAddOption={addOption} placeholder="—" /></td>
                         <td><EditSelect field="video_assigned_to" value={v.assigned_to} options={assignedOpts} onChange={a => patch(v.id, { assigned_to: a })} onAddOption={addOption} placeholder="—" /></td>
@@ -194,10 +194,10 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                         <td style={{ textAlign: 'center' }}>
                           {v.revision_count > 0
                             ? <span className="badge" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }} title={`${v.revision_count} revision round(s)`}>{v.revision_count}</span>
-                            : <span style={{ color: '#333' }}>0</span>}
+                            : <span style={{ color: 'var(--text-faint)' }}>0</span>}
                         </td>
                         <td>
-                          <button onClick={() => setExpanded(e => (e === v.id ? null : v.id))} className="btn-ghost" style={{ fontSize: 10, padding: '3px 8px', color: v.notes ? '#a5b4fc' : '#555' }} title="Expand notes">
+                          <button onClick={() => setExpanded(e => (e === v.id ? null : v.id))} className="btn-ghost" style={{ fontSize: 10, padding: '3px 8px', color: v.notes ? 'var(--accent)' : 'var(--text-faint)' }} title="Expand notes">
                             {v.notes ? '📝' : '+'} {expanded === v.id ? '▲' : '▾'}
                           </button>
                         </td>
@@ -205,7 +205,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                       </tr>
                       {expanded === v.id && (
                         <tr>
-                          <td colSpan={12} style={{ background: '#0b0b0b' }}>
+                          <td colSpan={12} style={{ background: 'var(--surface-2)' }}>
                             <div style={{ padding: '4px 2px' }}>
                               <div className="form-label" style={{ marginBottom: 4 }}>Notes</div>
                               <InlineText value={v.notes} onCommit={n => patch(v.id, { notes: n })} placeholder="Add notes…" multiline style={{ width: '100%' }} />

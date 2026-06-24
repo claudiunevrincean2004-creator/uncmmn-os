@@ -133,24 +133,24 @@ export default function Dashboard({ client, posts, subscriberSnapshots }: Props)
       {
         label: 'Views',
         data: chartViews,
-        borderColor: '#fff',
-        backgroundColor: 'rgba(255,255,255,0.04)',
+        borderColor: '#7C83F3',
+        backgroundColor: 'rgba(124,131,243,0.14)',
         tension: 0.4,
         fill: true,
         pointRadius: 3,
-        pointBackgroundColor: '#fff',
+        pointBackgroundColor: '#7C83F3',
         yAxisID: 'y',
         borderWidth: 1.5,
       },
       {
         label: 'Followers',
         data: chartFollows,
-        borderColor: '#6366f1',
-        backgroundColor: 'rgba(99,102,241,0.05)',
+        borderColor: '#22C3A6',
+        backgroundColor: 'rgba(34,195,166,0.12)',
         tension: 0.4,
         fill: true,
         pointRadius: 3,
-        pointBackgroundColor: '#6366f1',
+        pointBackgroundColor: '#22C3A6',
         yAxisID: 'y1',
         borderWidth: 1.5,
       },
@@ -162,21 +162,21 @@ export default function Dashboard({ client, posts, subscriberSnapshots }: Props)
     maintainAspectRatio: false,
     interaction: { mode: 'index' as const, intersect: false },
     plugins: {
-      legend: { labels: { color: '#555', font: { size: 11 }, boxWidth: 12 } },
+      legend: { labels: { color: '#8A90A2', font: { size: 11 }, boxWidth: 12 } },
       tooltip: {
-        backgroundColor: '#0d0d0d',
-        borderColor: '#2a2a2a',
+        backgroundColor: '#12141D',
+        borderColor: '#33394D',
         borderWidth: 1,
-        titleColor: '#fff',
-        bodyColor: '#888',
+        titleColor: '#F1F3F8',
+        bodyColor: '#9AA2B4',
         titleFont: { size: 12 },
         bodyFont: { size: 11 },
       },
     },
     scales: {
-      x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#444', font: { size: 10 } } },
-      y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#444', font: { size: 10 } }, position: 'left' as const },
-      y1: { grid: { display: false }, ticks: { color: '#6366f1', font: { size: 10 } }, position: 'right' as const },
+      x: { grid: { color: 'rgba(127,127,127,0.14)' }, ticks: { color: '#8A90A2', font: { size: 10 } } },
+      y: { grid: { color: 'rgba(127,127,127,0.14)' }, ticks: { color: '#8A90A2', font: { size: 10 } }, position: 'left' as const },
+      y1: { grid: { display: false }, ticks: { color: '#22C3A6', font: { size: 10 } }, position: 'right' as const },
     },
   };
 
@@ -186,40 +186,40 @@ export default function Dashboard({ client, posts, subscriberSnapshots }: Props)
   return (
     <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div>
-        <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>Dashboard</div>
-        <div style={{ fontSize: 12, color: '#444' }}>{client.name} — {monthLabel}</div>
+        <div className="font-head" style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>Dashboard</div>
+        <div style={{ fontSize: 12, color: 'var(--text-faint)' }}>{client.name} — {monthLabel}</div>
       </div>
 
       {/* Top metrics */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
         <div className="metric-chip">
-          <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>Total Views</div>
-          <div style={{ fontSize: 22, fontWeight: 700 }}>{fn(totalViews)}</div>
-          <div style={{ fontSize: 11, color: '#555', marginTop: 4 }}>this month</div>
+          <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>Total Views</div>
+          <div className="kpi-num" style={{ fontSize: 30 }}>{fn(totalViews)}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 4 }}>this month</div>
         </div>
         <div className="metric-chip">
-          <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>Followers Gained</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: followersGainedAvailable ? (followersGained >= 0 ? '#10b981' : '#ef4444') : '#555' }}>
+          <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>Followers Gained</div>
+          <div className="kpi-num" style={{ fontSize: 30, color: followersGainedAvailable ? (followersGained >= 0 ? 'var(--pos)' : 'var(--neg)') : 'var(--text-faint)' }}>
             {followersGainedAvailable ? `${followersGained >= 0 ? '+' : ''}${fn(followersGained)}` : '—'}
           </div>
-          <div style={{ fontSize: 11, color: '#555', marginTop: 4 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 4 }}>
             {followersGainedAvailable ? 'TikTok + YouTube' : 'Need 2+ snapshots'}
           </div>
         </div>
         <div className="metric-chip">
-          <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>Total Posts</div>
-          <div style={{ fontSize: 22, fontWeight: 700 }}>{totalPosts}</div>
-          <div style={{ fontSize: 11, color: '#555', marginTop: 4 }}>this month</div>
+          <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>Total Posts</div>
+          <div className="kpi-num" style={{ fontSize: 30 }}>{totalPosts}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 4 }}>this month</div>
         </div>
       </div>
 
       {/* Top outlier posts */}
       <div className="card">
-        <div style={{ fontSize: 11, color: '#555', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          Top Outlier Posts <span style={{ color: '#333', fontWeight: 400, letterSpacing: 0, textTransform: 'none', marginLeft: 4 }}>· 1.5x above avg ({fn(allTimeAvg)})</span>
+        <div style={{ fontSize: 11, color: 'var(--text-faint)', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Top Outlier Posts <span style={{ color: 'var(--text-faint)', fontWeight: 400, letterSpacing: 0, textTransform: 'none', marginLeft: 4 }}>· 1.5x above avg ({fn(allTimeAvg)})</span>
         </div>
         {outliers.length === 0 ? (
-          <div style={{ color: '#333', fontSize: 12 }}>No outlier posts yet.</div>
+          <div style={{ color: 'var(--text-faint)', fontSize: 12 }}>No outlier posts yet.</div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
             {outliers.map(p => {
@@ -227,10 +227,10 @@ export default function Dashboard({ client, posts, subscriberSnapshots }: Props)
               return (
                 <div
                   key={p.id}
-                  style={{ background: '#111', border: '0.5px solid #1a1a1a', borderRadius: 8, padding: 12, cursor: link ? 'pointer' : 'default', position: 'relative', transition: 'border-color 0.15s' }}
+                  style={{ background: 'var(--surface-2)', border: '0.5px solid var(--border)', borderRadius: 8, padding: 12, cursor: link ? 'pointer' : 'default', position: 'relative', transition: 'border-color 0.15s' }}
                   onClick={() => { if (link) window.open(link, '_blank', 'noopener,noreferrer'); }}
-                  onMouseEnter={e => { if (link) e.currentTarget.style.borderColor = '#333'; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = '#1a1a1a'; }}
+                  onMouseEnter={e => { if (link) e.currentTarget.style.borderColor = 'var(--text-faint)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                     <span className="badge badge-outlier">{p.multiple.toFixed(1)}x</span>
@@ -244,7 +244,7 @@ export default function Dashboard({ client, posts, subscriberSnapshots }: Props)
                       { l: 'ER%', v: `${er(p).toFixed(1)}%` },
                     ].map(m => (
                       <div key={m.l}>
-                        <div style={{ fontSize: 9, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{m.l}</div>
+                        <div style={{ fontSize: 9, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{m.l}</div>
                         <div style={{ fontWeight: 700, fontSize: 13 }}>{m.v}</div>
                       </div>
                     ))}
@@ -258,12 +258,12 @@ export default function Dashboard({ client, posts, subscriberSnapshots }: Props)
 
       {/* Growth chart */}
       <div className="card">
-        <div style={{ fontSize: 11, color: '#555', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Growth Trend</div>
+        <div style={{ fontSize: 11, color: 'var(--text-faint)', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Growth Trend</div>
         <div style={{ height: 220 }}>
           {chartLabels.length > 0 ? (
             <Line data={chartData} options={chartOptions} />
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#333', fontSize: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-faint)', fontSize: 12 }}>
               No data with dates yet
             </div>
           )}
@@ -280,32 +280,32 @@ export default function Dashboard({ client, posts, subscriberSnapshots }: Props)
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
               <PlatformIcon platform={name} size={20} />
               <div style={{ fontSize: 13, fontWeight: 700 }}>{name}</div>
-              <div style={{ fontSize: 11, color: '#555', marginLeft: 'auto' }}>{s.count} posts this month</div>
+              <div style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 'auto' }}>{s.count} posts this month</div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
               <div>
-                <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>Views</div>
+                <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>Views</div>
                 <div style={{ fontSize: 16, fontWeight: 700 }}>{fn(s.views)}</div>
               </div>
               <div>
-                <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>Likes</div>
+                <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>Likes</div>
                 <div style={{ fontSize: 16, fontWeight: 700 }}>{fn(s.likes)}</div>
               </div>
               <div>
-                <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>Comments</div>
+                <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>Comments</div>
                 <div style={{ fontSize: 16, fontWeight: 700 }}>{fn(s.comments)}</div>
               </div>
               <div>
-                <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>ER%</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: '#6366f1' }}>{s.erPct.toFixed(1)}%</div>
+                <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>ER%</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)' }}>{s.erPct.toFixed(1)}%</div>
               </div>
               <div>
-                <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>Followers</div>
+                <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>Followers</div>
                 <div style={{ fontSize: 16, fontWeight: 700 }}>{snapCount !== null ? fn(snapCount) : '—'}</div>
               </div>
               <div>
-                <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>Gained this mo.</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: gain === null ? '#555' : gain >= 0 ? '#10b981' : '#ef4444' }}>
+                <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>Gained this mo.</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: gain === null ? 'var(--text-faint)' : gain >= 0 ? '#10b981' : '#ef4444' }}>
                   {gain === null ? '—' : `${gain >= 0 ? '+' : ''}${fn(gain)}`}
                 </div>
               </div>

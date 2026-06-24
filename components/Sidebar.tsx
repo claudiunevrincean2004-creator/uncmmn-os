@@ -30,8 +30,8 @@ export default function Sidebar({ activeMP, collapsed, onToggleCollapse, onSelec
     <div style={{
       width: w,
       minWidth: w,
-      background: '#000',
-      borderRight: '0.5px solid #1a1a1a',
+      background: 'var(--surface)',
+      borderRight: '0.5px solid var(--border)',
       display: 'flex',
       flexDirection: 'column',
       height: '100vh',
@@ -48,9 +48,9 @@ export default function Sidebar({ activeMP, collapsed, onToggleCollapse, onSelec
           width: 24,
           height: 24,
           borderRadius: '50%',
-          background: '#111',
-          border: '0.5px solid #2a2a2a',
-          color: '#666',
+          background: 'var(--surface-2)',
+          border: '0.5px solid var(--border)',
+          color: 'var(--text-faint)',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
@@ -59,14 +59,14 @@ export default function Sidebar({ activeMP, collapsed, onToggleCollapse, onSelec
           zIndex: 10,
           transition: 'background 0.15s',
         }}
-        onMouseEnter={e => { e.currentTarget.style.background = '#1a1a1a'; e.currentTarget.style.color = '#fff'; }}
-        onMouseLeave={e => { e.currentTarget.style.background = '#111'; e.currentTarget.style.color = '#666'; }}
+        onMouseEnter={e => { e.currentTarget.style.background = 'var(--border)'; e.currentTarget.style.color = 'var(--text)'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface-2)'; e.currentTarget.style.color = 'var(--text-faint)'; }}
         title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >
         {collapsed ? '›' : '‹'}
       </button>
 
-      <div style={{ padding: collapsed ? '18px 8px 14px' : '18px 14px 14px', borderBottom: '0.5px solid #111', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+      <div style={{ padding: collapsed ? '18px 8px 14px' : '18px 14px 14px', borderBottom: '0.5px solid var(--border)', overflow: 'hidden', whiteSpace: 'nowrap' }}>
         <div style={{ display: 'flex', justifyContent: collapsed ? 'center' : 'flex-start', lineHeight: 1 }}>
           <StarLogo size={collapsed ? 28 : 30} />
         </div>
@@ -87,8 +87,8 @@ export default function Sidebar({ activeMP, collapsed, onToggleCollapse, onSelec
         ))}
       </div>
 
-      <div style={{ padding: collapsed ? '10px 4px' : '10px 14px', borderTop: '0.5px solid #111' }}>
-        <div style={{ fontSize: 10, color: '#222', textAlign: collapsed ? 'center' : undefined }}>v1.0.0</div>
+      <div style={{ padding: collapsed ? '10px 4px' : '10px 14px', borderTop: '0.5px solid var(--border)' }}>
+        <div style={{ fontSize: 10, color: 'var(--text-faint)', textAlign: collapsed ? 'center' : undefined }}>v1.0.0</div>
       </div>
     </div>
   );

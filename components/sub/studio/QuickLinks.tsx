@@ -43,7 +43,7 @@ export default function QuickLinks({ context, links, onReload }: Props) {
 
   // Plain inline JSX (not a nested component) so the inputs keep focus across re-renders
   const editor = (
-    <div style={{ display: 'flex', gap: 6, alignItems: 'center', background: '#111', border: '0.5px solid #2a2a2a', borderRadius: 8, padding: '6px 8px' }}>
+    <div style={{ display: 'flex', gap: 6, alignItems: 'center', background: 'var(--surface-2)', border: '0.5px solid var(--border)', borderRadius: 8, padding: '6px 8px' }}>
       <input className="form-input" style={{ width: 130, fontSize: 11, padding: '4px 7px' }} value={label} onChange={e => setLabel(e.target.value)} placeholder="Label" autoFocus />
       <input className="form-input" style={{ width: 200, fontSize: 11, padding: '4px 7px' }} value={url} onChange={e => setUrl(e.target.value)} placeholder="https://…" onKeyDown={e => { if (e.key === 'Enter') save(); }} />
       <button className="btn-primary" style={{ fontSize: 11, padding: '4px 10px' }} onClick={save} disabled={saving}>Save</button>
@@ -60,14 +60,14 @@ export default function QuickLinks({ context, links, onReload }: Props) {
           <div key={l.id} style={{ display: 'flex', alignItems: 'center' }}>
             <button
               className="btn-ghost"
-              style={{ fontSize: 11, padding: '5px 12px', borderRadius: '6px 0 0 6px', color: l.url ? '#a5b4fc' : '#666', borderRight: 'none' }}
+              style={{ fontSize: 11, padding: '5px 12px', borderRadius: '6px 0 0 6px', color: l.url ? 'var(--accent)' : 'var(--text-faint)', borderRight: 'none' }}
               onClick={() => { if (l.url) window.open(l.url, '_blank', 'noopener,noreferrer'); else startEdit(l); }}
               title={l.url || 'No link set'}
             >
               📁 {l.label || 'Untitled'}{l.url ? ' ↗' : ''}
             </button>
-            <button className="btn-ghost" style={{ fontSize: 10, padding: '5px 7px', borderRadius: 0, borderRight: 'none', color: '#555' }} onClick={() => startEdit(l)} title="Edit">✎</button>
-            <button className="btn-ghost" style={{ fontSize: 10, padding: '5px 7px', borderRadius: '0 6px 6px 0', color: '#555' }} onClick={() => del(l.id)} title="Delete">✕</button>
+            <button className="btn-ghost" style={{ fontSize: 10, padding: '5px 7px', borderRadius: 0, borderRight: 'none', color: 'var(--text-faint)' }} onClick={() => startEdit(l)} title="Edit">✎</button>
+            <button className="btn-ghost" style={{ fontSize: 10, padding: '5px 7px', borderRadius: '0 6px 6px 0', color: 'var(--text-faint)' }} onClick={() => del(l.id)} title="Delete">✕</button>
           </div>
         )
       ))}

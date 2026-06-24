@@ -33,17 +33,17 @@ export default function DriveTab({ client, driveFolders, onReload }: Props) {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <span style={{ fontSize: 12, color: '#555' }}>{clientFolders.length} folders linked</span>
+        <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>{clientFolders.length} folders linked</span>
         <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px' }} onClick={() => { setEditFolder(null); setShowModal(true); }}>+ Add Folder</button>
       </div>
 
       {clientFolders.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#333', padding: '40px 0', fontSize: 12 }}>No Drive folders linked yet.</div>
+        <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>No Drive folders linked yet.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {Object.entries(grouped).map(([cat, folders]) => (
             <div key={cat}>
-              <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#444', fontWeight: 600, marginBottom: 8, paddingBottom: 6, borderBottom: '0.5px solid #1a1a1a' }}>
+              <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-faint)', fontWeight: 600, marginBottom: 8, paddingBottom: 6, borderBottom: '0.5px solid var(--border)' }}>
                 {cat}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
@@ -60,16 +60,16 @@ export default function DriveTab({ client, driveFolders, onReload }: Props) {
                             href={folder.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            style={{ fontSize: 10, color: '#6366f1', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
+                            style={{ fontSize: 10, color: 'var(--accent)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
                           >
                             Open in Drive →
                           </a>
                         ) : (
-                          <span style={{ fontSize: 10, color: '#333' }}>No URL set</span>
+                          <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>No URL set</span>
                         )}
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginLeft: 6 }}>
-                        <button style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', fontSize: 11, padding: '2px 4px' }} onClick={() => { setEditFolder(folder); setShowModal(true); }}>✎</button>
+                        <button style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 11, padding: '2px 4px' }} onClick={() => { setEditFolder(folder); setShowModal(true); }}>✎</button>
                         <button className="btn-danger" style={{ padding: '2px 4px' }} onClick={() => deleteFolder(folder.id)}>✕</button>
                       </div>
                     </div>

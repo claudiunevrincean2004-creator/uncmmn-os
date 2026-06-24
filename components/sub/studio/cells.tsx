@@ -73,7 +73,7 @@ export function PillSelect({
       title="Click to change"
     >
       {options.map(o => (
-        <option key={o} value={o} style={{ background: '#111', color: '#fff', fontWeight: 600 }}>{o}</option>
+        <option key={o} value={o} style={{ background: 'var(--surface-2)', color: 'var(--text)', fontWeight: 600 }}>{o}</option>
       ))}
     </select>
   );
@@ -197,8 +197,8 @@ export function EditPillSelect({
       }}
       title="Click to change"
     >
-      {opts.map(o => <option key={o} value={o} style={{ background: '#111', color: '#fff', fontWeight: 600 }}>{o}</option>)}
-      <option value={ADD_NEW} style={{ background: '#111', color: '#fff', fontWeight: 600 }}>+ Add new…</option>
+      {opts.map(o => <option key={o} value={o} style={{ background: 'var(--surface-2)', color: 'var(--text)', fontWeight: 600 }}>{o}</option>)}
+      <option value={ADD_NEW} style={{ background: 'var(--surface-2)', color: 'var(--text)', fontWeight: 600 }}>+ Add new…</option>
     </select>
   );
 }
@@ -237,15 +237,15 @@ export function UrlCell({
           href={value}
           target="_blank"
           rel="noopener noreferrer"
-          style={{ color: '#6366f1', textDecoration: 'none', fontSize: 13 }}
+          style={{ color: 'var(--accent)', textDecoration: 'none', fontSize: 13 }}
           title={value}
         >↗</a>
       ) : (
-        <span style={{ color: '#333' }}>—</span>
+        <span style={{ color: 'var(--text-faint)' }}>—</span>
       )}
       <button
         onClick={() => setEditing(true)}
-        style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', fontSize: 11, padding: 0 }}
+        style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 11, padding: 0 }}
         title={value ? 'Edit link' : 'Add link'}
       >✎</button>
     </div>

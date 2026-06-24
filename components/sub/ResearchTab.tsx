@@ -22,7 +22,7 @@ const STATUS_LABELS: Record<ResearchStatus, string> = {
 };
 
 const STATUS_COLORS: Record<ResearchStatus, { color: string; bg: string; border: string }> = {
-  unused: { color: '#888', bg: '#1a1a1a', border: '#2a2a2a' },
+  unused: { color: 'var(--text-dim)', bg: 'var(--border)', border: 'var(--border)' },
   progress: { color: '#3b82f6', bg: '#3b82f615', border: '#3b82f640' },
   used: { color: '#10b981', bg: '#10b98115', border: '#10b98140' },
 };
@@ -193,9 +193,9 @@ export default function ResearchTab({ client, items, onReload }: Props) {
     <div>
       {/* Toolbar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 12, color: '#555' }}>
+        <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>
           {totalCount} idea{totalCount === 1 ? '' : 's'}
-          {filtered.length !== totalCount && <span style={{ color: '#444', marginLeft: 6 }}>· {filtered.length} shown</span>}
+          {filtered.length !== totalCount && <span style={{ color: 'var(--text-faint)', marginLeft: 6 }}>· {filtered.length} shown</span>}
         </span>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -226,12 +226,12 @@ export default function ResearchTab({ client, items, onReload }: Props) {
       {formOpen && (
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12, marginBottom: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
+            <span style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
               {editingId ? 'Edit idea' : 'New idea'}
             </span>
             <button
               onClick={closeForm}
-              style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: 0, lineHeight: 1 }}
+              style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 14, padding: 0, lineHeight: 1 }}
               title="Cancel"
             >
               ✕
@@ -262,7 +262,7 @@ export default function ResearchTab({ client, items, onReload }: Props) {
             style={{ fontSize: 11 }}
           />
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-            <label style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Reason</label>
+            <label style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Reason</label>
             <select className="form-input" value={reason} onChange={e => setReason(e.target.value)} style={{ width: 'auto', fontSize: 11, padding: '4px 8px' }}>
               {REASONS.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
@@ -278,8 +278,8 @@ export default function ResearchTab({ client, items, onReload }: Props) {
                 borderRadius: 4,
                 cursor: 'pointer',
                 background: newHot ? '#ef444418' : 'transparent',
-                color: newHot ? '#ef4444' : '#555',
-                border: `0.5px solid ${newHot ? '#ef4444' : '#2a2a2a'}`,
+                color: newHot ? '#ef4444' : 'var(--text-faint)',
+                border: `0.5px solid ${newHot ? '#ef4444' : 'var(--border)'}`,
                 fontFamily: 'inherit',
               }}
             >
@@ -299,7 +299,7 @@ export default function ResearchTab({ client, items, onReload }: Props) {
 
       {/* Results — empty after filtering */}
       {filtered.length === 0 && totalCount > 0 && (
-        <div style={{ textAlign: 'center', color: '#333', padding: '40px 0', fontSize: 12 }}>
+        <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>
           No matches. Adjust search or reason filter.
         </div>
       )}
@@ -351,7 +351,7 @@ export default function ResearchTab({ client, items, onReload }: Props) {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {colItems.length === 0 ? (
-                    <div style={{ fontSize: 11, color: '#333', textAlign: 'center', padding: '16px 0' }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-faint)', textAlign: 'center', padding: '16px 0' }}>
                       Empty
                     </div>
                   ) : colItems.map(item => (
@@ -386,14 +386,14 @@ function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => voi
     textTransform: 'uppercase',
     padding: '5px 10px',
     cursor: 'pointer',
-    background: active ? '#fff' : 'transparent',
-    color: active ? '#000' : '#666',
+    background: active ? 'var(--text)' : 'transparent',
+    color: active ? 'var(--bg)' : 'var(--text-faint)',
     border: 'none',
     fontFamily: 'inherit',
     transition: 'all 0.15s',
   });
   return (
-    <div style={{ display: 'inline-flex', border: '0.5px solid #2a2a2a', borderRadius: 6, overflow: 'hidden' }}>
+    <div style={{ display: 'inline-flex', border: '0.5px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
       <button onClick={() => onChange('grid')} style={btn(view === 'grid')}>Grid</button>
       <button onClick={() => onChange('kanban')} style={btn(view === 'kanban')}>Kanban</button>
     </div>
@@ -405,13 +405,13 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
     <div style={{
       textAlign: 'center',
       padding: '80px 24px',
-      border: '0.5px dashed #2a2a2a',
+      border: '0.5px dashed var(--border)',
       borderRadius: 12,
-      background: '#0a0a0a',
+      background: 'var(--surface)',
     }}>
       <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.4 }}>💡</div>
-      <div style={{ fontSize: 14, color: '#ccc', marginBottom: 6, fontWeight: 600 }}>No ideas yet</div>
-      <div style={{ fontSize: 12, color: '#555', marginBottom: 20, lineHeight: 1.5 }}>
+      <div style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 6, fontWeight: 600 }}>No ideas yet</div>
+      <div style={{ fontSize: 12, color: 'var(--text-faint)', marginBottom: 20, lineHeight: 1.5 }}>
         Capture hooks, formats, references, or anything else worth coming back to.
       </div>
       <button className="btn-primary" style={{ fontSize: 12, padding: '8px 18px' }} onClick={onAdd}>
@@ -427,8 +427,8 @@ function Toast({ msg }: { msg: string }) {
       position: 'fixed',
       bottom: 20,
       right: 20,
-      background: '#fff',
-      color: '#000',
+      background: 'var(--text)',
+      color: 'var(--bg)',
       padding: '8px 14px',
       borderRadius: 6,
       fontSize: 11,
@@ -479,8 +479,8 @@ function IdeaCard({ item, expanded, onToggleExpand, onCycleStatus, onEdit, onDel
     <div
       className="research-card"
       style={{
-        background: '#0d0d0d',
-        border: `0.5px solid ${item.hot ? '#ef444440' : '#1a1a1a'}`,
+        background: 'var(--surface)',
+        border: `0.5px solid ${item.hot ? '#ef444440' : 'var(--border)'}`,
         borderRadius: 10,
         padding: compact ? 10 : 12,
         opacity: dim,
@@ -523,10 +523,10 @@ function IdeaCard({ item, expanded, onToggleExpand, onCycleStatus, onEdit, onDel
           onClick={onEdit}
           title="Edit"
           style={{
-            background: '#1a1a1a',
-            border: '0.5px solid #2a2a2a',
+            background: 'var(--border)',
+            border: '0.5px solid var(--border)',
             borderRadius: 4,
-            color: '#aaa',
+            color: 'var(--text-dim)',
             cursor: 'pointer',
             fontSize: 11,
             padding: '2px 7px',
@@ -558,7 +558,7 @@ function IdeaCard({ item, expanded, onToggleExpand, onCycleStatus, onEdit, onDel
         style={{
           fontSize: 14,
           fontWeight: 700,
-          color: '#fff',
+          color: 'var(--text)',
           lineHeight: 1.3,
           letterSpacing: '-0.01em',
           wordBreak: 'break-word',
@@ -581,15 +581,15 @@ function IdeaCard({ item, expanded, onToggleExpand, onCycleStatus, onEdit, onDel
               display: 'inline-flex',
               alignItems: 'center',
               gap: 4,
-              color: '#888',
+              color: 'var(--text-dim)',
               textDecoration: 'none',
               fontSize: 11,
               wordBreak: 'break-all',
             }}
             title={content}
           >
-            <span style={{ borderBottom: '0.5px solid #2a2a2a', paddingBottom: 1 }}>{safeDomain(content)}</span>
-            <span style={{ fontSize: 9, color: '#666' }}>↗</span>
+            <span style={{ borderBottom: '0.5px solid var(--border)', paddingBottom: 1 }}>{safeDomain(content)}</span>
+            <span style={{ fontSize: 9, color: 'var(--text-faint)' }}>↗</span>
           </a>
         ) : (
           <div
@@ -597,7 +597,7 @@ function IdeaCard({ item, expanded, onToggleExpand, onCycleStatus, onEdit, onDel
             style={{
               fontSize: 11,
               lineHeight: 1.45,
-              color: '#888',
+              color: 'var(--text-dim)',
               cursor: 'pointer',
               wordBreak: 'break-word',
               ...contentClampStyle,
@@ -637,9 +637,9 @@ function IdeaCard({ item, expanded, onToggleExpand, onCycleStatus, onEdit, onDel
             textTransform: 'uppercase',
             padding: '2px 7px',
             borderRadius: 3,
-            background: '#161616',
-            color: '#888',
-            border: '0.5px solid #1f1f1f',
+            background: 'var(--surface)',
+            color: 'var(--text-dim)',
+            border: '0.5px solid var(--border)',
           }}>
             {item.reason}
           </span>
@@ -669,14 +669,14 @@ function IdeaCard({ item, expanded, onToggleExpand, onCycleStatus, onEdit, onDel
 
       {/* Note */}
       {item.note && (
-        <div style={{ fontSize: 11, color: '#666', fontStyle: 'italic', lineHeight: 1.45, wordBreak: 'break-word' }}>
+        <div style={{ fontSize: 11, color: 'var(--text-faint)', fontStyle: 'italic', lineHeight: 1.45, wordBreak: 'break-word' }}>
           {item.note}
         </div>
       )}
 
       {/* Date — bottom */}
       {dateStr && (
-        <div style={{ fontSize: 9, color: '#444', marginTop: 'auto', textAlign: 'right' }}>
+        <div style={{ fontSize: 9, color: 'var(--text-faint)', marginTop: 'auto', textAlign: 'right' }}>
           {dateStr}
         </div>
       )}
