@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption } from '@/lib/types';
+import { StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { todayISO } from '@/lib/studio';
 import VideoReview from './studio/VideoReview';
@@ -28,11 +28,12 @@ interface Props {
   dropdownOptions: StudioDropdownOption[];
   properties: CustomProperty[];
   customOptions: CustomPropertyOption[];
+  profiles: Profile[];
   isAdmin: boolean;
   onReload: () => void;
 }
 
-export default function StudioTab({ videos, sequences, sessions, adCreatives, comments, activity, quickLinks, dropdownOptions, properties, customOptions, isAdmin, onReload }: Props) {
+export default function StudioTab({ videos, sequences, sessions, adCreatives, comments, activity, quickLinks, dropdownOptions, properties, customOptions, profiles, isAdmin, onReload }: Props) {
   const [sub, setSub] = usePersistedState<SubTab>('studio_subtab', 'videos');
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -82,7 +83,7 @@ export default function StudioTab({ videos, sequences, sessions, adCreatives, co
         ))}
       </div>
 
-      {sub === 'videos' && <VideoReview videos={videos} comments={comments} activity={activity} quickLinks={quickLinks} dropdownOptions={dropdownOptions} onReload={onReload} showToast={showToast} />}
+      {sub === 'videos' && <VideoReview videos={videos} comments={comments} activity={activity} quickLinks={quickLinks} dropdownOptions={dropdownOptions} profiles={profiles} isAdmin={isAdmin} onReload={onReload} showToast={showToast} />}
       {sub === 'sequences' && <StorySequences sequences={sequences} comments={comments} activity={activity} dropdownOptions={dropdownOptions} properties={properties} customOptions={customOptions} isAdmin={isAdmin} onReload={onReload} />}
       {sub === 'sessions' && <FilmingSessions sessions={sessions} comments={comments} activity={activity} dropdownOptions={dropdownOptions} properties={properties} customOptions={customOptions} isAdmin={isAdmin} onReload={onReload} />}
       {sub === 'ads' && <AdCreative adCreatives={adCreatives} comments={comments} activity={activity} quickLinks={quickLinks} dropdownOptions={dropdownOptions} properties={properties} customOptions={customOptions} isAdmin={isAdmin} onReload={onReload} showToast={showToast} />}

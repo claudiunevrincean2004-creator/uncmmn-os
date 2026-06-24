@@ -5,11 +5,12 @@ import { StudioSequence, StudioComment, StudioActivity, StudioDropdownOption, Cu
 import { usePersistedState } from '@/lib/use-persisted-state';
 import {
   SEQUENCE_STATUSES, SEQUENCE_STATUS_COLORS,
-  isOverdue, logActivity, mergeOptions, inDateRange,
+  isOverdue, logActivity, inDateRange, getFieldOptions, colorMap,
 } from '@/lib/studio';
 import { InlineText, EditPillSelect, MiniSelect, UrlCell, InlineDate } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal } from './CustomColumns';
+import FieldOptionsManager from './FieldOptionsManager';
 
 const DONE = ['Posted'];
 const TABLE_KEY = 'sequence';
@@ -34,12 +35,14 @@ export default function StorySequences({ sequences, comments, activity, dropdown
   const [expanded, setExpanded] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mgrOpen, setMgrOpen] = useState(false);
+  const [optsField, setOptsField] = useState<{ field: string; title: string } | null>(null);
 
   const cprops = useMemo(() => sortProps(properties, TABLE_KEY), [properties]);
   const optsByProp = useMemo(() => groupOptions(customOptions), [customOptions]);
 
-  const custom = (field: string) => dropdownOptions.filter(o => o.field === field).map(o => o.value);
-  const statusOpts = mergeOptions(SEQUENCE_STATUSES, custom('sequence_status'));
+  const statusFieldOpts = getFieldOptions(dropdownOptions, 'sequence_status', SEQUENCE_STATUSES, SEQUENCE_STATUS_COLORS);
+  const statusValues = statusFieldOpts.map(o => o.value);
+  const statusColors = colorMap(statusFieldOpts);
 
   async function addOption(field: string, value: string) {
     if (!dropdownOptions.some(o => o.field === field && o.value.toLowerCase() === value.toLowerCase())) {
@@ -92,11 +95,11 @@ export default function StorySequences({ sequences, comments, activity, dropdown
 
   const fields: FieldDef[] = useMemo(() => [
     { key: 'title', label: 'Title / Desc', type: 'textarea', placeholder: 'Title / description' },
-    { key: 'status', label: 'Status', type: 'pill', field: 'sequence_status', options: statusOpts, colors: SEQUENCE_STATUS_COLORS },
+    { key: 'status', label: 'Status', type: 'pill', field: 'sequence_status', options: statusValues, colors: statusColors, allowAdd: false },
     { key: 'final_url', label: 'Final Product', type: 'url' },
     { key: 'scheduled_date', label: 'Scheduled', type: 'date' },
     { key: 'notes', label: 'Notes', type: 'textarea', placeholder: 'Add notes…' },
-  ], [statusOpts]);
+  ], [statusValues, statusColors]);
 
   const selected = selectedId ? sequences.find(s => s.id === selectedId) : null;
 
@@ -127,7 +130,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
               <thead>
                 <tr>
                   <th style={{ minWidth: 200 }}>Title / Description</th>
-                  <th>Status</th>
+                  <th onClick={isAdmin ? () => setOptsField({ field: 'sequence_status', title: 'Status' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Status{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <th>Final</th>
                   <th>Scheduled</th>
                   <th>Notes</th>
@@ -144,7 +147,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
                         <td style={{ minWidth: 200 }}>
                           <button onClick={() => setSelectedId(s.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{s.title}</button>
                         </td>
-                        <td><EditPillSelect field="sequence_status" value={s.status} options={statusOpts} colors={SEQUENCE_STATUS_COLORS} onChange={st => changeStatus(s, st)} onAddOption={addOption} /></td>
+                        <td><EditPillSelect field="sequence_status" value={s.status} options={statusValues} colors={statusColors} onChange={st => changeStatus(s, st)} allowAdd={false} /></td>
                         <td><UrlCell value={s.final_url} onCommit={u => patch(s.id, { final_url: u })} /></td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -197,6 +200,9 @@ export default function StorySequences({ sequences, comments, activity, dropdown
 
       {mgrOpen && (
         <PropertyManagerModal tableKey={TABLE_KEY} properties={properties} options={customOptions} onClose={() => setMgrOpen(false)} onReload={onReload} />
+      )}
+      {optsField && (
+        <FieldOptionsManager field={optsField.field} title={optsField.title} options={dropdownOptions} onClose={() => setOptsField(null)} onReload={onReload} />
       )}
     </div>
   );

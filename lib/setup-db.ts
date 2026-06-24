@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 
-export async function checkSchema(): Promise<{ missing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[]; adColumnsMissing: string[] }> {
+export async function checkSchema(): Promise<{ missing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[]; adColumnsMissing: string[]; dropdownColsMissing: boolean }> {
   const requiredTables = [
     'clients', 'posts', 'goals', 'drive_folders',
     'subscriber_snapshots', 'research_items', 'revenue_entries',
@@ -48,10 +48,19 @@ export async function checkSchema(): Promise<{ missing: string[]; postColumnsMis
     }
   }
 
-  return { missing, postColumnsMissing, researchColumnsMissing, adColumnsMissing };
+  // Built-in Format/Status options become DB-backed: detect the `color` column.
+  let dropdownColsMissing = false;
+  if (!missing.includes('studio_dropdown_options')) {
+    const { error } = await supabase.from('studio_dropdown_options').select('color').limit(0);
+    if (error && (error.code === '42703' || error.code === 'PGRST204' || /column/i.test(error.message))) {
+      dropdownColsMissing = true;
+    }
+  }
+
+  return { missing, postColumnsMissing, researchColumnsMissing, adColumnsMissing, dropdownColsMissing };
 }
 
-export function getMigrationSQL(missing: string[], postColumnsMissing: string[] = [], researchColumnsMissing: string[] = [], adColumnsMissing: string[] = []): string {
+export function getMigrationSQL(missing: string[], postColumnsMissing: string[] = [], researchColumnsMissing: string[] = [], adColumnsMissing: string[] = [], dropdownColsMissing = false): string {
   const parts: string[] = [];
 
   if (missing.includes('clients')) {
@@ -336,6 +345,21 @@ drop policy if exists "custom_property_options_read" on custom_property_options;
 create policy "custom_property_options_read" on custom_property_options for select to authenticated using (true);
 drop policy if exists "custom_property_options_admin_write" on custom_property_options;
 create policy "custom_property_options_admin_write" on custom_property_options for all to authenticated using (public.is_admin()) with check (public.is_admin());`);
+  }
+
+  if (dropdownColsMissing) {
+    parts.push(`-- Make built-in Format/Status options editable (color + ordering) and seed defaults
+alter table studio_dropdown_options add column if not exists color text;
+alter table studio_dropdown_options add column if not exists position int not null default 0;
+create unique index if not exists studio_dropdown_options_field_value_key on studio_dropdown_options (field, value);
+insert into studio_dropdown_options (field, value, color, position) values
+  ('video_status','Scripting','#6b7280',0),('video_status','Recording','#3b82f6',1),('video_status','Raw Footage Ready','#eab308',2),('video_status','Editing','#f59e0b',3),('video_status','In Review','#8b5cf6',4),('video_status','Revision Requested','#ef4444',5),('video_status','Ad Variation Needed','#ec4899',6),('video_status','Approved','#10b981',7),('video_status','Posted','#14b8a6',8),
+  ('video_format','Short',null,0),('video_format','Long Form',null,1),('video_format','Reel',null,2),('video_format','Story',null,3),('video_format','Other',null,4),
+  ('sequence_status','Draft','#6b7280',0),('sequence_status','Ready for Review','#8b5cf6',1),('sequence_status','Revision Requested','#ef4444',2),('sequence_status','Approved','#10b981',3),('sequence_status','Posted','#14b8a6',4),
+  ('session_status','Planned','#6b7280',0),('session_status','Confirmed','#3b82f6',1),('session_status','Filming','#f59e0b',2),('session_status','Filmed','#10b981',3),('session_status','Cancelled','#ef4444',4),
+  ('ad_status','Live','#10b981',0),('ad_status','Paused','#eab308',1),('ad_status','Winner','#14b8a6',2),('ad_status','Killed','#ef4444',3),('ad_status','Revision Requested','#f59e0b',4),
+  ('ad_format','Video',null,0),('ad_format','Static',null,1)
+on conflict (field, value) do nothing;`);
   }
 
   return parts.join('\n\n');

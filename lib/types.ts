@@ -116,6 +116,17 @@ export interface StudioDropdownOption {
   id: string;
   field: string;
   value: string;
+  color?: string | null;
+  position?: number;
+  created_at?: string;
+}
+
+export interface Profile {
+  id: string;
+  role?: string;
+  assignable?: boolean;
+  email?: string | null;
+  display_name?: string | null;
   created_at?: string;
 }
 

@@ -1,19 +1,22 @@
 'use client';
 import { useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { StudioComment, StudioActivity } from '@/lib/types';
+import { StudioComment, StudioActivity, Profile } from '@/lib/types';
 import { formatActivityTime } from '@/lib/studio';
 import { useDismiss } from '@/lib/use-dismiss';
 import { InlineText, MiniSelect, PillSelect, EditSelect, EditPillSelect, InlineDate, InlineNumber } from './cells';
+import { UserPicker } from './UserPicker';
 
 export interface FieldDef {
   key: string;
   label: string;
-  type: 'text' | 'textarea' | 'select' | 'pill' | 'url' | 'date' | 'number' | 'readonly' | 'readonly-url';
+  type: 'text' | 'textarea' | 'select' | 'pill' | 'url' | 'date' | 'number' | 'readonly' | 'readonly-url' | 'user';
   options?: string[];
   colors?: Record<string, string>;
   placeholder?: string;
   field?: string; // dropdown-option key — enables "+ Add new…" for select/pill
+  allowAdd?: boolean; // false → admin-managed options only (no inline add)
+  allowEmpty?: boolean;
   visibleIf?: (values: Record<string, any>) => boolean;
 }
 
@@ -27,11 +30,12 @@ interface Props {
   onAddOption: (field: string, value: string) => void;
   comments: StudioComment[];
   activity: StudioActivity[];
+  profiles?: Profile[];
   onReload: () => void;
   onClose: () => void;
 }
 
-function FieldControl({ field, values, onChangeField, onAddOption }: { field: FieldDef; values: Record<string, any>; onChangeField: (k: string, v: any) => void; onAddOption: (f: string, v: string) => void }) {
+function FieldControl({ field, values, onChangeField, onAddOption, profiles }: { field: FieldDef; values: Record<string, any>; onChangeField: (k: string, v: any) => void; onAddOption: (f: string, v: string) => void; profiles: Profile[] }) {
   const value = values[field.key];
   switch (field.type) {
     case 'text':
@@ -42,13 +46,15 @@ function FieldControl({ field, values, onChangeField, onAddOption }: { field: Fi
       return <InlineNumber value={Number(value) || 0} onCommit={v => onChangeField(field.key, v)} width={80} />;
     case 'date':
       return <InlineDate value={value} onCommit={v => onChangeField(field.key, v || undefined)} />;
+    case 'user':
+      return <UserPicker value={value} profiles={profiles} onChange={v => onChangeField(field.key, v)} />;
     case 'select':
       return field.field
-        ? <EditSelect field={field.field} value={value} options={field.options || []} onChange={v => onChangeField(field.key, v)} onAddOption={onAddOption} placeholder="—" width="100%" />
+        ? <EditSelect field={field.field} value={value} options={field.options || []} onChange={v => onChangeField(field.key, v)} onAddOption={onAddOption} placeholder="—" width="100%" allowAdd={field.allowAdd} />
         : <MiniSelect value={value} options={field.options || []} onChange={v => onChangeField(field.key, v)} placeholder="—" width="100%" />;
     case 'pill':
       return field.field
-        ? <EditPillSelect field={field.field} value={value} options={field.options || []} colors={field.colors || {}} onChange={v => onChangeField(field.key, v)} onAddOption={onAddOption} />
+        ? <EditPillSelect field={field.field} value={value || ''} options={field.options || []} colors={field.colors || {}} onChange={v => onChangeField(field.key, v)} onAddOption={onAddOption} allowAdd={field.allowAdd} allowEmpty={field.allowEmpty} />
         : <PillSelect value={value} options={field.options || []} colors={field.colors || {}} onChange={v => onChangeField(field.key, v)} />;
     case 'url':
       return (
@@ -67,7 +73,7 @@ function FieldControl({ field, values, onChangeField, onAddOption }: { field: Fi
   }
 }
 
-export default function ItemPanel({ itemType, itemId, title, fields, values, onChangeField, onAddOption, comments, activity, onReload, onClose }: Props) {
+export default function ItemPanel({ itemType, itemId, title, fields, values, onChangeField, onAddOption, comments, activity, profiles = [], onReload, onClose }: Props) {
   const [newComment, setNewComment] = useState('');
   const [saving, setSaving] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -135,7 +141,7 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
         {fields.filter(f => !f.visibleIf || f.visibleIf(values)).map(f => (
           <div key={f.key} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 10, alignItems: 'start' }}>
             <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, paddingTop: 6 }}>{f.label}</div>
-            <div><FieldControl field={f} values={values} onChangeField={onChangeField} onAddOption={onAddOption} /></div>
+            <div><FieldControl field={f} values={values} onChangeField={onChangeField} onAddOption={onAddOption} profiles={profiles} /></div>
           </div>
         ))}
       </div>

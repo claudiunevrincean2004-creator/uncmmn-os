@@ -1,16 +1,20 @@
 'use client';
 import { Fragment, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { StudioVideo, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption } from '@/lib/types';
+import { StudioVideo, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 import {
   VIDEO_FORMATS, VIDEO_STATUSES, VIDEO_STATUS_COLORS,
-  PRIORITIES, PRIORITY_COLORS, TEAM,
+  PRIORITIES, PRIORITY_COLORS,
   isOverdue, logActivity, todayISO, mergeOptions, inDateRange,
+  getFieldOptions, colorMap,
 } from '@/lib/studio';
-import { InlineText, EditSelect, EditPillSelect, MiniSelect, UrlCell, InlineDate } from './cells';
+import { InlineText, EditPillSelect, MiniSelect, UrlCell, InlineDate } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import QuickLinks from './QuickLinks';
+import { UserPicker, resolveAssignee } from './UserPicker';
+import FieldOptionsManager from './FieldOptionsManager';
+import AssigneeSettings from './AssigneeSettings';
 
 const DONE = ['Approved', 'Posted'];
 
@@ -20,11 +24,13 @@ interface Props {
   activity: StudioActivity[];
   quickLinks: StudioQuickLink[];
   dropdownOptions: StudioDropdownOption[];
+  profiles: Profile[];
+  isAdmin: boolean;
   onReload: () => void;
   showToast: (msg: string) => void;
 }
 
-export default function VideoReview({ videos, comments, activity, quickLinks, dropdownOptions, onReload, showToast }: Props) {
+export default function VideoReview({ videos, comments, activity, quickLinks, dropdownOptions, profiles, isAdmin, onReload, showToast }: Props) {
   const [fStatus, setFStatus] = usePersistedState<string>('studio_v_status', 'All');
   const [fAssigned, setFAssigned] = usePersistedState<string>('studio_v_assigned', 'All');
   const [fFormat, setFFormat] = usePersistedState<string>('studio_v_format', 'All');
@@ -34,12 +40,17 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   const [dateTo, setDateTo] = usePersistedState<string>('studio_v_to', '');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [optsField, setOptsField] = useState<{ field: string; title: string } | null>(null);
+  const [assigneeSettings, setAssigneeSettings] = useState(false);
 
-  const custom = (field: string) => dropdownOptions.filter(o => o.field === field).map(o => o.value);
-  const formatOpts = mergeOptions(VIDEO_FORMATS, custom('video_format'));
-  const assignedOpts = mergeOptions(TEAM, custom('video_assigned_to'));
-  const statusOpts = mergeOptions(VIDEO_STATUSES, custom('video_status'));
-  const priorityOpts = mergeOptions(PRIORITIES, custom('video_priority'));
+  // Built-in Format & Status options are DB-backed (admin-managed) with defaults
+  const statusFieldOpts = getFieldOptions(dropdownOptions, 'video_status', VIDEO_STATUSES, VIDEO_STATUS_COLORS);
+  const formatFieldOpts = getFieldOptions(dropdownOptions, 'video_format', VIDEO_FORMATS);
+  const statusValues = statusFieldOpts.map(o => o.value);
+  const statusColors = colorMap(statusFieldOpts);
+  const formatValues = formatFieldOpts.map(o => o.value);
+  const formatColors = colorMap(formatFieldOpts);
+  const priorityOpts = mergeOptions(PRIORITIES, dropdownOptions.filter(o => o.field === 'video_priority').map(o => o.value));
 
   async function addOption(field: string, value: string) {
     if (!dropdownOptions.some(o => o.field === field && o.value.toLowerCase() === value.toLowerCase())) {
@@ -89,14 +100,14 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   // Filter dropdowns only offer values actually present in the data
   const present = (vals: (string | undefined)[]) => ['All', ...Array.from(new Set(vals.filter(Boolean) as string[]))];
   const statusPresent = present(videos.map(v => v.status));
-  const assignedPresent = present(videos.map(v => v.assigned_to));
+  const assignedPresent = present(videos.map(v => resolveAssignee(v.assigned_to, profiles) || undefined));
   const formatPresent = present(videos.map(v => v.format));
   const priorityPresent = present(videos.map(v => v.priority || 'Normal'));
 
   const filtered = useMemo(() => {
     let r = videos;
     if (fStatus !== 'All') r = r.filter(v => v.status === fStatus);
-    if (fAssigned !== 'All') r = r.filter(v => (v.assigned_to || '') === fAssigned);
+    if (fAssigned !== 'All') r = r.filter(v => (resolveAssignee(v.assigned_to, profiles) || '') === fAssigned);
     if (fFormat !== 'All') r = r.filter(v => (v.format || '') === fFormat);
     if (fPriority !== 'All') r = r.filter(v => (v.priority || 'Normal') === fPriority);
     if (dateFrom || dateTo) r = r.filter(v => inDateRange(v.deadline, dateFrom, dateTo));
@@ -108,13 +119,13 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
       if (!bd) return -1;
       return sortDir === 'asc' ? ad.localeCompare(bd) : bd.localeCompare(ad);
     });
-  }, [videos, fStatus, fAssigned, fFormat, fPriority, sortDir, dateFrom, dateTo]);
+  }, [videos, fStatus, fAssigned, fFormat, fPriority, sortDir, dateFrom, dateTo, profiles]);
 
   const fields: FieldDef[] = useMemo(() => [
     { key: 'title', label: 'Title / Desc', type: 'textarea', placeholder: 'Title / description' },
-    { key: 'format', label: 'Format', type: 'select', field: 'video_format', options: formatOpts },
-    { key: 'assigned_to', label: 'Assigned To', type: 'select', field: 'video_assigned_to', options: assignedOpts },
-    { key: 'status', label: 'Status', type: 'pill', field: 'video_status', options: statusOpts, colors: VIDEO_STATUS_COLORS },
+    { key: 'format', label: 'Format', type: 'pill', field: 'video_format', options: formatValues, colors: formatColors, allowAdd: false, allowEmpty: true },
+    { key: 'assigned_to', label: 'Assigned To', type: 'user' },
+    { key: 'status', label: 'Status', type: 'pill', field: 'video_status', options: statusValues, colors: statusColors, allowAdd: false },
     { key: 'priority', label: 'Priority', type: 'pill', field: 'video_priority', options: priorityOpts, colors: PRIORITY_COLORS },
     { key: 'brief_url', label: 'Brief', type: 'url' },
     { key: 'raw_files_url', label: 'Raw Files', type: 'url' },
@@ -122,7 +133,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
     { key: 'deadline', label: 'Deadline', type: 'date' },
     { key: 'revision_count', label: 'Revisions', type: 'readonly' },
     { key: 'notes', label: 'Notes', type: 'textarea', placeholder: 'Add notes…' },
-  ], [formatOpts, assignedOpts, statusOpts, priorityOpts]);
+  ], [formatValues, formatColors, statusValues, statusColors, priorityOpts]);
 
   const selected = selectedId ? videos.find(v => v.id === selectedId) : null;
 
@@ -144,6 +155,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
           <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>To</span>
           <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
           {(dateFrom || dateTo) && <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>clear</button>}
+          {isAdmin && <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setAssigneeSettings(true)}>Assignees</button>}
           <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{filtered.length} {filtered.length === 1 ? 'video' : 'videos'}</span>
           <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={addVideo}>+ Add Video</button>
         </div>
@@ -156,9 +168,9 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
               <thead>
                 <tr>
                   <th style={{ minWidth: 180 }}>Title / Description</th>
-                  <th>Format</th>
+                  <th onClick={isAdmin ? () => setOptsField({ field: 'video_format', title: 'Format' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Format{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <th>Assigned To</th>
-                  <th>Status</th>
+                  <th onClick={isAdmin ? () => setOptsField({ field: 'video_status', title: 'Status' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Status{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <th>Brief</th>
                   <th>Raw Files</th>
                   <th>Final</th>
@@ -178,9 +190,9 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                         <td style={{ minWidth: 180 }}>
                           <button onClick={() => setSelectedId(v.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{v.title}</button>
                         </td>
-                        <td><EditSelect field="video_format" value={v.format} options={formatOpts} onChange={f => patch(v.id, { format: f })} onAddOption={addOption} placeholder="—" /></td>
-                        <td><EditSelect field="video_assigned_to" value={v.assigned_to} options={assignedOpts} onChange={a => patch(v.id, { assigned_to: a })} onAddOption={addOption} placeholder="—" /></td>
-                        <td><EditPillSelect field="video_status" value={v.status} options={statusOpts} colors={VIDEO_STATUS_COLORS} onChange={s => changeStatus(v, s)} onAddOption={addOption} /></td>
+                        <td><EditPillSelect field="video_format" value={v.format || ''} options={formatValues} colors={formatColors} onChange={f => patch(v.id, { format: f })} allowAdd={false} allowEmpty /></td>
+                        <td><UserPicker value={v.assigned_to} profiles={profiles} onChange={uid => patch(v.id, { assigned_to: uid })} /></td>
+                        <td><EditPillSelect field="video_status" value={v.status} options={statusValues} colors={statusColors} onChange={s => changeStatus(v, s)} allowAdd={false} /></td>
                         <td><UrlCell value={v.brief_url} onCommit={u => patch(v.id, { brief_url: u })} /></td>
                         <td><UrlCell value={v.raw_files_url} onCommit={u => patch(v.id, { raw_files_url: u })} /></td>
                         <td><UrlCell value={v.final_url} onCommit={u => patch(v.id, { final_url: u })} /></td>
@@ -233,9 +245,17 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
           onAddOption={addOption}
           comments={comments}
           activity={activity}
+          profiles={profiles}
           onReload={onReload}
           onClose={() => setSelectedId(null)}
         />
+      )}
+
+      {optsField && (
+        <FieldOptionsManager field={optsField.field} title={optsField.title} options={dropdownOptions} onClose={() => setOptsField(null)} onReload={onReload} />
+      )}
+      {assigneeSettings && (
+        <AssigneeSettings profiles={profiles} onClose={() => setAssigneeSettings(false)} onReload={onReload} />
       )}
     </div>
   );

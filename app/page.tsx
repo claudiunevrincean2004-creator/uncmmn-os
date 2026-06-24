@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Role, canAccess } from '@/lib/auth-config';
 import { checkSchema, getMigrationSQL } from '@/lib/setup-db';
-import { Client, Post, DriveFolder, SubscriberSnapshot, ResearchItem, StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, MainPage } from '@/lib/types';
+import { Client, Post, DriveFolder, SubscriberSnapshot, ResearchItem, StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile, MainPage } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 
 import Sidebar from '@/components/Sidebar';
@@ -56,8 +56,9 @@ export default function Home() {
   const [studioDropdownOptions, setStudioDropdownOptions] = useState<StudioDropdownOption[]>([]);
   const [customProperties, setCustomProperties] = useState<CustomProperty[]>([]);
   const [customPropOptions, setCustomPropOptions] = useState<CustomPropertyOption[]>([]);
+  const [studioProfiles, setStudioProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [schemaMissing, setSchemaMissing] = useState<{ missing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[]; adColumnsMissing: string[] } | null>(null);
+  const [schemaMissing, setSchemaMissing] = useState<{ missing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[]; adColumnsMissing: string[]; dropdownColsMissing: boolean } | null>(null);
   const [showMigrationSQL, setShowMigrationSQL] = useState(false);
 
   const [mainPage, setMainPage] = usePersistedState<MainPage>('main_page', 'dashboard');
@@ -116,7 +117,7 @@ export default function Home() {
   }, [mainPage, setMainPage]);
 
   const loadData = useCallback(async () => {
-    const [c, p, d, ss, ri, sv, sq, sn, ac, cm, av, ql, dr, cp, co] = await Promise.all([
+    const [c, p, d, ss, ri, sv, sq, sn, ac, cm, av, ql, dr, cp, co, pr] = await Promise.all([
       safeSelect('clients', 'created_at'),
       safeSelect('posts', 'date', false),
       safeSelect('drive_folders', 'category'),
@@ -132,6 +133,7 @@ export default function Home() {
       safeSelect('studio_dropdown_options', 'created_at'),
       safeSelect('custom_properties', 'position'),
       safeSelect('custom_property_options', 'position'),
+      safeSelect('profiles', 'created_at'),
     ]);
 
     let active = (c as Client[])[0] || null;
@@ -160,12 +162,13 @@ export default function Home() {
     setStudioDropdownOptions(dr as StudioDropdownOption[]);
     setCustomProperties(cp as CustomProperty[]);
     setCustomPropOptions(co as CustomPropertyOption[]);
+    setStudioProfiles(pr as Profile[]);
     setLoading(false);
   }, []);
 
   useEffect(() => {
     checkSchema().then(result => {
-      if (result.missing.length > 0 || result.postColumnsMissing.length > 0 || result.researchColumnsMissing.length > 0 || result.adColumnsMissing.length > 0) {
+      if (result.missing.length > 0 || result.postColumnsMissing.length > 0 || result.researchColumnsMissing.length > 0 || result.adColumnsMissing.length > 0 || result.dropdownColsMissing) {
         setSchemaMissing(result);
       }
     });
@@ -195,13 +198,13 @@ export default function Home() {
       />
 
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {schemaMissing && (schemaMissing.missing.length > 0 || schemaMissing.postColumnsMissing.length > 0 || schemaMissing.researchColumnsMissing.length > 0 || schemaMissing.adColumnsMissing.length > 0) && (
+        {schemaMissing && (schemaMissing.missing.length > 0 || schemaMissing.postColumnsMissing.length > 0 || schemaMissing.researchColumnsMissing.length > 0 || schemaMissing.adColumnsMissing.length > 0 || schemaMissing.dropdownColsMissing) && (
           <div style={{ background: '#1a1000', borderBottom: '1px solid #3a2a00', padding: '10px 24px', flexShrink: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <span style={{ color: '#f59e0b', fontWeight: 600, fontSize: 12 }}>Database setup required</span>
                 <span style={{ color: 'var(--text-dim)', fontSize: 11, marginLeft: 8 }}>
-                  Missing: {[...schemaMissing.missing, ...schemaMissing.postColumnsMissing.map(c => `posts.${c}`), ...schemaMissing.researchColumnsMissing.map(c => `research_items.${c}`), ...schemaMissing.adColumnsMissing.map(c => `studio_ad_creatives.${c}`)].join(', ')}
+                  Missing: {[...schemaMissing.missing, ...schemaMissing.postColumnsMissing.map(c => `posts.${c}`), ...schemaMissing.researchColumnsMissing.map(c => `research_items.${c}`), ...schemaMissing.adColumnsMissing.map(c => `studio_ad_creatives.${c}`), ...(schemaMissing.dropdownColsMissing ? ['studio_dropdown_options.color'] : [])].join(', ')}
                 </span>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
@@ -217,7 +220,7 @@ export default function Home() {
                   style={{ fontSize: 10, padding: '4px 10px' }}
                   onClick={() => {
                     checkSchema().then(result => {
-                      if (result.missing.length === 0 && result.postColumnsMissing.length === 0 && result.researchColumnsMissing.length === 0 && result.adColumnsMissing.length === 0) {
+                      if (result.missing.length === 0 && result.postColumnsMissing.length === 0 && result.researchColumnsMissing.length === 0 && result.adColumnsMissing.length === 0 && !result.dropdownColsMissing) {
                         setSchemaMissing(null);
                         setShowMigrationSQL(false);
                         loadData();
@@ -248,11 +251,11 @@ export default function Home() {
                     cursor: 'pointer',
                   }}
                   onClick={() => {
-                    navigator.clipboard.writeText(getMigrationSQL(schemaMissing.missing, schemaMissing.postColumnsMissing, schemaMissing.researchColumnsMissing, schemaMissing.adColumnsMissing));
+                    navigator.clipboard.writeText(getMigrationSQL(schemaMissing.missing, schemaMissing.postColumnsMissing, schemaMissing.researchColumnsMissing, schemaMissing.adColumnsMissing, schemaMissing.dropdownColsMissing));
                   }}
                   title="Click to copy"
                 >
-                  {getMigrationSQL(schemaMissing.missing, schemaMissing.postColumnsMissing, schemaMissing.researchColumnsMissing, schemaMissing.adColumnsMissing)}
+                  {getMigrationSQL(schemaMissing.missing, schemaMissing.postColumnsMissing, schemaMissing.researchColumnsMissing, schemaMissing.adColumnsMissing, schemaMissing.dropdownColsMissing)}
                 </pre>
                 <div style={{ fontSize: 9, color: 'var(--text-faint)', marginTop: 4 }}>Click the SQL block to copy. After running it, click "Re-check" above.</div>
               </div>
@@ -325,6 +328,7 @@ export default function Home() {
                 dropdownOptions={studioDropdownOptions}
                 properties={customProperties}
                 customOptions={customPropOptions}
+                profiles={studioProfiles}
                 isAdmin={role === 'admin'}
                 onReload={loadData}
               />

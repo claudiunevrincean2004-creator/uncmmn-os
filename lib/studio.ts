@@ -107,6 +107,36 @@ export function mergeOptions(base: string[], custom: string[]): string[] {
   return Array.from(new Set([...base, ...custom]));
 }
 
+export interface FieldOption { value: string; color?: string | null; }
+
+// Ordered options for a built-in select field (Format / Status), sourced from the
+// studio_dropdown_options table when seeded, falling back to the in-code defaults.
+export function getFieldOptions(
+  rows: { field: string; value: string; color?: string | null; position?: number; created_at?: string }[],
+  field: string,
+  fallbackValues: string[],
+  fallbackColors?: Record<string, string>,
+): FieldOption[] {
+  const db = rows.filter(r => r.field === field);
+  // The DB list is authoritative only once the migration has run (rows carry a
+  // `position`). Before that, show the built-in defaults plus any legacy
+  // user-added values so nothing is dropped.
+  const migrated = db.some(r => r.position !== undefined && r.position !== null);
+  if (db.length && migrated) {
+    return [...db]
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0) || (a.created_at || '').localeCompare(b.created_at || ''))
+      .map(r => ({ value: r.value, color: r.color ?? fallbackColors?.[r.value] ?? null }));
+  }
+  const legacy = db.map(r => r.value).filter(v => !fallbackValues.includes(v));
+  return [...fallbackValues, ...legacy].map(v => ({ value: v, color: fallbackColors?.[v] ?? null }));
+}
+
+export function colorMap(opts: FieldOption[]): Record<string, string> {
+  const m: Record<string, string> = {};
+  opts.forEach(o => { if (o.color) m[o.value] = o.color; });
+  return m;
+}
+
 // True if a yyyy-mm-dd date falls within an optional [from, to] range.
 // When a bound is set, undated items are excluded.
 export function inDateRange(dateStr: string | undefined, from: string, to: string): boolean {

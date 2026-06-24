@@ -3,11 +3,12 @@ import { Fragment, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
-import { AD_FORMATS, AD_STATUSES, AD_STATUS_COLORS, todayISO, logActivity, mergeOptions, inDateRange } from '@/lib/studio';
+import { AD_FORMATS, AD_STATUSES, AD_STATUS_COLORS, todayISO, logActivity, mergeOptions, inDateRange, getFieldOptions, colorMap } from '@/lib/studio';
 import { EditPillSelect, EditSelect, MiniSelect, InlineText, InlineDate } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import QuickLinks from './QuickLinks';
 import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal } from './CustomColumns';
+import FieldOptionsManager from './FieldOptionsManager';
 
 type SortKey = 'date_added' | 'angle';
 const TABLE_KEY = 'ad';
@@ -37,14 +38,19 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   const [expanded, setExpanded] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mgrOpen, setMgrOpen] = useState(false);
+  const [optsField, setOptsField] = useState<{ field: string; title: string } | null>(null);
 
   const cprops = useMemo(() => sortProps(properties, TABLE_KEY), [properties]);
   const optsByProp = useMemo(() => groupOptions(customOptions), [customOptions]);
 
   const custom = (field: string) => dropdownOptions.filter(o => o.field === field).map(o => o.value);
   const presentAngles = Array.from(new Set(adCreatives.map(a => a.angle).filter(Boolean) as string[]));
-  const formatOpts = mergeOptions(AD_FORMATS, custom('ad_format'));
-  const statusOpts = mergeOptions(AD_STATUSES, custom('ad_status'));
+  const statusFieldOpts = getFieldOptions(dropdownOptions, 'ad_status', AD_STATUSES, AD_STATUS_COLORS);
+  const statusValues = statusFieldOpts.map(o => o.value);
+  const statusColors = colorMap(statusFieldOpts);
+  const formatFieldOpts = getFieldOptions(dropdownOptions, 'ad_format', AD_FORMATS);
+  const formatValues = formatFieldOpts.map(o => o.value);
+  const formatColors = colorMap(formatFieldOpts);
   const angleOpts = mergeOptions(custom('ad_angle'), presentAngles);
 
   async function addOption(field: string, value: string) {
@@ -113,12 +119,12 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   const fields: FieldDef[] = useMemo(() => [
     { key: 'creative_id', label: 'Creative ID', type: 'text', placeholder: 'Name / identifier' },
     { key: 'date_added', label: 'Date Added', type: 'date' },
-    { key: 'ad_format', label: 'Format', type: 'select', field: 'ad_format', options: formatOpts },
+    { key: 'ad_format', label: 'Format', type: 'pill', field: 'ad_format', options: formatValues, colors: formatColors, allowAdd: false, allowEmpty: true },
     { key: 'angle', label: 'Angle', type: 'select', field: 'ad_angle', options: angleOpts },
     { key: 'hook', label: 'Hook', type: 'text', placeholder: 'Hook' },
     { key: 'buyer_feedback', label: 'Buyer Feedback', type: 'textarea', placeholder: 'Buyer feedback…' },
-    { key: 'status', label: 'Status', type: 'pill', field: 'ad_status', options: statusOpts, colors: AD_STATUS_COLORS },
-  ], [formatOpts, angleOpts, statusOpts]);
+    { key: 'status', label: 'Status', type: 'pill', field: 'ad_status', options: statusValues, colors: statusColors, allowAdd: false },
+  ], [formatValues, formatColors, angleOpts, statusValues, statusColors]);
 
   const selected = selectedId ? adCreatives.find(a => a.id === selectedId) : null;
 
@@ -158,12 +164,12 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                 <tr>
                   <th style={{ minWidth: 160 }}>Creative ID</th>
                   <th>Date Added</th>
-                  <th>Format</th>
+                  <th onClick={isAdmin ? () => setOptsField({ field: 'ad_format', title: 'Format' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Format{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <th>Angle</th>
                   <th>Hook</th>
                   <th>Buyer Feedback</th>
                   <th>Iterate</th>
-                  <th>Status</th>
+                  <th onClick={isAdmin ? () => setOptsField({ field: 'ad_status', title: 'Status' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Status{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <CustomHeaderCells props={cprops} isAdmin={isAdmin} onManage={() => setMgrOpen(true)} />
                   <th></th>
                 </tr>
@@ -176,7 +182,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                         <button onClick={() => setSelectedId(a.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{a.creative_id || 'Untitled'}</button>
                       </td>
                       <td><InlineDate value={a.date_added} onCommit={d => patch(a.id, { date_added: d || undefined })} /></td>
-                      <td><EditSelect field="ad_format" value={a.ad_format} options={formatOpts} onChange={f => patch(a.id, { ad_format: f })} onAddOption={addOption} placeholder="—" /></td>
+                      <td><EditPillSelect field="ad_format" value={a.ad_format || ''} options={formatValues} colors={formatColors} onChange={f => patch(a.id, { ad_format: f })} allowAdd={false} allowEmpty /></td>
                       <td><EditSelect field="ad_angle" value={a.angle} options={angleOpts} onChange={x => patch(a.id, { angle: x })} onAddOption={addOption} placeholder="—" /></td>
                       <td><InlineText value={a.hook} onCommit={t => patch(a.id, { hook: t })} placeholder="—" style={{ width: 110 }} /></td>
                       <td>
@@ -187,7 +193,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                       <td>
                         <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px', color: 'var(--accent)' }} onClick={() => handleIterate(a)} title="Trigger iteration">↻ Iterate</button>
                       </td>
-                      <td><EditPillSelect field="ad_status" value={a.status} options={statusOpts} colors={AD_STATUS_COLORS} onChange={s => changeStatus(a, s)} onAddOption={addOption} /></td>
+                      <td><EditPillSelect field="ad_status" value={a.status} options={statusValues} colors={statusColors} onChange={s => changeStatus(a, s)} allowAdd={false} /></td>
                       <CustomRowCells row={a} props={cprops} optionsByProp={optsByProp} onPatch={patch} />
                       <td><button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteAd(a.id)}>✕</button></td>
                     </tr>
@@ -227,6 +233,9 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
 
       {mgrOpen && (
         <PropertyManagerModal tableKey={TABLE_KEY} properties={properties} options={customOptions} onClose={() => setMgrOpen(false)} onReload={onReload} />
+      )}
+      {optsField && (
+        <FieldOptionsManager field={optsField.field} title={optsField.title} options={dropdownOptions} onClose={() => setOptsField(null)} onReload={onReload} />
       )}
     </div>
   );

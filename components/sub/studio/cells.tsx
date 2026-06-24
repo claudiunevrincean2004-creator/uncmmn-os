@@ -118,14 +118,16 @@ export function EditSelect({
   onAddOption,
   placeholder,
   width,
+  allowAdd = true,
 }: {
   field: string;
   options: string[];
   value?: string;
   onChange: (v: string) => void;
-  onAddOption: (field: string, value: string) => void;
+  onAddOption?: (field: string, value: string) => void;
   placeholder?: string;
   width?: number | string;
+  allowAdd?: boolean;
 }) {
   // Always keep the current value selectable even if it isn't in the option list
   const opts = value && !options.includes(value) ? [value, ...options] : options;
@@ -133,7 +135,7 @@ export function EditSelect({
     if (v === ADD_NEW) {
       const entered = window.prompt(`Add new ${field.replace(/_/g, ' ')} option:`);
       const t = entered?.trim();
-      if (t) { onAddOption(field, t); onChange(t); }
+      if (t) { onAddOption?.(field, t); onChange(t); }
       return;
     }
     onChange(v);
@@ -147,7 +149,7 @@ export function EditSelect({
     >
       {placeholder && <option value="">{placeholder}</option>}
       {opts.map(o => <option key={o} value={o}>{o}</option>)}
-      <option value={ADD_NEW}>+ Add new…</option>
+      {allowAdd && <option value={ADD_NEW}>+ Add new…</option>}
     </select>
   );
 }
@@ -160,13 +162,17 @@ export function EditPillSelect({
   colors,
   onChange,
   onAddOption,
+  allowAdd = true,
+  allowEmpty = false,
 }: {
   field: string;
   options: string[];
   value: string;
   colors: Record<string, string>;
   onChange: (v: string) => void;
-  onAddOption: (field: string, value: string) => void;
+  onAddOption?: (field: string, value: string) => void;
+  allowAdd?: boolean;
+  allowEmpty?: boolean;
 }) {
   const color = colors[value] || '#6b7280';
   const opts = value && !options.includes(value) ? [value, ...options] : options;
@@ -174,7 +180,7 @@ export function EditPillSelect({
     if (v === ADD_NEW) {
       const entered = window.prompt(`Add new ${field.replace(/_/g, ' ')} option:`);
       const t = entered?.trim();
-      if (t) { onAddOption(field, t); onChange(t); }
+      if (t) { onAddOption?.(field, t); onChange(t); }
       return;
     }
     onChange(v);
@@ -197,13 +203,27 @@ export function EditPillSelect({
       }}
       title="Click to change"
     >
+      {allowEmpty && <option value="" style={{ background: 'var(--surface-2)', color: 'var(--text)', fontWeight: 600 }}>—</option>}
       {opts.map(o => <option key={o} value={o} style={{ background: 'var(--surface-2)', color: 'var(--text)', fontWeight: 600 }}>{o}</option>)}
-      <option value={ADD_NEW} style={{ background: 'var(--surface-2)', color: 'var(--text)', fontWeight: 600 }}>+ Add new…</option>
+      {allowAdd && <option value={ADD_NEW} style={{ background: 'var(--surface-2)', color: 'var(--text)', fontWeight: 600 }}>+ Add new…</option>}
     </select>
   );
 }
 
-// A clickable external-link icon with an inline-editable URL behind a pencil.
+// Short, readable form of a URL — e.g. "drive.google.com/folders/1A…"
+export function shortUrl(raw: string, max = 30): string {
+  let s = raw;
+  try {
+    const u = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+    s = u.hostname.replace(/^www\./, '') + (u.pathname === '/' ? '' : u.pathname) + (u.search || '');
+  } catch {
+    s = raw.replace(/^https?:\/\//i, '').replace(/^www\./, '');
+  }
+  s = s.replace(/\/$/, '');
+  return s.length > max ? s.slice(0, max - 1) + '…' : s;
+}
+
+// A clickable, readable link (short URL) with an inline-editable URL behind a pencil.
 export function UrlCell({
   value,
   onCommit,
@@ -231,21 +251,21 @@ export function UrlCell({
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, maxWidth: 200 }}>
       {value ? (
         <a
           href={value}
           target="_blank"
           rel="noopener noreferrer"
-          style={{ color: 'var(--accent)', textDecoration: 'none', fontSize: 13 }}
+          style={{ color: 'var(--accent)', textDecoration: 'none', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
           title={value}
-        >↗</a>
+        >{shortUrl(value)}</a>
       ) : (
         <span style={{ color: 'var(--text-faint)' }}>—</span>
       )}
       <button
         onClick={() => setEditing(true)}
-        style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 11, padding: 0 }}
+        style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 11, padding: 0, flexShrink: 0 }}
         title={value ? 'Edit link' : 'Add link'}
       >✎</button>
     </div>

@@ -3,10 +3,11 @@ import { Fragment, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StudioSession, StudioComment, StudioActivity, StudioDropdownOption, CustomProperty, CustomPropertyOption } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
-import { SESSION_STATUSES, SESSION_STATUS_COLORS, todayISO, logActivity, mergeOptions, inDateRange } from '@/lib/studio';
+import { SESSION_STATUSES, SESSION_STATUS_COLORS, todayISO, logActivity, inDateRange, getFieldOptions, colorMap } from '@/lib/studio';
 import { InlineText, EditPillSelect, MiniSelect, UrlCell, InlineDate, InlineNumber } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal } from './CustomColumns';
+import FieldOptionsManager from './FieldOptionsManager';
 
 const TABLE_KEY = 'session';
 
@@ -30,12 +31,14 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
   const [expanded, setExpanded] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mgrOpen, setMgrOpen] = useState(false);
+  const [optsField, setOptsField] = useState<{ field: string; title: string } | null>(null);
 
   const cprops = useMemo(() => sortProps(properties, TABLE_KEY), [properties]);
   const optsByProp = useMemo(() => groupOptions(customOptions), [customOptions]);
 
-  const custom = (field: string) => dropdownOptions.filter(o => o.field === field).map(o => o.value);
-  const statusOpts = mergeOptions(SESSION_STATUSES, custom('session_status'));
+  const statusFieldOpts = getFieldOptions(dropdownOptions, 'session_status', SESSION_STATUSES, SESSION_STATUS_COLORS);
+  const statusValues = statusFieldOpts.map(o => o.value);
+  const statusColors = colorMap(statusFieldOpts);
 
   async function addOption(field: string, value: string) {
     if (!dropdownOptions.some(o => o.field === field && o.value.toLowerCase() === value.toLowerCase())) {
@@ -91,11 +94,11 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
     { key: 'name', label: 'Session / Desc', type: 'textarea', placeholder: 'Session name / description' },
     { key: 'script_url', label: 'Link to Script', type: 'url' },
     { key: 'date', label: 'Date', type: 'date' },
-    { key: 'status', label: 'Status', type: 'pill', field: 'session_status', options: statusOpts, colors: SESSION_STATUS_COLORS },
+    { key: 'status', label: 'Status', type: 'pill', field: 'session_status', options: statusValues, colors: statusColors, allowAdd: false },
     { key: 'videos_planned', label: 'Videos to Film', type: 'number' },
     { key: 'videos_filmed', label: 'Videos Filmed', type: 'number' },
     { key: 'notes', label: 'Notes', type: 'textarea', placeholder: 'Add notes…' },
-  ], [statusOpts]);
+  ], [statusValues, statusColors]);
 
   const selected = selectedId ? sessions.find(s => s.id === selectedId) : null;
 
@@ -128,7 +131,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                   <th style={{ minWidth: 180 }}>Session / Description</th>
                   <th>Script</th>
                   <th>Date</th>
-                  <th>Status</th>
+                  <th onClick={isAdmin ? () => setOptsField({ field: 'session_status', title: 'Status' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Status{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <th>To Film</th>
                   <th>Filmed</th>
                   <th style={{ minWidth: 120 }}>Completion</th>
@@ -151,7 +154,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                         </td>
                         <td><UrlCell value={s.script_url} onCommit={u => patch(s.id, { script_url: u })} /></td>
                         <td><InlineDate value={s.date} onCommit={d => patch(s.id, { date: d || undefined })} /></td>
-                        <td><EditPillSelect field="session_status" value={s.status} options={statusOpts} colors={SESSION_STATUS_COLORS} onChange={st => changeStatus(s, st)} onAddOption={addOption} /></td>
+                        <td><EditPillSelect field="session_status" value={s.status} options={statusValues} colors={statusColors} onChange={st => changeStatus(s, st)} allowAdd={false} /></td>
                         <td style={{ textAlign: 'center' }}><InlineNumber value={planned} onCommit={n => patch(s.id, { videos_planned: n })} /></td>
                         <td style={{ textAlign: 'center' }}><InlineNumber value={filmed} onCommit={n => patch(s.id, { videos_filmed: n })} /></td>
                         <td style={{ minWidth: 120 }}>
@@ -207,6 +210,9 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
 
       {mgrOpen && (
         <PropertyManagerModal tableKey={TABLE_KEY} properties={properties} options={customOptions} onClose={() => setMgrOpen(false)} onReload={onReload} />
+      )}
+      {optsField && (
+        <FieldOptionsManager field={optsField.field} title={optsField.title} options={dropdownOptions} onClose={() => setOptsField(null)} onReload={onReload} />
       )}
     </div>
   );
