@@ -28,6 +28,7 @@ const PAGE_LABELS: Record<MainPage, string> = {
   research: 'Research',
   goals: 'Goals',
   drive: 'Drive',
+  studio: 'Studio',
 };
 
 export default function Home() {
@@ -47,7 +48,7 @@ export default function Home() {
 
   // Migrate stale persisted page values from prior builds
   useEffect(() => {
-    if (!(['dashboard', 'content', 'research', 'goals', 'drive'] as const).includes(mainPage)) {
+    if (!(['dashboard', 'content', 'research', 'goals', 'drive', 'studio'] as const).includes(mainPage)) {
       setMainPage('dashboard');
     }
   }, [mainPage, setMainPage]);
