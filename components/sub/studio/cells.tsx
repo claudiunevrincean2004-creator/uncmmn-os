@@ -91,7 +91,7 @@ export function MiniSelect({
   options: string[];
   onChange: (v: string) => void;
   placeholder?: string;
-  width?: number;
+  width?: number | string;
 }) {
   return (
     <select

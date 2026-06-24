@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { checkSchema, getMigrationSQL } from '@/lib/setup-db';
-import { Client, Post, Goal, DriveFolder, SubscriberSnapshot, ResearchItem, StudioVideo, StudioSequence, StudioSession, MainPage } from '@/lib/types';
+import { Client, Post, Goal, DriveFolder, SubscriberSnapshot, ResearchItem, StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity, MainPage } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 
 import Sidebar from '@/components/Sidebar';
@@ -42,6 +42,9 @@ export default function Home() {
   const [studioVideos, setStudioVideos] = useState<StudioVideo[]>([]);
   const [studioSequences, setStudioSequences] = useState<StudioSequence[]>([]);
   const [studioSessions, setStudioSessions] = useState<StudioSession[]>([]);
+  const [studioAdCreatives, setStudioAdCreatives] = useState<StudioAdCreative[]>([]);
+  const [studioComments, setStudioComments] = useState<StudioComment[]>([]);
+  const [studioActivity, setStudioActivity] = useState<StudioActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [schemaMissing, setSchemaMissing] = useState<{ missing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[] } | null>(null);
   const [showMigrationSQL, setShowMigrationSQL] = useState(false);
@@ -57,7 +60,7 @@ export default function Home() {
   }, [mainPage, setMainPage]);
 
   const loadData = useCallback(async () => {
-    const [c, p, g, d, ss, ri, sv, sq, sn] = await Promise.all([
+    const [c, p, g, d, ss, ri, sv, sq, sn, ac, cm, av] = await Promise.all([
       safeSelect('clients', 'created_at'),
       safeSelect('posts', 'date', false),
       safeSelect('goals', 'created_at'),
@@ -67,6 +70,9 @@ export default function Home() {
       safeSelect('studio_videos', 'created_at', false),
       safeSelect('studio_sequences', 'created_at', false),
       safeSelect('studio_sessions', 'created_at', false),
+      safeSelect('studio_ad_creatives', 'created_at', false),
+      safeSelect('studio_comments', 'created_at'),
+      safeSelect('studio_activity', 'created_at', false),
     ]);
 
     let active = (c as Client[])[0] || null;
@@ -89,6 +95,9 @@ export default function Home() {
     setStudioVideos(sv as StudioVideo[]);
     setStudioSequences(sq as StudioSequence[]);
     setStudioSessions(sn as StudioSession[]);
+    setStudioAdCreatives(ac as StudioAdCreative[]);
+    setStudioComments(cm as StudioComment[]);
+    setStudioActivity(av as StudioActivity[]);
     setLoading(false);
   }, []);
 
@@ -235,6 +244,9 @@ export default function Home() {
                 videos={studioVideos}
                 sequences={studioSequences}
                 sessions={studioSessions}
+                adCreatives={studioAdCreatives}
+                comments={studioComments}
+                activity={studioActivity}
                 onReload={loadData}
               />
             </div>

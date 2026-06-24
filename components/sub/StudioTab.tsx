@@ -1,29 +1,44 @@
 'use client';
-import { useMemo } from 'react';
-import { StudioVideo, StudioSequence, StudioSession } from '@/lib/types';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { todayISO, addDaysISO } from '@/lib/studio';
 import VideoReview from './studio/VideoReview';
 import StorySequences from './studio/StorySequences';
 import FilmingSessions from './studio/FilmingSessions';
+import AdCreative from './studio/AdCreative';
 
-type SubTab = 'videos' | 'sequences' | 'sessions';
+type SubTab = 'videos' | 'sequences' | 'sessions' | 'ads';
 
 const SUBTABS: { key: SubTab; label: string }[] = [
   { key: 'videos', label: 'Video Review' },
   { key: 'sequences', label: 'Story Sequences' },
   { key: 'sessions', label: 'Filming Sessions' },
+  { key: 'ads', label: 'Ad Creative' },
 ];
 
 interface Props {
   videos: StudioVideo[];
   sequences: StudioSequence[];
   sessions: StudioSession[];
+  adCreatives: StudioAdCreative[];
+  comments: StudioComment[];
+  activity: StudioActivity[];
   onReload: () => void;
 }
 
-export default function StudioTab({ videos, sequences, sessions, onReload }: Props) {
+export default function StudioTab({ videos, sequences, sessions, adCreatives, comments, activity, onReload }: Props) {
   const [sub, setSub] = usePersistedState<SubTab>('studio_subtab', 'videos');
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function showToast(msg: string) {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast(msg);
+    toastTimer.current = setTimeout(() => setToast(null), 3500);
+  }
+
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
   const stats = useMemo(() => {
     const today = todayISO();
@@ -57,7 +72,7 @@ export default function StudioTab({ videos, sequences, sessions, onReload }: Pro
   ];
 
   return (
-    <div>
+    <div style={{ position: 'relative' }}>
       {/* Overview bar */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 16 }}>
         {overviewItems.map(item => (
@@ -77,9 +92,36 @@ export default function StudioTab({ videos, sequences, sessions, onReload }: Pro
         ))}
       </div>
 
-      {sub === 'videos' && <VideoReview videos={videos} onReload={onReload} />}
-      {sub === 'sequences' && <StorySequences sequences={sequences} onReload={onReload} />}
-      {sub === 'sessions' && <FilmingSessions sessions={sessions} onReload={onReload} />}
+      {sub === 'videos' && <VideoReview videos={videos} comments={comments} activity={activity} onReload={onReload} showToast={showToast} />}
+      {sub === 'sequences' && <StorySequences sequences={sequences} comments={comments} activity={activity} onReload={onReload} />}
+      {sub === 'sessions' && <FilmingSessions sessions={sessions} comments={comments} activity={activity} onReload={onReload} />}
+      {sub === 'ads' && <AdCreative adCreatives={adCreatives} comments={comments} activity={activity} onReload={onReload} />}
+
+      {/* Toast */}
+      {toast && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            background: '#0d0d0d',
+            border: '0.5px solid #ec4899',
+            borderRadius: 8,
+            padding: '10px 16px',
+            fontSize: 12,
+            color: '#fff',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+            zIndex: 2000,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            animation: 'slideInRight 0.2s ease',
+          }}
+        >
+          <span style={{ color: '#ec4899' }}>✦</span>
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

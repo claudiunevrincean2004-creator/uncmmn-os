@@ -1,4 +1,5 @@
 // Studio tab — shared option lists, color maps and helpers
+import { supabase } from './supabase';
 
 export const VIDEO_FORMATS = ['Short', 'Long Form', 'Reel', 'Story', 'Other'];
 
@@ -12,19 +13,36 @@ export const VIDEO_STATUSES = [
   'Editing',
   'In Review',
   'Revision Requested',
+  'Ad Variation Needed',
   'Approved',
   'Posted',
 ];
 
 export const VIDEO_STATUS_COLORS: Record<string, string> = {
-  'Scripting': '#6b7280',          // gray
-  'Recording': '#3b82f6',          // blue
-  'Raw Footage Ready': '#eab308',  // yellow
-  'Editing': '#f59e0b',            // orange
-  'In Review': '#8b5cf6',          // purple
-  'Revision Requested': '#ef4444', // red
-  'Approved': '#10b981',           // green
-  'Posted': '#14b8a6',             // teal
+  'Scripting': '#6b7280',           // gray
+  'Recording': '#3b82f6',           // blue
+  'Raw Footage Ready': '#eab308',   // yellow
+  'Editing': '#f59e0b',             // orange
+  'In Review': '#8b5cf6',           // purple
+  'Revision Requested': '#ef4444',  // red
+  'Ad Variation Needed': '#ec4899', // pink
+  'Approved': '#10b981',            // green
+  'Posted': '#14b8a6',              // teal
+};
+
+// Ad Creative pipeline
+export const AD_FORMATS = ['Story Ad', 'Feed Ad', 'Spark Ad', 'Carousel', 'Other'];
+export const CTA_TYPES = ['Shop Now', 'Learn More', 'Follow', 'DM Us', 'Link in Bio', 'Custom'];
+export const AD_STATUSES = ['Pending', 'In Progress', 'In Review', 'Revision Requested', 'Approved', 'Live'];
+export const AD_PLATFORMS = ['TikTok Ads', 'Meta Ads', 'YouTube Ads', 'Both'];
+
+export const AD_STATUS_COLORS: Record<string, string> = {
+  Pending: '#6b7280',                // gray
+  'In Progress': '#f59e0b',          // orange
+  'In Review': '#8b5cf6',            // purple
+  'Revision Requested': '#ef4444',   // red
+  Approved: '#10b981',               // green
+  Live: '#14b8a6',                   // teal
 };
 
 export const PRIORITIES = ['Low', 'Normal', 'High', 'Urgent'];
@@ -94,8 +112,31 @@ export function isOverdue(dateStr: string | undefined, status: string, doneStatu
   return dateStr.slice(0, 10) < todayISO();
 }
 
-// Structured status-change log (placeholder for future Slack integration)
-export function logStatusChange(entity: string, id: string, from: string, to: string): void {
-  // eslint-disable-next-line no-console
-  console.log(`[studio] ${entity} ${id} status: "${from}" → "${to}" @ ${new Date().toISOString()}`);
+// Persist an entry to the studio_activity log (also handy for future Slack integration)
+export async function logActivity(
+  itemType: string,
+  itemId: string,
+  action: string,
+  oldValue: string | null,
+  newValue: string | null,
+): Promise<void> {
+  await supabase.from('studio_activity').insert([{
+    item_type: itemType,
+    item_id: itemId,
+    action,
+    old_value: oldValue,
+    new_value: newValue,
+  }]);
+}
+
+// Format an ISO timestamp like "Apr 25 at 3:45pm"
+export function formatActivityTime(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const date = d.toLocaleString('default', { month: 'short', day: 'numeric' });
+  let h = d.getHours();
+  const m = String(d.getMinutes()).padStart(2, '0');
+  const ampm = h >= 12 ? 'pm' : 'am';
+  h = h % 12 || 12;
+  return `${date} at ${h}:${m}${ampm}`;
 }

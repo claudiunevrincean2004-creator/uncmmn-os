@@ -90,6 +90,40 @@ export interface StudioSequence {
   created_at?: string;
 }
 
+export interface StudioAdCreative {
+  id: string;
+  source_video_title?: string;
+  source_video_url?: string;
+  ad_format?: string;
+  cta_type?: string;
+  custom_cta?: string;
+  status: string;
+  creative_url?: string;
+  platform?: string;
+  deadline?: string;
+  notes?: string;
+  assigned_to?: string;
+  created_at?: string;
+}
+
+export interface StudioComment {
+  id: string;
+  item_type: string;
+  item_id: string;
+  text: string;
+  created_at?: string;
+}
+
+export interface StudioActivity {
+  id: string;
+  item_type: string;
+  item_id: string;
+  action?: string;
+  old_value?: string;
+  new_value?: string;
+  created_at?: string;
+}
+
 export interface StudioSession {
   id: string;
   name: string;

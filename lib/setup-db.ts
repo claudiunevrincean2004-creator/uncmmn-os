@@ -5,6 +5,7 @@ export async function checkSchema(): Promise<{ missing: string[]; postColumnsMis
     'clients', 'posts', 'goals', 'drive_folders',
     'subscriber_snapshots', 'research_items', 'revenue_entries',
     'studio_videos', 'studio_sequences', 'studio_sessions',
+    'studio_ad_creatives', 'studio_comments', 'studio_activity',
   ];
 
   const missing: string[] = [];
@@ -189,6 +190,55 @@ create policy "anon_all_studio_sequences" on studio_sequences for all to anon us
 alter table studio_sessions enable row level security;
 drop policy if exists "anon_all_studio_sessions" on studio_sessions;
 create policy "anon_all_studio_sessions" on studio_sessions for all to anon using (true) with check (true);`);
+  }
+
+  if (missing.includes('studio_ad_creatives')) {
+    parts.push(`create table if not exists studio_ad_creatives (
+  id uuid primary key default gen_random_uuid(),
+  source_video_title text,
+  source_video_url text,
+  ad_format text,
+  cta_type text,
+  custom_cta text,
+  status text default 'Pending',
+  creative_url text,
+  platform text,
+  deadline date,
+  notes text,
+  assigned_to text,
+  created_at timestamptz default now()
+);
+alter table studio_ad_creatives enable row level security;
+drop policy if exists "anon_all_studio_ad_creatives" on studio_ad_creatives;
+create policy "anon_all_studio_ad_creatives" on studio_ad_creatives for all to anon using (true) with check (true);`);
+  }
+
+  if (missing.includes('studio_comments')) {
+    parts.push(`create table if not exists studio_comments (
+  id uuid primary key default gen_random_uuid(),
+  item_type text not null,
+  item_id uuid not null,
+  text text not null,
+  created_at timestamptz default now()
+);
+alter table studio_comments enable row level security;
+drop policy if exists "anon_all_studio_comments" on studio_comments;
+create policy "anon_all_studio_comments" on studio_comments for all to anon using (true) with check (true);`);
+  }
+
+  if (missing.includes('studio_activity')) {
+    parts.push(`create table if not exists studio_activity (
+  id uuid primary key default gen_random_uuid(),
+  item_type text not null,
+  item_id uuid not null,
+  action text,
+  old_value text,
+  new_value text,
+  created_at timestamptz default now()
+);
+alter table studio_activity enable row level security;
+drop policy if exists "anon_all_studio_activity" on studio_activity;
+create policy "anon_all_studio_activity" on studio_activity for all to anon using (true) with check (true);`);
   }
 
   if (researchColumnsMissing.includes('title')) {
