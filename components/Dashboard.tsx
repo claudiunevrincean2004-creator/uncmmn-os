@@ -112,21 +112,16 @@ export default function Dashboard({ client, posts, subscriberSnapshots }: Props)
         <div className="metric-chip">
           <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>Total Views</div>
           <div className="kpi-num" style={{ fontSize: 30 }}>{fn(totalViews)}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 4 }}>this month</div>
         </div>
         <div className="metric-chip">
           <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>Followers Gained</div>
           <div className="kpi-num" style={{ fontSize: 30, color: followersGainedAvailable ? (followersGained >= 0 ? 'var(--pos)' : 'var(--neg)') : 'var(--text-faint)' }}>
             {followersGainedAvailable ? `${followersGained >= 0 ? '+' : ''}${fn(followersGained)}` : '—'}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 4 }}>
-            {followersGainedAvailable ? 'TikTok + YouTube' : 'Need 2+ snapshots'}
-          </div>
         </div>
         <div className="metric-chip">
           <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>Total Posts</div>
           <div className="kpi-num" style={{ fontSize: 30 }}>{totalPosts}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 4 }}>this month</div>
         </div>
       </div>
 

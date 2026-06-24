@@ -6,20 +6,7 @@ import { fn, er, avg } from '@/lib/utils';
 import PlatformIcon from '@/components/PlatformIcon';
 import PostModal from '@/components/modals/PostModal';
 import { usePersistedState } from '@/lib/use-persisted-state';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-} from 'chart.js';
-import { Line } from 'react-chartjs-2';
-
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
+import ViewsOverTime from '@/components/ViewsOverTime';
 
 type SortKey = 'date' | 'views' | 'likes' | 'comments' | 'shares' | 'saves' | 'follows' | 'er';
 type SortDir = 'asc' | 'desc';
@@ -184,102 +171,26 @@ export default function ContentTab({ client, posts, subscriberSnapshots, onReloa
   const prevFollowersGained = followersGainedFor(activePlat, prevRange, prevPeriodPosts);
   const prevAvgEr = aggregateEr(prevPeriodPosts);
 
-  // Growth chart data by month for the selected platform & period
-  const monthlyData = useMemo(() => {
-    const map: Record<string, { views: number; follows: number }> = {};
-    periodPosts.forEach(p => {
+  // Daily views for the last 30 days, scoped to the selected platform (gaps filled with 0)
+  const dailyViews = useMemo(() => {
+    const map: Record<string, number> = {};
+    platformPostsAll.forEach(p => {
       if (!p.date) return;
-      const key = p.date.slice(0, 7);
-      if (!map[key]) map[key] = { views: 0, follows: 0 };
-      map[key].views += p.views || 0;
-      if (activePlat === 'Instagram' || (activePlat === 'All' && p.platform.toLowerCase() === 'instagram')) {
-        map[key].follows += p.follows || 0;
-      }
+      const key = p.date.slice(0, 10);
+      map[key] = (map[key] || 0) + (p.views || 0);
     });
-
-    function addSnapshotDeltas(snaps: SubscriberSnapshot[]) {
-      const byMonth: Record<string, number[]> = {};
-      snaps.forEach(s => {
-        if (!inRange(s.date, currentRange)) return;
-        const key = s.date.slice(0, 7);
-        if (!byMonth[key]) byMonth[key] = [];
-        byMonth[key].push(Number(s.subscriber_count));
-      });
-      Object.entries(byMonth).forEach(([key, arr]) => {
-        const delta = arr.length >= 2 ? Math.max(...arr) - Math.min(...arr) : 0;
-        if (!map[key]) map[key] = { views: 0, follows: 0 };
-        map[key].follows += delta;
-      });
+    const pad = (x: number) => String(x).padStart(2, '0');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const days: { date: string; views: number }[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const key = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      days.push({ date: key, views: map[key] || 0 });
     }
-    if (activePlat === 'TikTok') addSnapshotDeltas(tiktokSnaps);
-    else if (activePlat === 'YouTube') addSnapshotDeltas(youtubeSnaps);
-    else if (activePlat === 'All') {
-      addSnapshotDeltas(tiktokSnaps);
-      addSnapshotDeltas(youtubeSnaps);
-    }
-    return map;
-  }, [periodPosts, activePlat, tiktokSnaps, youtubeSnaps, currentRange]);
-
-  const chartKeys = Object.keys(monthlyData).sort();
-  const chartLabels = chartKeys.map(k => {
-    const [y, m] = k.split('-');
-    return new Date(parseInt(y), parseInt(m) - 1).toLocaleString('default', { month: 'short', year: '2-digit' });
-  });
-  const chartViews = chartKeys.map(k => monthlyData[k].views);
-  const chartFollows = chartKeys.map(k => monthlyData[k].follows);
-
-  const chartData = {
-    labels: chartLabels,
-    datasets: [
-      {
-        label: 'Views',
-        data: chartViews,
-        borderColor: '#7C83F3',
-        backgroundColor: 'rgba(124,131,243,0.14)',
-        tension: 0.4,
-        fill: true,
-        pointRadius: 3,
-        pointBackgroundColor: '#7C83F3',
-        yAxisID: 'y',
-        borderWidth: 1.5,
-      },
-      {
-        label: 'Followers',
-        data: chartFollows,
-        borderColor: '#22C3A6',
-        backgroundColor: 'rgba(34,195,166,0.12)',
-        tension: 0.4,
-        fill: true,
-        pointRadius: 3,
-        pointBackgroundColor: '#22C3A6',
-        yAxisID: 'y1',
-        borderWidth: 1.5,
-      },
-    ],
-  };
-
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: { mode: 'index' as const, intersect: false },
-    plugins: {
-      legend: { labels: { color: '#8A90A2', font: { size: 11 }, boxWidth: 12 } },
-      tooltip: {
-        backgroundColor: '#12141D',
-        borderColor: '#33394D',
-        borderWidth: 1,
-        titleColor: '#F1F3F8',
-        bodyColor: '#9AA2B4',
-        titleFont: { size: 12 },
-        bodyFont: { size: 11 },
-      },
-    },
-    scales: {
-      x: { grid: { color: 'rgba(127,127,127,0.14)' }, ticks: { color: '#8A90A2', font: { size: 10 } } },
-      y: { grid: { color: 'rgba(127,127,127,0.14)' }, ticks: { color: '#8A90A2', font: { size: 10 } }, position: 'left' as const },
-      y1: { grid: { display: false }, ticks: { color: '#22C3A6', font: { size: 10 } }, position: 'right' as const },
-    },
-  };
+    return days;
+  }, [platformPostsAll]);
 
   // Outliers within the selected period for the selected platform
   const periodAvgViews = avg(periodPosts.map(p => p.views));
@@ -444,34 +355,21 @@ export default function ContentTab({ client, posts, subscriberSnapshots, onReloa
           return (
             <div key={c.label} className="metric-chip">
               <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>{c.label}</div>
-              <div className="kpi-num" style={{ fontSize: 30, marginBottom: 4, color: c.color || 'var(--text)' }}>{c.value}</div>
-              {showDelta ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div className="kpi-num" style={{ fontSize: 30, color: c.color || 'var(--text)' }}>{c.value}</div>
+              {showDelta && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6 }}>
                   <span className={`badge ${c.diff >= 0 ? 'badge-up' : 'badge-down'}`}>{c.diff >= 0 ? '+' : ''}{c.diff.toFixed(1)}%</span>
                   <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>vs prev period</span>
                 </div>
-              ) : (
-                <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{c.sub}</div>
               )}
             </div>
           );
         })}
       </div>
 
-      {/* Growth chart */}
-      <div className="card" style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 11, color: 'var(--text-faint)', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          Growth Trend{activePlat !== 'All' ? ` — ${activePlat}` : ''}
-        </div>
-        <div style={{ height: 220 }}>
-          {chartLabels.length > 0 ? (
-            <Line data={chartData} options={chartOptions} />
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-faint)', fontSize: 12 }}>
-              No data in this period
-            </div>
-          )}
-        </div>
+      {/* Views over time */}
+      <div style={{ marginBottom: 14 }}>
+        <ViewsOverTime data={dailyViews} />
       </div>
 
       {/* Outlier posts */}
