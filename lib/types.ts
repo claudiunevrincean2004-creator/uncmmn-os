@@ -61,7 +61,47 @@ export interface RevenueEntry {
   created_at?: string;
 }
 
-export type MainPage = 'dashboard' | 'content' | 'research' | 'goals' | 'drive';
+export type MainPage = 'dashboard' | 'content' | 'research' | 'goals' | 'drive' | 'studio';
+
+export interface StudioVideo {
+  id: string;
+  title: string;
+  format?: string;
+  assigned_to?: string;
+  status: string;
+  priority: string;
+  brief_url?: string;
+  raw_files_url?: string;
+  final_url?: string;
+  deadline?: string;
+  notes?: string;
+  revision_count: number;
+  created_at?: string;
+}
+
+export interface StudioSequence {
+  id: string;
+  title: string;
+  status: string;
+  final_url?: string;
+  scheduled_date?: string;
+  platform?: string;
+  notes?: string;
+  created_at?: string;
+}
+
+export interface StudioSession {
+  id: string;
+  name: string;
+  script_url?: string;
+  date?: string;
+  location?: string;
+  status: string;
+  videos_planned: number;
+  videos_filmed: number;
+  notes?: string;
+  created_at?: string;
+}
 
 export type ResearchStatus = 'unused' | 'progress' | 'used';
 
