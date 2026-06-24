@@ -1,6 +1,8 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { Role, canAccess } from '@/lib/auth-config';
 import { checkSchema, getMigrationSQL } from '@/lib/setup-db';
 import { Client, Post, DriveFolder, SubscriberSnapshot, ResearchItem, StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, MainPage } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
@@ -59,6 +61,8 @@ export default function Home() {
   const [mainPage, setMainPage] = usePersistedState<MainPage>('main_page', 'dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = usePersistedState<boolean>('sidebar_collapsed', false);
   const [theme, setTheme] = useState<'aurora' | 'midnight'>('aurora');
+  const router = useRouter();
+  const [role, setRole] = useState<Role | null>(null);
 
   // Sync theme from storage on mount (the layout script already applied it pre-paint)
   useEffect(() => {
@@ -76,6 +80,31 @@ export default function Home() {
       return next;
     });
   }
+
+  // Resolve the signed-in user's role (middleware already guarantees a session here)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.replace('/login'); return; }
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+      if (cancelled) return;
+      setRole(profile?.role === 'admin' ? 'admin' : 'editor');
+    })();
+    return () => { cancelled = true; };
+  }, [router]);
+
+  async function signOut() {
+    await supabase.auth.signOut();
+    router.replace('/login');
+  }
+
+  // Layer 2 — editors are confined to their allowed tabs; bounce anything else to Studio
+  useEffect(() => {
+    if (role === 'editor' && !canAccess('editor', mainPage)) {
+      setMainPage('studio');
+    }
+  }, [role, mainPage, setMainPage]);
 
   // Migrate stale persisted page values from prior builds
   useEffect(() => {
@@ -137,7 +166,7 @@ export default function Home() {
     loadData();
   }, [loadData]);
 
-  if (loading) {
+  if (loading || !role) {
     return (
       <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center' }}>
@@ -153,8 +182,10 @@ export default function Home() {
       <Sidebar
         activeMP={mainPage}
         collapsed={sidebarCollapsed}
+        role={role}
         onToggleCollapse={() => setSidebarCollapsed(v => !v)}
         onSelectMain={setMainPage}
+        onLogout={signOut}
       />
 
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>

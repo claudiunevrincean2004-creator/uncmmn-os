@@ -1,5 +1,6 @@
 'use client';
 import { MainPage } from '@/lib/types';
+import { Role, canAccess } from '@/lib/auth-config';
 import StarLogo from '@/components/StarLogo';
 
 interface NavItem {
@@ -19,12 +20,16 @@ const NAV: NavItem[] = [
 interface Props {
   activeMP: MainPage;
   collapsed: boolean;
+  role: Role;
   onToggleCollapse: () => void;
   onSelectMain: (page: MainPage) => void;
+  onLogout: () => void;
 }
 
-export default function Sidebar({ activeMP, collapsed, onToggleCollapse, onSelectMain }: Props) {
+export default function Sidebar({ activeMP, collapsed, role, onToggleCollapse, onSelectMain, onLogout }: Props) {
   const w = collapsed ? 56 : 210;
+  // Layer 3 — only render the tabs this role is allowed to see
+  const nav = NAV.filter(item => canAccess(role, item.key));
 
   return (
     <div style={{
@@ -73,7 +78,7 @@ export default function Sidebar({ activeMP, collapsed, onToggleCollapse, onSelec
       </div>
 
       <div style={{ padding: collapsed ? '10px 4px' : '10px 8px', flex: 1 }}>
-        {NAV.map(item => (
+        {nav.map(item => (
           <div
             key={item.key}
             className={`nav-item${activeMP === item.key ? ' active' : ''}`}
@@ -87,8 +92,17 @@ export default function Sidebar({ activeMP, collapsed, onToggleCollapse, onSelec
         ))}
       </div>
 
-      <div style={{ padding: collapsed ? '10px 4px' : '10px 14px', borderTop: '0.5px solid var(--border)' }}>
-        <div style={{ fontSize: 10, color: 'var(--text-faint)', textAlign: collapsed ? 'center' : undefined }}>v1.0.0</div>
+      <div style={{ padding: collapsed ? '10px 4px' : '10px 8px', borderTop: '0.5px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div
+          className="nav-item"
+          onClick={onLogout}
+          title="Sign out"
+          style={collapsed ? { justifyContent: 'center', padding: '8px 0' } : undefined}
+        >
+          <span style={{ fontSize: 13 }}>⏻</span>
+          {!collapsed && <span>Sign out</span>}
+        </div>
+        <div style={{ fontSize: 10, color: 'var(--text-faint)', textAlign: collapsed ? 'center' : undefined, padding: collapsed ? 0 : '0 2px' }}>v1.0.0</div>
       </div>
     </div>
   );
