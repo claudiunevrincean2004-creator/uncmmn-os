@@ -7,6 +7,7 @@ export async function checkSchema(): Promise<{ missing: string[]; postColumnsMis
     'studio_videos', 'studio_sequences', 'studio_sessions',
     'studio_ad_creatives', 'studio_comments', 'studio_activity',
     'studio_quick_links', 'studio_dropdown_options',
+    'custom_properties',
   ];
 
   const missing: string[] = [];
@@ -303,6 +304,38 @@ update research_items set title = coalesce(nullif(title, ''), left(coalesce(cont
 
   if (postColumnsMissing.includes('post_url')) {
     parts.push(`alter table posts add column if not exists post_url text;`);
+  }
+
+  if (missing.includes('custom_properties')) {
+    parts.push(`-- Custom SELECT properties for Studio tables (requires public.is_admin() from auth_setup.sql)
+create table if not exists custom_properties (
+  id uuid primary key default gen_random_uuid(),
+  table_key text not null,
+  name text not null,
+  position int not null default 0,
+  created_at timestamptz default now()
+);
+create table if not exists custom_property_options (
+  id uuid primary key default gen_random_uuid(),
+  property_id uuid not null references custom_properties(id) on delete cascade,
+  label text not null,
+  color text,
+  position int not null default 0,
+  created_at timestamptz default now()
+);
+alter table studio_sequences   add column if not exists custom_values jsonb not null default '{}'::jsonb;
+alter table studio_sessions     add column if not exists custom_values jsonb not null default '{}'::jsonb;
+alter table studio_ad_creatives add column if not exists custom_values jsonb not null default '{}'::jsonb;
+alter table custom_properties enable row level security;
+drop policy if exists "custom_properties_read" on custom_properties;
+create policy "custom_properties_read" on custom_properties for select to authenticated using (true);
+drop policy if exists "custom_properties_admin_write" on custom_properties;
+create policy "custom_properties_admin_write" on custom_properties for all to authenticated using (public.is_admin()) with check (public.is_admin());
+alter table custom_property_options enable row level security;
+drop policy if exists "custom_property_options_read" on custom_property_options;
+create policy "custom_property_options_read" on custom_property_options for select to authenticated using (true);
+drop policy if exists "custom_property_options_admin_write" on custom_property_options;
+create policy "custom_property_options_admin_write" on custom_property_options for all to authenticated using (public.is_admin()) with check (public.is_admin());`);
   }
 
   return parts.join('\n\n');

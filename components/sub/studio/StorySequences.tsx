@@ -1,7 +1,7 @@
 'use client';
 import { Fragment, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { StudioSequence, StudioComment, StudioActivity, StudioDropdownOption } from '@/lib/types';
+import { StudioSequence, StudioComment, StudioActivity, StudioDropdownOption, CustomProperty, CustomPropertyOption } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 import {
   SEQUENCE_STATUSES, SEQUENCE_STATUS_COLORS,
@@ -9,24 +9,34 @@ import {
 } from '@/lib/studio';
 import { InlineText, EditPillSelect, MiniSelect, UrlCell, InlineDate } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
+import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal } from './CustomColumns';
 
 const DONE = ['Posted'];
+const TABLE_KEY = 'sequence';
 
 interface Props {
   sequences: StudioSequence[];
   comments: StudioComment[];
   activity: StudioActivity[];
   dropdownOptions: StudioDropdownOption[];
+  properties: CustomProperty[];
+  customOptions: CustomPropertyOption[];
+  isAdmin: boolean;
   onReload: () => void;
 }
 
-export default function StorySequences({ sequences, comments, activity, dropdownOptions, onReload }: Props) {
+export default function StorySequences({ sequences, comments, activity, dropdownOptions, properties, customOptions, isAdmin, onReload }: Props) {
   const [fStatus, setFStatus] = usePersistedState<string>('studio_s_status', 'All');
   const [sortDir, setSortDir] = usePersistedState<'asc' | 'desc'>('studio_s_sortdir', 'asc');
   const [dateFrom, setDateFrom] = usePersistedState<string>('studio_s_from', '');
   const [dateTo, setDateTo] = usePersistedState<string>('studio_s_to', '');
+  const [custFilters, setCustFilters] = usePersistedState<Record<string, string>>('studio_s_custfilters', {});
   const [expanded, setExpanded] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [mgrOpen, setMgrOpen] = useState(false);
+
+  const cprops = useMemo(() => sortProps(properties, TABLE_KEY), [properties]);
+  const optsByProp = useMemo(() => groupOptions(customOptions), [customOptions]);
 
   const custom = (field: string) => dropdownOptions.filter(o => o.field === field).map(o => o.value);
   const statusOpts = mergeOptions(SEQUENCE_STATUSES, custom('sequence_status'));
@@ -78,6 +88,8 @@ export default function StorySequences({ sequences, comments, activity, dropdown
     });
   }, [sequences, fStatus, sortDir, dateFrom, dateTo]);
 
+  const rows = useMemo(() => applyCustomFilters(filtered, cprops, custFilters), [filtered, cprops, custFilters]);
+
   const fields: FieldDef[] = useMemo(() => [
     { key: 'title', label: 'Title / Desc', type: 'textarea', placeholder: 'Title / description' },
     { key: 'status', label: 'Status', type: 'pill', field: 'sequence_status', options: statusOpts, colors: SEQUENCE_STATUS_COLORS },
@@ -101,11 +113,13 @@ export default function StorySequences({ sequences, comments, activity, dropdown
           <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>To</span>
           <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
           {(dateFrom || dateTo) && <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>clear</button>}
-          <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{filtered.length} {filtered.length === 1 ? 'sequence' : 'sequences'}</span>
+          <CustomFilterControls props={cprops} optionsByProp={optsByProp} filters={custFilters} setFilters={setCustFilters} />
+          {isAdmin && <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setMgrOpen(true)}>+ Add property</button>}
+          <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{rows.length} {rows.length === 1 ? 'sequence' : 'sequences'}</span>
           <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={addSequence}>+ Add Sequence</button>
         </div>
 
-        {filtered.length === 0 ? (
+        {rows.length === 0 ? (
           <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>No sequences match. Add a sequence or adjust filters.</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
@@ -117,11 +131,12 @@ export default function StorySequences({ sequences, comments, activity, dropdown
                   <th>Final</th>
                   <th>Scheduled</th>
                   <th>Notes</th>
+                  <CustomHeaderCells props={cprops} isAdmin={isAdmin} onManage={() => setMgrOpen(true)} />
                   <th></th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(s => {
+                {rows.map(s => {
                   const overdue = isOverdue(s.scheduled_date, s.status, DONE);
                   return (
                     <Fragment key={s.id}>
@@ -142,11 +157,12 @@ export default function StorySequences({ sequences, comments, activity, dropdown
                             {s.notes ? '📝' : '+'} {expanded === s.id ? '▲' : '▾'}
                           </button>
                         </td>
+                        <CustomRowCells row={s} props={cprops} optionsByProp={optsByProp} onPatch={patch} />
                         <td><button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteSequence(s.id)}>✕</button></td>
                       </tr>
                       {expanded === s.id && (
                         <tr>
-                          <td colSpan={6} style={{ background: 'var(--surface-2)' }}>
+                          <td colSpan={6 + cprops.length} style={{ background: 'var(--surface-2)' }}>
                             <div style={{ padding: '4px 2px' }}>
                               <div className="form-label" style={{ marginBottom: 4 }}>Notes</div>
                               <InlineText value={s.notes} onCommit={n => patch(s.id, { notes: n })} placeholder="Add notes…" multiline style={{ width: '100%' }} />
@@ -177,6 +193,10 @@ export default function StorySequences({ sequences, comments, activity, dropdown
           onReload={onReload}
           onClose={() => setSelectedId(null)}
         />
+      )}
+
+      {mgrOpen && (
+        <PropertyManagerModal tableKey={TABLE_KEY} properties={properties} options={customOptions} onClose={() => setMgrOpen(false)} onReload={onReload} />
       )}
     </div>
   );

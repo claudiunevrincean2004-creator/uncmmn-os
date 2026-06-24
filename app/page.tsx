@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Role, canAccess } from '@/lib/auth-config';
 import { checkSchema, getMigrationSQL } from '@/lib/setup-db';
-import { Client, Post, DriveFolder, SubscriberSnapshot, ResearchItem, StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, MainPage } from '@/lib/types';
+import { Client, Post, DriveFolder, SubscriberSnapshot, ResearchItem, StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, MainPage } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 
 import Sidebar from '@/components/Sidebar';
@@ -54,6 +54,8 @@ export default function Home() {
   const [studioActivity, setStudioActivity] = useState<StudioActivity[]>([]);
   const [studioQuickLinks, setStudioQuickLinks] = useState<StudioQuickLink[]>([]);
   const [studioDropdownOptions, setStudioDropdownOptions] = useState<StudioDropdownOption[]>([]);
+  const [customProperties, setCustomProperties] = useState<CustomProperty[]>([]);
+  const [customPropOptions, setCustomPropOptions] = useState<CustomPropertyOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [schemaMissing, setSchemaMissing] = useState<{ missing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[]; adColumnsMissing: string[] } | null>(null);
   const [showMigrationSQL, setShowMigrationSQL] = useState(false);
@@ -114,7 +116,7 @@ export default function Home() {
   }, [mainPage, setMainPage]);
 
   const loadData = useCallback(async () => {
-    const [c, p, d, ss, ri, sv, sq, sn, ac, cm, av, ql, dr] = await Promise.all([
+    const [c, p, d, ss, ri, sv, sq, sn, ac, cm, av, ql, dr, cp, co] = await Promise.all([
       safeSelect('clients', 'created_at'),
       safeSelect('posts', 'date', false),
       safeSelect('drive_folders', 'category'),
@@ -128,6 +130,8 @@ export default function Home() {
       safeSelect('studio_activity', 'created_at', false),
       safeSelect('studio_quick_links', 'created_at'),
       safeSelect('studio_dropdown_options', 'created_at'),
+      safeSelect('custom_properties', 'position'),
+      safeSelect('custom_property_options', 'position'),
     ]);
 
     let active = (c as Client[])[0] || null;
@@ -154,6 +158,8 @@ export default function Home() {
     setStudioActivity(av as StudioActivity[]);
     setStudioQuickLinks(ql as StudioQuickLink[]);
     setStudioDropdownOptions(dr as StudioDropdownOption[]);
+    setCustomProperties(cp as CustomProperty[]);
+    setCustomPropOptions(co as CustomPropertyOption[]);
     setLoading(false);
   }, []);
 
@@ -317,6 +323,9 @@ export default function Home() {
                 activity={studioActivity}
                 quickLinks={studioQuickLinks}
                 dropdownOptions={studioDropdownOptions}
+                properties={customProperties}
+                customOptions={customPropOptions}
+                isAdmin={role === 'admin'}
                 onReload={loadData}
               />
             </div>

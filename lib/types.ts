@@ -77,6 +77,7 @@ export interface StudioSequence {
   scheduled_date?: string;
   platform?: string;
   notes?: string;
+  custom_values?: Record<string, string>;
   created_at?: string;
 }
 
@@ -99,6 +100,7 @@ export interface StudioAdCreative {
   deadline?: string;
   notes?: string;
   assigned_to?: string;
+  custom_values?: Record<string, string>;
   created_at?: string;
 }
 
@@ -145,6 +147,25 @@ export interface StudioSession {
   videos_planned: number;
   videos_filmed: number;
   notes?: string;
+  custom_values?: Record<string, string>;
+  created_at?: string;
+}
+
+// Admin-managed SELECT columns for the customizable Studio tables (not Video Review)
+export interface CustomProperty {
+  id: string;
+  table_key: string; // 'sequence' | 'session' | 'ad'
+  name: string;
+  position: number;
+  created_at?: string;
+}
+
+export interface CustomPropertyOption {
+  id: string;
+  property_id: string;
+  label: string;
+  color?: string | null;
+  position: number;
   created_at?: string;
 }
 
