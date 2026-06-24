@@ -3,20 +3,7 @@ import { useMemo } from 'react';
 import { Client, Post, SubscriberSnapshot } from '@/lib/types';
 import { fn, er, avg } from '@/lib/utils';
 import PlatformIcon from '@/components/PlatformIcon';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-} from 'chart.js';
-import { Line } from 'react-chartjs-2';
-
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
+import ViewsOverTime from '@/components/ViewsOverTime';
 
 interface Props {
   client: Client;
@@ -89,96 +76,26 @@ export default function Dashboard({ client, posts, subscriberSnapshots }: Props)
       .slice(0, 6);
   }, [clientPosts, allTimeAvg]);
 
-  // Growth chart by month
-  const monthlyData = useMemo(() => {
-    const byMonth: Record<string, { views: number; follows: number }> = {};
+  // Daily views for the last 30 days (sum post views by date, fill gaps with 0)
+  const dailyViews = useMemo(() => {
+    const map: Record<string, number> = {};
     clientPosts.forEach(p => {
       if (!p.date) return;
-      const key = p.date.slice(0, 7);
-      if (!byMonth[key]) byMonth[key] = { views: 0, follows: 0 };
-      byMonth[key].views += p.views || 0;
-      byMonth[key].follows += p.follows || 0;
+      const key = p.date.slice(0, 10);
+      map[key] = (map[key] || 0) + (p.views || 0);
     });
-
-    // Add snapshot delta as follows for months that have snapshots
-    const snapsByMonth: Record<string, { tt: number[]; yt: number[] }> = {};
-    clientSnaps.forEach(s => {
-      const key = s.date.slice(0, 7);
-      if (!snapsByMonth[key]) snapsByMonth[key] = { tt: [], yt: [] };
-      if (s.platform.toLowerCase() === 'tiktok') snapsByMonth[key].tt.push(Number(s.subscriber_count));
-      if (s.platform.toLowerCase() === 'youtube') snapsByMonth[key].yt.push(Number(s.subscriber_count));
-    });
-    Object.entries(snapsByMonth).forEach(([key, arrs]) => {
-      const ttDelta = arrs.tt.length >= 2 ? Math.max(...arrs.tt) - Math.min(...arrs.tt) : 0;
-      const ytDelta = arrs.yt.length >= 2 ? Math.max(...arrs.yt) - Math.min(...arrs.yt) : 0;
-      const total = ttDelta + ytDelta;
-      if (!byMonth[key]) byMonth[key] = { views: 0, follows: 0 };
-      if (total > byMonth[key].follows) byMonth[key].follows = total;
-    });
-
-    return byMonth;
-  }, [clientPosts, clientSnaps]);
-
-  const chartKeys = Object.keys(monthlyData).sort();
-  const chartLabels = chartKeys.map(k => {
-    const [y, m] = k.split('-');
-    return new Date(parseInt(y), parseInt(m) - 1).toLocaleString('default', { month: 'short', year: '2-digit' });
-  });
-  const chartViews = chartKeys.map(k => monthlyData[k].views);
-  const chartFollows = chartKeys.map(k => monthlyData[k].follows);
-
-  const chartData = {
-    labels: chartLabels,
-    datasets: [
-      {
-        label: 'Views',
-        data: chartViews,
-        borderColor: '#7C83F3',
-        backgroundColor: 'rgba(124,131,243,0.14)',
-        tension: 0.4,
-        fill: true,
-        pointRadius: 3,
-        pointBackgroundColor: '#7C83F3',
-        yAxisID: 'y',
-        borderWidth: 1.5,
-      },
-      {
-        label: 'Followers',
-        data: chartFollows,
-        borderColor: '#22C3A6',
-        backgroundColor: 'rgba(34,195,166,0.12)',
-        tension: 0.4,
-        fill: true,
-        pointRadius: 3,
-        pointBackgroundColor: '#22C3A6',
-        yAxisID: 'y1',
-        borderWidth: 1.5,
-      },
-    ],
-  };
-
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: { mode: 'index' as const, intersect: false },
-    plugins: {
-      legend: { labels: { color: '#8A90A2', font: { size: 11 }, boxWidth: 12 } },
-      tooltip: {
-        backgroundColor: '#12141D',
-        borderColor: '#33394D',
-        borderWidth: 1,
-        titleColor: '#F1F3F8',
-        bodyColor: '#9AA2B4',
-        titleFont: { size: 12 },
-        bodyFont: { size: 11 },
-      },
-    },
-    scales: {
-      x: { grid: { color: 'rgba(127,127,127,0.14)' }, ticks: { color: '#8A90A2', font: { size: 10 } } },
-      y: { grid: { color: 'rgba(127,127,127,0.14)' }, ticks: { color: '#8A90A2', font: { size: 10 } }, position: 'left' as const },
-      y1: { grid: { display: false }, ticks: { color: '#22C3A6', font: { size: 10 } }, position: 'right' as const },
-    },
-  };
+    const pad = (x: number) => String(x).padStart(2, '0');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const days: { date: string; views: number }[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const key = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      days.push({ date: key, views: map[key] || 0 });
+    }
+    return days;
+  }, [clientPosts]);
 
   const tt = platformStats(monthPosts, 'tiktok');
   const yt = platformStats(monthPosts, 'youtube');
@@ -256,19 +173,8 @@ export default function Dashboard({ client, posts, subscriberSnapshots }: Props)
         )}
       </div>
 
-      {/* Growth chart */}
-      <div className="card">
-        <div style={{ fontSize: 11, color: 'var(--text-faint)', marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Growth Trend</div>
-        <div style={{ height: 220 }}>
-          {chartLabels.length > 0 ? (
-            <Line data={chartData} options={chartOptions} />
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-faint)', fontSize: 12 }}>
-              No data with dates yet
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Views over time */}
+      <ViewsOverTime data={dailyViews} />
 
       {/* Platform breakdown */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>

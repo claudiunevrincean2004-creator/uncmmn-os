@@ -26,7 +26,7 @@ const PAGE_LABELS: Record<MainPage, string> = {
   dashboard: 'Dashboard',
   content: 'Content',
   research: 'Research',
-  drive: 'Drive',
+  drive: 'Assets',
   studio: 'Studio',
 };
 
