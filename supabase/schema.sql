@@ -80,6 +80,49 @@ create table if not exists revenue_entries (
   created_at timestamptz default now()
 );
 
+-- Studio — Video Review
+create table if not exists studio_videos (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  format text,
+  assigned_to text,
+  status text default 'Scripting',
+  priority text default 'Normal',
+  brief_url text,
+  raw_files_url text,
+  final_url text,
+  deadline date,
+  notes text,
+  revision_count integer default 0,
+  created_at timestamptz default now()
+);
+
+-- Studio — Story Sequences
+create table if not exists studio_sequences (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  status text default 'Draft',
+  final_url text,
+  scheduled_date date,
+  platform text,
+  notes text,
+  created_at timestamptz default now()
+);
+
+-- Studio — Filming Sessions
+create table if not exists studio_sessions (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  script_url text,
+  date date,
+  location text,
+  status text default 'Planned',
+  videos_planned integer default 0,
+  videos_filmed integer default 0,
+  notes text,
+  created_at timestamptz default now()
+);
+
 -- Disable RLS for simplicity (enable and add policies for production)
 alter table clients disable row level security;
 alter table posts disable row level security;
@@ -88,3 +131,16 @@ alter table drive_folders disable row level security;
 alter table subscriber_snapshots disable row level security;
 alter table research_items disable row level security;
 alter table revenue_entries disable row level security;
+
+-- Studio tables: RLS enabled with anon access policies
+alter table studio_videos enable row level security;
+drop policy if exists "anon_all_studio_videos" on studio_videos;
+create policy "anon_all_studio_videos" on studio_videos for all to anon using (true) with check (true);
+
+alter table studio_sequences enable row level security;
+drop policy if exists "anon_all_studio_sequences" on studio_sequences;
+create policy "anon_all_studio_sequences" on studio_sequences for all to anon using (true) with check (true);
+
+alter table studio_sessions enable row level security;
+drop policy if exists "anon_all_studio_sessions" on studio_sessions;
+create policy "anon_all_studio_sessions" on studio_sessions for all to anon using (true) with check (true);

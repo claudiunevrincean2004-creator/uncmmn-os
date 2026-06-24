@@ -1,9 +1,7 @@
 'use client';
-import { useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import { Client, Post, SubscriberSnapshot, RevenueEntry } from '@/lib/types';
-import { fn, fm, er, avg } from '@/lib/utils';
-import { usePersistedState } from '@/lib/use-persisted-state';
+import { useMemo } from 'react';
+import { Client, Post, SubscriberSnapshot } from '@/lib/types';
+import { fn, er, avg } from '@/lib/utils';
 import PlatformIcon from '@/components/PlatformIcon';
 import {
   Chart as ChartJS,
@@ -24,7 +22,6 @@ interface Props {
   client: Client;
   posts: Post[];
   subscriberSnapshots: SubscriberSnapshot[];
-  revenueEntries: RevenueEntry[];
   onReload: () => void;
 }
 
@@ -61,7 +58,7 @@ function followerGain(snaps: SubscriberSnapshot[], startISO: string): number | n
   return null;
 }
 
-export default function Dashboard({ client, posts, subscriberSnapshots, revenueEntries, onReload }: Props) {
+export default function Dashboard({ client, posts, subscriberSnapshots }: Props) {
   const now = new Date();
   const monthStartISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
   const monthLabel = now.toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -185,58 +182,6 @@ export default function Dashboard({ client, posts, subscriberSnapshots, revenueE
 
   const tt = platformStats(monthPosts, 'tiktok');
   const yt = platformStats(monthPosts, 'youtube');
-
-  // Revenue
-  const monthEntries = useMemo(
-    () => revenueEntries.filter(r => r.date?.startsWith(monthStartISO.slice(0, 7))),
-    [revenueEntries, monthStartISO]
-  );
-  const monthRevenue = monthEntries.reduce((s, e) => s + (Number(e.amount) || 0), 0);
-  const [sharePct, setSharePct] = usePersistedState<number>('nathan_profit_share_pct', 70);
-  const nathanCut = monthRevenue * (sharePct / 100);
-  const yourCut = monthRevenue * (1 - sharePct / 100);
-
-  // Inline revenue form
-  const [showForm, setShowForm] = useState(false);
-  const [newDate, setNewDate] = useState(new Date().toISOString().slice(0, 10));
-  const [newAmount, setNewAmount] = useState('');
-  const [newSource, setNewSource] = useState('');
-  const [newNotes, setNewNotes] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  function resetForm() {
-    setNewDate(new Date().toISOString().slice(0, 10));
-    setNewAmount('');
-    setNewSource('');
-    setNewNotes('');
-  }
-
-  async function saveEntry() {
-    const amount = parseFloat(newAmount);
-    if (!amount || saving) return;
-    setSaving(true);
-    await supabase.from('revenue_entries').insert([{
-      date: newDate,
-      amount,
-      source: newSource.trim() || null,
-      notes: newNotes.trim() || null,
-    }]);
-    setSaving(false);
-    resetForm();
-    setShowForm(false);
-    onReload();
-  }
-
-  async function deleteEntry(id: string) {
-    if (!confirm('Delete this revenue entry?')) return;
-    await supabase.from('revenue_entries').delete().eq('id', id);
-    onReload();
-  }
-
-  const sortedEntries = useMemo(
-    () => [...revenueEntries].sort((a, b) => (b.date || '').localeCompare(a.date || '')),
-    [revenueEntries]
-  );
 
   return (
     <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -367,105 +312,6 @@ export default function Dashboard({ client, posts, subscriberSnapshots, revenueE
             </div>
           </div>
         ))}
-      </div>
-
-      {/* Revenue / profit share */}
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <div style={{ fontSize: 11, color: '#555', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Revenue · Profit Share</div>
-          <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px' }} onClick={() => setShowForm(v => !v)}>
-            {showForm ? 'Cancel' : '+ Log Revenue'}
-          </button>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 1fr', gap: 10, marginBottom: 14 }}>
-          <div className="metric-chip">
-            <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>Revenue this month</div>
-            <div style={{ fontSize: 22, fontWeight: 700 }}>{fm(monthRevenue)}</div>
-            <div style={{ fontSize: 11, color: '#555', marginTop: 4 }}>{monthEntries.length} {monthEntries.length === 1 ? 'entry' : 'entries'}</div>
-          </div>
-          <div className="metric-chip">
-            <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>Nathan&apos;s share</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input
-                type="number"
-                min={0}
-                max={100}
-                value={sharePct}
-                onChange={e => setSharePct(Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
-                className="form-input"
-                style={{ width: 70, fontSize: 18, fontWeight: 700, padding: '4px 8px' }}
-              />
-              <span style={{ fontSize: 18, fontWeight: 700, color: '#888' }}>%</span>
-            </div>
-            <div style={{ fontSize: 11, color: '#555', marginTop: 4 }}>editable</div>
-          </div>
-          <div className="metric-chip">
-            <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>Nathan earns</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#10b981' }}>{fm(nathanCut)}</div>
-            <div style={{ fontSize: 11, color: '#555', marginTop: 4 }}>{sharePct}% of revenue</div>
-          </div>
-          <div className="metric-chip">
-            <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>You earn</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#6366f1' }}>{fm(yourCut)}</div>
-            <div style={{ fontSize: 11, color: '#555', marginTop: 4 }}>{(100 - sharePct).toFixed(0)}% of revenue</div>
-          </div>
-        </div>
-
-        {showForm && (
-          <div style={{ background: '#111', border: '0.5px solid #1a1a1a', borderRadius: 8, padding: 12, marginBottom: 14 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '140px 140px 1fr 1fr auto', gap: 8, alignItems: 'end' }}>
-              <div>
-                <label className="form-label">Date</label>
-                <input className="form-input" type="date" value={newDate} onChange={e => setNewDate(e.target.value)} />
-              </div>
-              <div>
-                <label className="form-label">Amount</label>
-                <input className="form-input" type="number" value={newAmount} onChange={e => setNewAmount(e.target.value)} placeholder="0" />
-              </div>
-              <div>
-                <label className="form-label">Source</label>
-                <input className="form-input" value={newSource} onChange={e => setNewSource(e.target.value)} placeholder="Brand deal, course sale..." />
-              </div>
-              <div>
-                <label className="form-label">Notes</label>
-                <input className="form-input" value={newNotes} onChange={e => setNewNotes(e.target.value)} placeholder="optional" />
-              </div>
-              <button className="btn-primary" onClick={saveEntry} disabled={saving || !newAmount}>
-                {saving ? 'Saving…' : 'Save'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {sortedEntries.length === 0 ? (
-          <div style={{ textAlign: 'center', color: '#333', padding: '20px 0', fontSize: 12 }}>No revenue entries yet.</div>
-        ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Source</th>
-                <th>Notes</th>
-                <th style={{ textAlign: 'right' }}>Amount</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedEntries.map(e => (
-                <tr key={e.id}>
-                  <td style={{ color: '#888', fontSize: 11 }}>{e.date}</td>
-                  <td>{e.source || '—'}</td>
-                  <td style={{ color: '#666' }}>{e.notes || '—'}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 600 }}>{fm(Number(e.amount) || 0)}</td>
-                  <td style={{ textAlign: 'right' }}>
-                    <button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteEntry(e.id)}>✕</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
       </div>
     </div>
   );

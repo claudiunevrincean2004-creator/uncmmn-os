@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { checkSchema, getMigrationSQL } from '@/lib/setup-db';
-import { Client, Post, Goal, DriveFolder, SubscriberSnapshot, ResearchItem, RevenueEntry, MainPage } from '@/lib/types';
+import { Client, Post, Goal, DriveFolder, SubscriberSnapshot, ResearchItem, StudioVideo, StudioSequence, StudioSession, MainPage } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 
 import Sidebar from '@/components/Sidebar';
@@ -11,6 +11,7 @@ import ContentTab from '@/components/sub/ContentTab';
 import GoalsTab from '@/components/sub/GoalsTab';
 import ResearchTab from '@/components/sub/ResearchTab';
 import DriveTab from '@/components/sub/DriveTab';
+import StudioTab from '@/components/sub/StudioTab';
 
 async function safeSelect(table: string, orderCol: string, ascending = true) {
   const { data, error } = await supabase.from(table).select('*').order(orderCol, { ascending });
@@ -38,7 +39,9 @@ export default function Home() {
   const [driveFolders, setDriveFolders] = useState<DriveFolder[]>([]);
   const [subscriberSnapshots, setSubscriberSnapshots] = useState<SubscriberSnapshot[]>([]);
   const [researchItems, setResearchItems] = useState<ResearchItem[]>([]);
-  const [revenueEntries, setRevenueEntries] = useState<RevenueEntry[]>([]);
+  const [studioVideos, setStudioVideos] = useState<StudioVideo[]>([]);
+  const [studioSequences, setStudioSequences] = useState<StudioSequence[]>([]);
+  const [studioSessions, setStudioSessions] = useState<StudioSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [schemaMissing, setSchemaMissing] = useState<{ missing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[] } | null>(null);
   const [showMigrationSQL, setShowMigrationSQL] = useState(false);
@@ -54,14 +57,16 @@ export default function Home() {
   }, [mainPage, setMainPage]);
 
   const loadData = useCallback(async () => {
-    const [c, p, g, d, ss, ri, re] = await Promise.all([
+    const [c, p, g, d, ss, ri, sv, sq, sn] = await Promise.all([
       safeSelect('clients', 'created_at'),
       safeSelect('posts', 'date', false),
       safeSelect('goals', 'created_at'),
       safeSelect('drive_folders', 'category'),
       safeSelect('subscriber_snapshots', 'date'),
       safeSelect('research_items', 'created_at', false),
-      safeSelect('revenue_entries', 'date', false),
+      safeSelect('studio_videos', 'created_at', false),
+      safeSelect('studio_sequences', 'created_at', false),
+      safeSelect('studio_sessions', 'created_at', false),
     ]);
 
     let active = (c as Client[])[0] || null;
@@ -81,7 +86,9 @@ export default function Home() {
     setDriveFolders(d as DriveFolder[]);
     setSubscriberSnapshots(ss as SubscriberSnapshot[]);
     setResearchItems(ri as ResearchItem[]);
-    setRevenueEntries(re as RevenueEntry[]);
+    setStudioVideos(sv as StudioVideo[]);
+    setStudioSequences(sq as StudioSequence[]);
+    setStudioSessions(sn as StudioSession[]);
     setLoading(false);
   }, []);
 
@@ -194,7 +201,6 @@ export default function Home() {
               client={client}
               posts={posts}
               subscriberSnapshots={subscriberSnapshots}
-              revenueEntries={revenueEntries}
               onReload={loadData}
             />
           )}
@@ -221,6 +227,16 @@ export default function Home() {
           {client && mainPage === 'drive' && (
             <div style={{ padding: '16px 24px' }}>
               <DriveTab client={client} driveFolders={driveFolders} onReload={loadData} />
+            </div>
+          )}
+          {client && mainPage === 'studio' && (
+            <div style={{ padding: '16px 24px' }}>
+              <StudioTab
+                videos={studioVideos}
+                sequences={studioSequences}
+                sessions={studioSessions}
+                onReload={loadData}
+              />
             </div>
           )}
         </div>

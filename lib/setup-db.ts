@@ -4,6 +4,7 @@ export async function checkSchema(): Promise<{ missing: string[]; postColumnsMis
   const requiredTables = [
     'clients', 'posts', 'goals', 'drive_folders',
     'subscriber_snapshots', 'research_items', 'revenue_entries',
+    'studio_videos', 'studio_sequences', 'studio_sessions',
   ];
 
   const missing: string[] = [];
@@ -133,6 +134,61 @@ alter table research_items disable row level security;`);
   created_at timestamptz default now()
 );
 alter table revenue_entries disable row level security;`);
+  }
+
+  if (missing.includes('studio_videos')) {
+    parts.push(`create table if not exists studio_videos (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  format text,
+  assigned_to text,
+  status text default 'Scripting',
+  priority text default 'Normal',
+  brief_url text,
+  raw_files_url text,
+  final_url text,
+  deadline date,
+  notes text,
+  revision_count integer default 0,
+  created_at timestamptz default now()
+);
+alter table studio_videos enable row level security;
+drop policy if exists "anon_all_studio_videos" on studio_videos;
+create policy "anon_all_studio_videos" on studio_videos for all to anon using (true) with check (true);`);
+  }
+
+  if (missing.includes('studio_sequences')) {
+    parts.push(`create table if not exists studio_sequences (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  status text default 'Draft',
+  final_url text,
+  scheduled_date date,
+  platform text,
+  notes text,
+  created_at timestamptz default now()
+);
+alter table studio_sequences enable row level security;
+drop policy if exists "anon_all_studio_sequences" on studio_sequences;
+create policy "anon_all_studio_sequences" on studio_sequences for all to anon using (true) with check (true);`);
+  }
+
+  if (missing.includes('studio_sessions')) {
+    parts.push(`create table if not exists studio_sessions (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  script_url text,
+  date date,
+  location text,
+  status text default 'Planned',
+  videos_planned integer default 0,
+  videos_filmed integer default 0,
+  notes text,
+  created_at timestamptz default now()
+);
+alter table studio_sessions enable row level security;
+drop policy if exists "anon_all_studio_sessions" on studio_sessions;
+create policy "anon_all_studio_sessions" on studio_sessions for all to anon using (true) with check (true);`);
   }
 
   if (researchColumnsMissing.includes('title')) {
