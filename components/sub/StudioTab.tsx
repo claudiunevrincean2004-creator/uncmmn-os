@@ -1,8 +1,8 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity } from '@/lib/types';
+import { StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
-import { todayISO, addDaysISO } from '@/lib/studio';
+import { todayISO } from '@/lib/studio';
 import VideoReview from './studio/VideoReview';
 import StorySequences from './studio/StorySequences';
 import FilmingSessions from './studio/FilmingSessions';
@@ -24,10 +24,12 @@ interface Props {
   adCreatives: StudioAdCreative[];
   comments: StudioComment[];
   activity: StudioActivity[];
+  quickLinks: StudioQuickLink[];
+  dropdownOptions: StudioDropdownOption[];
   onReload: () => void;
 }
 
-export default function StudioTab({ videos, sequences, sessions, adCreatives, comments, activity, onReload }: Props) {
+export default function StudioTab({ videos, sequences, sessions, adCreatives, comments, activity, quickLinks, dropdownOptions, onReload }: Props) {
   const [sub, setSub] = usePersistedState<SubTab>('studio_subtab', 'videos');
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -42,39 +44,24 @@ export default function StudioTab({ videos, sequences, sessions, adCreatives, co
 
   const stats = useMemo(() => {
     const today = todayISO();
-    const in7 = addDaysISO(today, 7);
-
     const inReview = videos.filter(v => v.status === 'In Review').length;
     const awaitingRevision = videos.filter(v => v.status === 'Revision Requested').length;
     const overdue = videos.filter(v =>
       v.deadline && v.deadline.slice(0, 10) < today && v.status !== 'Posted'
     ).length;
-    const upcomingDeadlines = videos.filter(v => {
-      if (!v.deadline) return false;
-      const d = v.deadline.slice(0, 10);
-      return d >= today && d <= in7 && v.status !== 'Posted' && v.status !== 'Approved';
-    }).length;
-
-    const nextSession = sessions
-      .filter(s => s.date && s.date.slice(0, 10) >= today && s.status !== 'Cancelled')
-      .map(s => s.date!.slice(0, 10))
-      .sort((a, b) => a.localeCompare(b))[0];
-
-    return { inReview, awaitingRevision, overdue, upcomingDeadlines, nextSession };
-  }, [videos, sessions]);
+    return { inReview, awaitingRevision, overdue };
+  }, [videos]);
 
   const overviewItems: { label: string; value: string; color?: string }[] = [
     { label: 'Videos in Review', value: String(stats.inReview), color: '#8b5cf6' },
     { label: 'Awaiting Revision', value: String(stats.awaitingRevision), color: stats.awaitingRevision > 0 ? '#ef4444' : '#fff' },
     { label: 'Overdue', value: String(stats.overdue), color: stats.overdue > 0 ? '#ef4444' : '#fff' },
-    { label: 'Next Filming Session', value: stats.nextSession || '—', color: stats.nextSession ? '#3b82f6' : '#555' },
-    { label: 'Upcoming Deadlines', value: String(stats.upcomingDeadlines), color: stats.upcomingDeadlines > 0 ? '#f59e0b' : '#fff' },
   ];
 
   return (
     <div style={{ position: 'relative' }}>
       {/* Overview bar */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
         {overviewItems.map(item => (
           <div key={item.label} className="metric-chip">
             <div style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>{item.label}</div>
@@ -92,10 +79,10 @@ export default function StudioTab({ videos, sequences, sessions, adCreatives, co
         ))}
       </div>
 
-      {sub === 'videos' && <VideoReview videos={videos} comments={comments} activity={activity} onReload={onReload} showToast={showToast} />}
-      {sub === 'sequences' && <StorySequences sequences={sequences} comments={comments} activity={activity} onReload={onReload} />}
-      {sub === 'sessions' && <FilmingSessions sessions={sessions} comments={comments} activity={activity} onReload={onReload} />}
-      {sub === 'ads' && <AdCreative adCreatives={adCreatives} comments={comments} activity={activity} onReload={onReload} />}
+      {sub === 'videos' && <VideoReview videos={videos} comments={comments} activity={activity} quickLinks={quickLinks} dropdownOptions={dropdownOptions} onReload={onReload} showToast={showToast} />}
+      {sub === 'sequences' && <StorySequences sequences={sequences} comments={comments} activity={activity} dropdownOptions={dropdownOptions} onReload={onReload} />}
+      {sub === 'sessions' && <FilmingSessions sessions={sessions} comments={comments} activity={activity} dropdownOptions={dropdownOptions} onReload={onReload} />}
+      {sub === 'ads' && <AdCreative adCreatives={adCreatives} comments={comments} activity={activity} quickLinks={quickLinks} dropdownOptions={dropdownOptions} onReload={onReload} showToast={showToast} />}
 
       {/* Toast */}
       {toast && (

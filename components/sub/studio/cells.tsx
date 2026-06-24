@@ -106,6 +106,103 @@ export function MiniSelect({
   );
 }
 
+const ADD_NEW = '__add_new__';
+
+// Editable dropdown that lets the user add their own option via "+ Add new…".
+// `options` should already be the merged base + custom list for this field.
+export function EditSelect({
+  field,
+  options,
+  value,
+  onChange,
+  onAddOption,
+  placeholder,
+  width,
+}: {
+  field: string;
+  options: string[];
+  value?: string;
+  onChange: (v: string) => void;
+  onAddOption: (field: string, value: string) => void;
+  placeholder?: string;
+  width?: number | string;
+}) {
+  // Always keep the current value selectable even if it isn't in the option list
+  const opts = value && !options.includes(value) ? [value, ...options] : options;
+  function handle(v: string) {
+    if (v === ADD_NEW) {
+      const entered = window.prompt(`Add new ${field.replace(/_/g, ' ')} option:`);
+      const t = entered?.trim();
+      if (t) { onAddOption(field, t); onChange(t); }
+      return;
+    }
+    onChange(v);
+  }
+  return (
+    <select
+      className="form-input"
+      style={{ width: width ?? 'auto', padding: '4px 7px', fontSize: 11 }}
+      value={value ?? ''}
+      onChange={e => handle(e.target.value)}
+    >
+      {placeholder && <option value="">{placeholder}</option>}
+      {opts.map(o => <option key={o} value={o}>{o}</option>)}
+      <option value={ADD_NEW}>+ Add new…</option>
+    </select>
+  );
+}
+
+// Colored pill select that also supports adding custom options.
+export function EditPillSelect({
+  field,
+  options,
+  value,
+  colors,
+  onChange,
+  onAddOption,
+}: {
+  field: string;
+  options: string[];
+  value: string;
+  colors: Record<string, string>;
+  onChange: (v: string) => void;
+  onAddOption: (field: string, value: string) => void;
+}) {
+  const color = colors[value] || '#6b7280';
+  const opts = value && !options.includes(value) ? [value, ...options] : options;
+  function handle(v: string) {
+    if (v === ADD_NEW) {
+      const entered = window.prompt(`Add new ${field.replace(/_/g, ' ')} option:`);
+      const t = entered?.trim();
+      if (t) { onAddOption(field, t); onChange(t); }
+      return;
+    }
+    onChange(v);
+  }
+  return (
+    <select
+      value={value}
+      onChange={e => handle(e.target.value)}
+      style={{
+        ...pillStyle(color),
+        appearance: 'none',
+        WebkitAppearance: 'none',
+        borderRadius: 20,
+        padding: '3px 9px',
+        fontSize: 10,
+        fontWeight: 700,
+        cursor: 'pointer',
+        outline: 'none',
+        fontFamily: 'inherit',
+      }}
+      title="Click to change"
+    >
+      {opts.map(o => <option key={o} value={o} style={{ background: '#111', color: '#fff', fontWeight: 600 }}>{o}</option>)}
+      <option value={ADD_NEW} style={{ background: '#111', color: '#fff', fontWeight: 600 }}>+ Add new…</option>
+    </select>
+  );
+}
+
 // A clickable external-link icon with an inline-editable URL behind a pencil.
 export function UrlCell({
   value,

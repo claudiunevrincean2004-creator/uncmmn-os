@@ -31,18 +31,15 @@ export const VIDEO_STATUS_COLORS: Record<string, string> = {
 };
 
 // Ad Creative pipeline
-export const AD_FORMATS = ['Story Ad', 'Feed Ad', 'Spark Ad', 'Carousel', 'Other'];
-export const CTA_TYPES = ['Shop Now', 'Learn More', 'Follow', 'DM Us', 'Link in Bio', 'Custom'];
-export const AD_STATUSES = ['Pending', 'In Progress', 'In Review', 'Revision Requested', 'Approved', 'Live'];
-export const AD_PLATFORMS = ['TikTok Ads', 'Meta Ads', 'YouTube Ads', 'Both'];
+export const AD_FORMATS = ['Video', 'Static'];
+export const AD_STATUSES = ['Live', 'Paused', 'Winner', 'Killed', 'Revision Requested'];
 
 export const AD_STATUS_COLORS: Record<string, string> = {
-  Pending: '#6b7280',                // gray
-  'In Progress': '#f59e0b',          // orange
-  'In Review': '#8b5cf6',            // purple
-  'Revision Requested': '#ef4444',   // red
-  Approved: '#10b981',               // green
-  Live: '#14b8a6',                   // teal
+  Live: '#10b981',                   // green
+  Paused: '#eab308',                 // yellow
+  Winner: '#14b8a6',                 // teal
+  Killed: '#ef4444',                 // red
+  'Revision Requested': '#f59e0b',   // orange
 };
 
 export const PRIORITIES = ['Low', 'Normal', 'High', 'Urgent'];
@@ -103,6 +100,22 @@ export function addDaysISO(iso: string, days: number): string {
   const d = new Date(iso + 'T00:00:00');
   d.setDate(d.getDate() + days);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Merge built-in options with user-added custom options, de-duplicated
+export function mergeOptions(base: string[], custom: string[]): string[] {
+  return Array.from(new Set([...base, ...custom]));
+}
+
+// True if a yyyy-mm-dd date falls within an optional [from, to] range.
+// When a bound is set, undated items are excluded.
+export function inDateRange(dateStr: string | undefined, from: string, to: string): boolean {
+  if (!from && !to) return true;
+  if (!dateStr) return false;
+  const d = dateStr.slice(0, 10);
+  if (from && d < from) return false;
+  if (to && d > to) return false;
+  return true;
 }
 
 // Overdue = a date in the past and the item isn't in one of the "done" statuses

@@ -1,33 +1,37 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { StudioSession, StudioComment, StudioActivity } from '@/lib/types';
+import { StudioSession, StudioComment, StudioActivity, StudioDropdownOption } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
-import { SESSION_STATUSES, SESSION_STATUS_COLORS, todayISO, logActivity } from '@/lib/studio';
-import { InlineText, PillSelect, MiniSelect, UrlCell, InlineDate, InlineNumber } from './cells';
+import { SESSION_STATUSES, SESSION_STATUS_COLORS, todayISO, logActivity, mergeOptions, inDateRange } from '@/lib/studio';
+import { InlineText, EditPillSelect, MiniSelect, UrlCell, InlineDate, InlineNumber } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
-
-const FIELDS: FieldDef[] = [
-  { key: 'name', label: 'Session / Desc', type: 'textarea', placeholder: 'Session name / description' },
-  { key: 'script_url', label: 'Link to Script', type: 'url' },
-  { key: 'date', label: 'Date', type: 'date' },
-  { key: 'location', label: 'Location', type: 'text', placeholder: 'optional' },
-  { key: 'status', label: 'Status', type: 'pill', options: SESSION_STATUSES, colors: SESSION_STATUS_COLORS },
-  { key: 'videos_planned', label: 'Videos to Film', type: 'number' },
-  { key: 'videos_filmed', label: 'Videos Filmed', type: 'number' },
-  { key: 'notes', label: 'Notes', type: 'textarea', placeholder: 'Add notes…' },
-];
 
 interface Props {
   sessions: StudioSession[];
   comments: StudioComment[];
   activity: StudioActivity[];
+  dropdownOptions: StudioDropdownOption[];
   onReload: () => void;
 }
 
-export default function FilmingSessions({ sessions, comments, activity, onReload }: Props) {
+export default function FilmingSessions({ sessions, comments, activity, dropdownOptions, onReload }: Props) {
   const [fStatus, setFStatus] = usePersistedState<string>('studio_f_status', 'All');
+  const [sortDir, setSortDir] = usePersistedState<'asc' | 'desc'>('studio_f_sortdir', 'asc');
+  const [dateFrom, setDateFrom] = usePersistedState<string>('studio_f_from', '');
+  const [dateTo, setDateTo] = usePersistedState<string>('studio_f_to', '');
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const custom = (field: string) => dropdownOptions.filter(o => o.field === field).map(o => o.value);
+  const statusOpts = mergeOptions(SESSION_STATUSES, custom('session_status'));
+
+  async function addOption(field: string, value: string) {
+    if (!dropdownOptions.some(o => o.field === field && o.value.toLowerCase() === value.toLowerCase())) {
+      await supabase.from('studio_dropdown_options').insert([{ field, value }]);
+    }
+    onReload();
+  }
 
   async function patch(id: string, p: Partial<StudioSession>) {
     await supabase.from('studio_sessions').update(p).eq('id', id);
@@ -53,16 +57,32 @@ export default function FilmingSessions({ sessions, comments, activity, onReload
   }
 
   const today = todayISO();
+  const present = (vals: (string | undefined)[]) => ['All', ...Array.from(new Set(vals.filter(Boolean) as string[]))];
+  const statusPresent = present(sessions.map(s => s.status));
 
   const filtered = useMemo(() => {
     let r = sessions;
     if (fStatus !== 'All') r = r.filter(s => s.status === fStatus);
-    const upcoming = r.filter(s => !s.date || s.date.slice(0, 10) >= today)
-      .sort((a, b) => (a.date ? a.date.slice(0, 10) : '9999').localeCompare(b.date ? b.date.slice(0, 10) : '9999'));
-    const past = r.filter(s => s.date && s.date.slice(0, 10) < today)
-      .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-    return [...upcoming, ...past];
-  }, [sessions, fStatus, today]);
+    if (dateFrom || dateTo) r = r.filter(s => inDateRange(s.date, dateFrom, dateTo));
+    return [...r].sort((a, b) => {
+      const ad = a.date ? a.date.slice(0, 10) : '';
+      const bd = b.date ? b.date.slice(0, 10) : '';
+      if (!ad && !bd) return 0;
+      if (!ad) return 1;
+      if (!bd) return -1;
+      return sortDir === 'asc' ? ad.localeCompare(bd) : bd.localeCompare(ad);
+    });
+  }, [sessions, fStatus, sortDir, dateFrom, dateTo]);
+
+  const fields: FieldDef[] = useMemo(() => [
+    { key: 'name', label: 'Session / Desc', type: 'textarea', placeholder: 'Session name / description' },
+    { key: 'script_url', label: 'Link to Script', type: 'url' },
+    { key: 'date', label: 'Date', type: 'date' },
+    { key: 'status', label: 'Status', type: 'pill', field: 'session_status', options: statusOpts, colors: SESSION_STATUS_COLORS },
+    { key: 'videos_planned', label: 'Videos to Film', type: 'number' },
+    { key: 'videos_filmed', label: 'Videos Filmed', type: 'number' },
+    { key: 'notes', label: 'Notes', type: 'textarea', placeholder: 'Add notes…' },
+  ], [statusOpts]);
 
   const selected = selectedId ? sessions.find(s => s.id === selectedId) : null;
 
@@ -70,17 +90,21 @@ export default function FilmingSessions({ sessions, comments, activity, onReload
     <div style={{ display: 'flex', alignItems: 'flex-start' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-          <MiniSelect value={fStatus} options={['All', ...SESSION_STATUSES]} onChange={setFStatus} />
-          <span style={{ fontSize: 11, color: '#555' }}>{filtered.length} {filtered.length === 1 ? 'session' : 'sessions'}</span>
-          <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={addSession}>
-            + Add Session
+          <MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} />
+          <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))} title="Sort by date">
+            Date {sortDir === 'asc' ? '↑ oldest' : '↓ newest'}
           </button>
+          <span style={{ fontSize: 10, color: '#444' }}>From</span>
+          <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+          <span style={{ fontSize: 10, color: '#444' }}>To</span>
+          <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
+          {(dateFrom || dateTo) && <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>clear</button>}
+          <span style={{ fontSize: 11, color: '#555' }}>{filtered.length} {filtered.length === 1 ? 'session' : 'sessions'}</span>
+          <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={addSession}>+ Add Session</button>
         </div>
 
         {filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', color: '#333', padding: '40px 0', fontSize: 12 }}>
-            No sessions match. Add a session or adjust filters.
-          </div>
+          <div style={{ textAlign: 'center', color: '#333', padding: '40px 0', fontSize: 12 }}>No sessions match. Add a session or adjust filters.</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
@@ -89,12 +113,11 @@ export default function FilmingSessions({ sessions, comments, activity, onReload
                   <th style={{ minWidth: 180 }}>Session / Description</th>
                   <th>Script</th>
                   <th>Date</th>
-                  <th>Location</th>
                   <th>Status</th>
                   <th>To Film</th>
                   <th>Filmed</th>
                   <th style={{ minWidth: 120 }}>Completion</th>
-                  <th style={{ minWidth: 150 }}>Notes</th>
+                  <th>Notes</th>
                   <th></th>
                 </tr>
               </thead>
@@ -105,43 +128,42 @@ export default function FilmingSessions({ sessions, comments, activity, onReload
                   const pct = planned > 0 ? Math.min(100, Math.round((filmed / planned) * 100)) : 0;
                   const isPast = s.date && s.date.slice(0, 10) < today;
                   return (
-                    <tr key={s.id} style={{ ...(isPast ? { opacity: 0.6 } : undefined), ...(selectedId === s.id ? { background: '#0f0f0f' } : undefined) }}>
-                      <td style={{ minWidth: 180 }}>
-                        <button
-                          onClick={() => setSelectedId(s.id)}
-                          style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                          title="Open details"
-                        >{s.name}</button>
-                      </td>
-                      <td><UrlCell value={s.script_url} onCommit={u => patch(s.id, { script_url: u })} /></td>
-                      <td><InlineDate value={s.date} onCommit={d => patch(s.id, { date: d || undefined })} /></td>
-                      <td>
-                        <InlineText value={s.location} onCommit={l => patch(s.id, { location: l })} placeholder="optional" style={{ width: 120 }} />
-                      </td>
-                      <td>
-                        <PillSelect value={s.status} options={SESSION_STATUSES} colors={SESSION_STATUS_COLORS} onChange={st => changeStatus(s, st)} />
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <InlineNumber value={planned} onCommit={n => patch(s.id, { videos_planned: n })} />
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <InlineNumber value={filmed} onCommit={n => patch(s.id, { videos_filmed: n })} />
-                      </td>
-                      <td style={{ minWidth: 120 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div className="progress-bar" style={{ flex: 1, minWidth: 60 }}>
-                            <div className={`progress-bar-fill${pct >= 100 ? ' complete' : ''}`} style={{ width: `${pct}%` }} />
+                    <Fragment key={s.id}>
+                      <tr style={{ ...(isPast ? { opacity: 0.6 } : undefined), ...(selectedId === s.id ? { background: '#0f0f0f' } : undefined) }}>
+                        <td style={{ minWidth: 180 }}>
+                          <button onClick={() => setSelectedId(s.id)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{s.name}</button>
+                        </td>
+                        <td><UrlCell value={s.script_url} onCommit={u => patch(s.id, { script_url: u })} /></td>
+                        <td><InlineDate value={s.date} onCommit={d => patch(s.id, { date: d || undefined })} /></td>
+                        <td><EditPillSelect field="session_status" value={s.status} options={statusOpts} colors={SESSION_STATUS_COLORS} onChange={st => changeStatus(s, st)} onAddOption={addOption} /></td>
+                        <td style={{ textAlign: 'center' }}><InlineNumber value={planned} onCommit={n => patch(s.id, { videos_planned: n })} /></td>
+                        <td style={{ textAlign: 'center' }}><InlineNumber value={filmed} onCommit={n => patch(s.id, { videos_filmed: n })} /></td>
+                        <td style={{ minWidth: 120 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div className="progress-bar" style={{ flex: 1, minWidth: 60 }}>
+                              <div className={`progress-bar-fill${pct >= 100 ? ' complete' : ''}`} style={{ width: `${pct}%` }} />
+                            </div>
+                            <span style={{ fontSize: 10, color: '#666', width: 30, textAlign: 'right' }}>{pct}%</span>
                           </div>
-                          <span style={{ fontSize: 10, color: '#666', width: 30, textAlign: 'right' }}>{pct}%</span>
-                        </div>
-                      </td>
-                      <td style={{ minWidth: 150 }}>
-                        <InlineText value={s.notes} onCommit={n => patch(s.id, { notes: n })} placeholder="Notes…" style={{ width: '100%' }} />
-                      </td>
-                      <td>
-                        <button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteSession(s.id)}>✕</button>
-                      </td>
-                    </tr>
+                        </td>
+                        <td>
+                          <button onClick={() => setExpanded(e => (e === s.id ? null : s.id))} className="btn-ghost" style={{ fontSize: 10, padding: '3px 8px', color: s.notes ? '#a5b4fc' : '#555' }} title="Expand notes">
+                            {s.notes ? '📝' : '+'} {expanded === s.id ? '▲' : '▾'}
+                          </button>
+                        </td>
+                        <td><button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteSession(s.id)}>✕</button></td>
+                      </tr>
+                      {expanded === s.id && (
+                        <tr>
+                          <td colSpan={9} style={{ background: '#0b0b0b' }}>
+                            <div style={{ padding: '4px 2px' }}>
+                              <div className="form-label" style={{ marginBottom: 4 }}>Notes</div>
+                              <InlineText value={s.notes} onCommit={n => patch(s.id, { notes: n })} placeholder="Add notes…" multiline style={{ width: '100%' }} />
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
                 })}
               </tbody>
@@ -155,9 +177,10 @@ export default function FilmingSessions({ sessions, comments, activity, onReload
           itemType="session"
           itemId={selected.id}
           title={selected.name}
-          fields={FIELDS}
+          fields={fields}
           values={selected}
           onChangeField={(key, value) => { if (key === 'status') changeStatus(selected, value); else patch(selected.id, { [key]: value }); }}
+          onAddOption={addOption}
           comments={comments}
           activity={activity}
           onReload={onReload}

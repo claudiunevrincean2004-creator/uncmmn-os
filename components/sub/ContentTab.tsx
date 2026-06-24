@@ -122,6 +122,7 @@ interface Props {
 export default function ContentTab({ client, posts, subscriberSnapshots, onReload }: Props) {
   const [showModal, setShowModal] = useState(false);
   const [editPost, setEditPost] = useState<Post | null>(null);
+  const [visibleCount, setVisibleCount] = useState(5);
 
   const [activePlat, setActivePlat] = usePersistedState<PlatformChoice>('content_platform', 'All');
   const [timePeriod, setTimePeriod] = usePersistedState<TimePeriod>('content_period', '30d');
@@ -317,6 +318,9 @@ export default function ContentTab({ client, posts, subscriberSnapshots, onReloa
       return sortDir === 'desc' ? bv - av : av - bv;
     });
   }, [tablePosts, filterPillar, filterFormat, sortKey, sortDir]);
+
+  // Only show the first N posts by default; "Show More" reveals 10 more each click
+  const visible = filtered.slice(0, visibleCount);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir(d => (d === 'desc' ? 'asc' : 'desc'));
@@ -589,7 +593,7 @@ export default function ContentTab({ client, posts, subscriberSnapshots, onReloa
               </tr>
             </thead>
             <tbody>
-              {filtered.map(post => {
+              {visible.map(post => {
                 const isOutlier = avgViewsAllTime > 0 && post.views >= avgViewsAllTime * 1.5;
                 return (
                   <tr key={post.id}>
@@ -633,6 +637,21 @@ export default function ContentTab({ client, posts, subscriberSnapshots, onReloa
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {filtered.length > 5 && (
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 12 }}>
+          {visibleCount < filtered.length && (
+            <button className="btn-ghost" style={{ fontSize: 11, padding: '5px 14px' }} onClick={() => setVisibleCount(c => c + 10)}>
+              Show More <span style={{ color: '#444' }}>({filtered.length - visibleCount} more)</span>
+            </button>
+          )}
+          {visibleCount > 5 && (
+            <button className="btn-ghost" style={{ fontSize: 11, padding: '5px 14px' }} onClick={() => setVisibleCount(5)}>
+              Show Less
+            </button>
+          )}
         </div>
       )}
 

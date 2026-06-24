@@ -33,16 +33,6 @@ export interface SubscriberSnapshot {
   date: string;
 }
 
-export interface Goal {
-  id: string;
-  client_id: string;
-  name: string;
-  current_val: number;
-  target_val: number;
-  platform: string;
-  created_at?: string;
-}
-
 export interface DriveFolder {
   id: string;
   client_id: string;
@@ -61,7 +51,7 @@ export interface RevenueEntry {
   created_at?: string;
 }
 
-export type MainPage = 'dashboard' | 'content' | 'research' | 'goals' | 'drive' | 'studio';
+export type MainPage = 'dashboard' | 'content' | 'research' | 'drive' | 'studio';
 
 export interface StudioVideo {
   id: string;
@@ -92,17 +82,38 @@ export interface StudioSequence {
 
 export interface StudioAdCreative {
   id: string;
+  creative_id?: string;
+  date_added?: string;
+  ad_format?: string;
+  angle?: string;
+  hook?: string;
+  buyer_feedback?: string;
+  status: string;
+  // legacy columns kept on the table but no longer surfaced in the UI
   source_video_title?: string;
   source_video_url?: string;
-  ad_format?: string;
   cta_type?: string;
   custom_cta?: string;
-  status: string;
   creative_url?: string;
   platform?: string;
   deadline?: string;
   notes?: string;
   assigned_to?: string;
+  created_at?: string;
+}
+
+export interface StudioQuickLink {
+  id: string;
+  context: string;
+  label?: string;
+  url?: string;
+  created_at?: string;
+}
+
+export interface StudioDropdownOption {
+  id: string;
+  field: string;
+  value: string;
   created_at?: string;
 }
 

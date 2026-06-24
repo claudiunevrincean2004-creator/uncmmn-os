@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StudioComment, StudioActivity } from '@/lib/types';
 import { formatActivityTime } from '@/lib/studio';
-import { InlineText, MiniSelect, PillSelect, InlineDate, InlineNumber } from './cells';
+import { InlineText, MiniSelect, PillSelect, EditSelect, EditPillSelect, InlineDate, InlineNumber } from './cells';
 
 export interface FieldDef {
   key: string;
@@ -12,6 +12,7 @@ export interface FieldDef {
   options?: string[];
   colors?: Record<string, string>;
   placeholder?: string;
+  field?: string; // dropdown-option key — enables "+ Add new…" for select/pill
   visibleIf?: (values: Record<string, any>) => boolean;
 }
 
@@ -22,13 +23,14 @@ interface Props {
   fields: FieldDef[];
   values: Record<string, any>;
   onChangeField: (key: string, value: any) => void;
+  onAddOption: (field: string, value: string) => void;
   comments: StudioComment[];
   activity: StudioActivity[];
   onReload: () => void;
   onClose: () => void;
 }
 
-function FieldControl({ field, values, onChangeField }: { field: FieldDef; values: Record<string, any>; onChangeField: (k: string, v: any) => void }) {
+function FieldControl({ field, values, onChangeField, onAddOption }: { field: FieldDef; values: Record<string, any>; onChangeField: (k: string, v: any) => void; onAddOption: (f: string, v: string) => void }) {
   const value = values[field.key];
   switch (field.type) {
     case 'text':
@@ -40,9 +42,13 @@ function FieldControl({ field, values, onChangeField }: { field: FieldDef; value
     case 'date':
       return <InlineDate value={value} onCommit={v => onChangeField(field.key, v || undefined)} />;
     case 'select':
-      return <MiniSelect value={value} options={field.options || []} onChange={v => onChangeField(field.key, v)} placeholder="—" width="100%" />;
+      return field.field
+        ? <EditSelect field={field.field} value={value} options={field.options || []} onChange={v => onChangeField(field.key, v)} onAddOption={onAddOption} placeholder="—" width="100%" />
+        : <MiniSelect value={value} options={field.options || []} onChange={v => onChangeField(field.key, v)} placeholder="—" width="100%" />;
     case 'pill':
-      return <PillSelect value={value} options={field.options || []} colors={field.colors || {}} onChange={v => onChangeField(field.key, v)} />;
+      return field.field
+        ? <EditPillSelect field={field.field} value={value} options={field.options || []} colors={field.colors || {}} onChange={v => onChangeField(field.key, v)} onAddOption={onAddOption} />
+        : <PillSelect value={value} options={field.options || []} colors={field.colors || {}} onChange={v => onChangeField(field.key, v)} />;
     case 'url':
       return (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
@@ -60,7 +66,7 @@ function FieldControl({ field, values, onChangeField }: { field: FieldDef; value
   }
 }
 
-export default function ItemPanel({ itemType, itemId, title, fields, values, onChangeField, comments, activity, onReload, onClose }: Props) {
+export default function ItemPanel({ itemType, itemId, title, fields, values, onChangeField, onAddOption, comments, activity, onReload, onClose }: Props) {
   const [newComment, setNewComment] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -123,7 +129,7 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
         {fields.filter(f => !f.visibleIf || f.visibleIf(values)).map(f => (
           <div key={f.key} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 10, alignItems: 'start' }}>
             <div style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, paddingTop: 6 }}>{f.label}</div>
-            <div><FieldControl field={f} values={values} onChangeField={onChangeField} /></div>
+            <div><FieldControl field={f} values={values} onChangeField={onChangeField} onAddOption={onAddOption} /></div>
           </div>
         ))}
       </div>

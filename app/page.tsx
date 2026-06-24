@@ -2,13 +2,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { checkSchema, getMigrationSQL } from '@/lib/setup-db';
-import { Client, Post, Goal, DriveFolder, SubscriberSnapshot, ResearchItem, StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity, MainPage } from '@/lib/types';
+import { Client, Post, DriveFolder, SubscriberSnapshot, ResearchItem, StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, MainPage } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 
 import Sidebar from '@/components/Sidebar';
 import Dashboard from '@/components/Dashboard';
 import ContentTab from '@/components/sub/ContentTab';
-import GoalsTab from '@/components/sub/GoalsTab';
 import ResearchTab from '@/components/sub/ResearchTab';
 import DriveTab from '@/components/sub/DriveTab';
 import StudioTab from '@/components/sub/StudioTab';
@@ -27,7 +26,6 @@ const PAGE_LABELS: Record<MainPage, string> = {
   dashboard: 'Dashboard',
   content: 'Content',
   research: 'Research',
-  goals: 'Goals',
   drive: 'Drive',
   studio: 'Studio',
 };
@@ -35,7 +33,6 @@ const PAGE_LABELS: Record<MainPage, string> = {
 export default function Home() {
   const [client, setClient] = useState<Client | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
-  const [goals, setGoals] = useState<Goal[]>([]);
   const [driveFolders, setDriveFolders] = useState<DriveFolder[]>([]);
   const [subscriberSnapshots, setSubscriberSnapshots] = useState<SubscriberSnapshot[]>([]);
   const [researchItems, setResearchItems] = useState<ResearchItem[]>([]);
@@ -45,8 +42,10 @@ export default function Home() {
   const [studioAdCreatives, setStudioAdCreatives] = useState<StudioAdCreative[]>([]);
   const [studioComments, setStudioComments] = useState<StudioComment[]>([]);
   const [studioActivity, setStudioActivity] = useState<StudioActivity[]>([]);
+  const [studioQuickLinks, setStudioQuickLinks] = useState<StudioQuickLink[]>([]);
+  const [studioDropdownOptions, setStudioDropdownOptions] = useState<StudioDropdownOption[]>([]);
   const [loading, setLoading] = useState(true);
-  const [schemaMissing, setSchemaMissing] = useState<{ missing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[] } | null>(null);
+  const [schemaMissing, setSchemaMissing] = useState<{ missing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[]; adColumnsMissing: string[] } | null>(null);
   const [showMigrationSQL, setShowMigrationSQL] = useState(false);
 
   const [mainPage, setMainPage] = usePersistedState<MainPage>('main_page', 'dashboard');
@@ -54,16 +53,15 @@ export default function Home() {
 
   // Migrate stale persisted page values from prior builds
   useEffect(() => {
-    if (!(['dashboard', 'content', 'research', 'goals', 'drive', 'studio'] as const).includes(mainPage)) {
+    if (!(['dashboard', 'content', 'research', 'drive', 'studio'] as const).includes(mainPage)) {
       setMainPage('dashboard');
     }
   }, [mainPage, setMainPage]);
 
   const loadData = useCallback(async () => {
-    const [c, p, g, d, ss, ri, sv, sq, sn, ac, cm, av] = await Promise.all([
+    const [c, p, d, ss, ri, sv, sq, sn, ac, cm, av, ql, dr] = await Promise.all([
       safeSelect('clients', 'created_at'),
       safeSelect('posts', 'date', false),
-      safeSelect('goals', 'created_at'),
       safeSelect('drive_folders', 'category'),
       safeSelect('subscriber_snapshots', 'date'),
       safeSelect('research_items', 'created_at', false),
@@ -73,6 +71,8 @@ export default function Home() {
       safeSelect('studio_ad_creatives', 'created_at', false),
       safeSelect('studio_comments', 'created_at'),
       safeSelect('studio_activity', 'created_at', false),
+      safeSelect('studio_quick_links', 'created_at'),
+      safeSelect('studio_dropdown_options', 'created_at'),
     ]);
 
     let active = (c as Client[])[0] || null;
@@ -88,7 +88,6 @@ export default function Home() {
 
     setClient(active);
     setPosts(p as Post[]);
-    setGoals(g as Goal[]);
     setDriveFolders(d as DriveFolder[]);
     setSubscriberSnapshots(ss as SubscriberSnapshot[]);
     setResearchItems(ri as ResearchItem[]);
@@ -98,12 +97,14 @@ export default function Home() {
     setStudioAdCreatives(ac as StudioAdCreative[]);
     setStudioComments(cm as StudioComment[]);
     setStudioActivity(av as StudioActivity[]);
+    setStudioQuickLinks(ql as StudioQuickLink[]);
+    setStudioDropdownOptions(dr as StudioDropdownOption[]);
     setLoading(false);
   }, []);
 
   useEffect(() => {
     checkSchema().then(result => {
-      if (result.missing.length > 0 || result.postColumnsMissing.length > 0 || result.researchColumnsMissing.length > 0) {
+      if (result.missing.length > 0 || result.postColumnsMissing.length > 0 || result.researchColumnsMissing.length > 0 || result.adColumnsMissing.length > 0) {
         setSchemaMissing(result);
       }
     });
@@ -131,13 +132,13 @@ export default function Home() {
       />
 
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {schemaMissing && (schemaMissing.missing.length > 0 || schemaMissing.postColumnsMissing.length > 0 || schemaMissing.researchColumnsMissing.length > 0) && (
+        {schemaMissing && (schemaMissing.missing.length > 0 || schemaMissing.postColumnsMissing.length > 0 || schemaMissing.researchColumnsMissing.length > 0 || schemaMissing.adColumnsMissing.length > 0) && (
           <div style={{ background: '#1a1000', borderBottom: '1px solid #3a2a00', padding: '10px 24px', flexShrink: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <span style={{ color: '#f59e0b', fontWeight: 600, fontSize: 12 }}>Database setup required</span>
                 <span style={{ color: '#888', fontSize: 11, marginLeft: 8 }}>
-                  Missing: {[...schemaMissing.missing, ...schemaMissing.postColumnsMissing.map(c => `posts.${c}`), ...schemaMissing.researchColumnsMissing.map(c => `research_items.${c}`)].join(', ')}
+                  Missing: {[...schemaMissing.missing, ...schemaMissing.postColumnsMissing.map(c => `posts.${c}`), ...schemaMissing.researchColumnsMissing.map(c => `research_items.${c}`), ...schemaMissing.adColumnsMissing.map(c => `studio_ad_creatives.${c}`)].join(', ')}
                 </span>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
@@ -153,7 +154,7 @@ export default function Home() {
                   style={{ fontSize: 10, padding: '4px 10px' }}
                   onClick={() => {
                     checkSchema().then(result => {
-                      if (result.missing.length === 0 && result.postColumnsMissing.length === 0 && result.researchColumnsMissing.length === 0) {
+                      if (result.missing.length === 0 && result.postColumnsMissing.length === 0 && result.researchColumnsMissing.length === 0 && result.adColumnsMissing.length === 0) {
                         setSchemaMissing(null);
                         setShowMigrationSQL(false);
                         loadData();
@@ -184,11 +185,11 @@ export default function Home() {
                     cursor: 'pointer',
                   }}
                   onClick={() => {
-                    navigator.clipboard.writeText(getMigrationSQL(schemaMissing.missing, schemaMissing.postColumnsMissing, schemaMissing.researchColumnsMissing));
+                    navigator.clipboard.writeText(getMigrationSQL(schemaMissing.missing, schemaMissing.postColumnsMissing, schemaMissing.researchColumnsMissing, schemaMissing.adColumnsMissing));
                   }}
                   title="Click to copy"
                 >
-                  {getMigrationSQL(schemaMissing.missing, schemaMissing.postColumnsMissing, schemaMissing.researchColumnsMissing)}
+                  {getMigrationSQL(schemaMissing.missing, schemaMissing.postColumnsMissing, schemaMissing.researchColumnsMissing, schemaMissing.adColumnsMissing)}
                 </pre>
                 <div style={{ fontSize: 9, color: '#555', marginTop: 4 }}>Click the SQL block to copy. After running it, click "Re-check" above.</div>
               </div>
@@ -228,11 +229,6 @@ export default function Home() {
               <ResearchTab client={client} items={researchItems} onReload={loadData} />
             </div>
           )}
-          {client && mainPage === 'goals' && (
-            <div style={{ padding: '16px 24px' }}>
-              <GoalsTab client={client} goals={goals} onReload={loadData} />
-            </div>
-          )}
           {client && mainPage === 'drive' && (
             <div style={{ padding: '16px 24px' }}>
               <DriveTab client={client} driveFolders={driveFolders} onReload={loadData} />
@@ -247,6 +243,8 @@ export default function Home() {
                 adCreatives={studioAdCreatives}
                 comments={studioComments}
                 activity={studioActivity}
+                quickLinks={studioQuickLinks}
+                dropdownOptions={studioDropdownOptions}
                 onReload={loadData}
               />
             </div>

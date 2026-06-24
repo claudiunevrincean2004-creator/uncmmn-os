@@ -126,17 +126,45 @@ create table if not exists studio_sessions (
 -- Studio — Ad Creative pipeline
 create table if not exists studio_ad_creatives (
   id uuid primary key default gen_random_uuid(),
+  creative_id text,
+  date_added date default current_date,
+  ad_format text,
+  angle text,
+  hook text,
+  buyer_feedback text,
+  status text default 'Paused',
   source_video_title text,
   source_video_url text,
-  ad_format text,
   cta_type text,
   custom_cta text,
-  status text default 'Pending',
   creative_url text,
   platform text,
   deadline date,
   notes text,
   assigned_to text,
+  created_at timestamptz default now()
+);
+-- Migrate older installs of studio_ad_creatives to the new columns
+alter table studio_ad_creatives add column if not exists creative_id text;
+alter table studio_ad_creatives add column if not exists date_added date default current_date;
+alter table studio_ad_creatives add column if not exists angle text;
+alter table studio_ad_creatives add column if not exists hook text;
+alter table studio_ad_creatives add column if not exists buyer_feedback text;
+
+-- Studio — Quick links (editable per-context shortcut buttons)
+create table if not exists studio_quick_links (
+  id uuid primary key default gen_random_uuid(),
+  context text not null,
+  label text,
+  url text,
+  created_at timestamptz default now()
+);
+
+-- Studio — User-defined dropdown options (custom values per field)
+create table if not exists studio_dropdown_options (
+  id uuid primary key default gen_random_uuid(),
+  field text not null,
+  value text not null,
   created_at timestamptz default now()
 );
 
@@ -193,3 +221,11 @@ create policy "anon_all_studio_comments" on studio_comments for all to anon usin
 alter table studio_activity enable row level security;
 drop policy if exists "anon_all_studio_activity" on studio_activity;
 create policy "anon_all_studio_activity" on studio_activity for all to anon using (true) with check (true);
+
+alter table studio_quick_links enable row level security;
+drop policy if exists "Allow all for anon" on studio_quick_links;
+create policy "Allow all for anon" on studio_quick_links for all using (true) with check (true);
+
+alter table studio_dropdown_options enable row level security;
+drop policy if exists "Allow all for anon" on studio_dropdown_options;
+create policy "Allow all for anon" on studio_dropdown_options for all using (true) with check (true);

@@ -12,7 +12,6 @@ const NAV: NavItem[] = [
   { key: 'content', label: 'Content', icon: '▦' },
   { key: 'research', label: 'Research', icon: '✦' },
   { key: 'studio', label: 'Studio', icon: '◈' },
-  { key: 'goals', label: 'Goals', icon: '◉' },
   { key: 'drive', label: 'Drive', icon: '▤' },
 ];
 

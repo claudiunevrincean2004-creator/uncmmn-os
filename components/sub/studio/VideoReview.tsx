@@ -1,48 +1,52 @@
 'use client';
 import { Fragment, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { StudioVideo, StudioComment, StudioActivity } from '@/lib/types';
+import { StudioVideo, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 import {
   VIDEO_FORMATS, VIDEO_STATUSES, VIDEO_STATUS_COLORS,
   PRIORITIES, PRIORITY_COLORS, TEAM,
-  isOverdue, logActivity,
+  isOverdue, logActivity, todayISO, mergeOptions, inDateRange,
 } from '@/lib/studio';
-import { InlineText, PillSelect, MiniSelect, UrlCell, InlineDate } from './cells';
+import { InlineText, EditSelect, EditPillSelect, MiniSelect, UrlCell, InlineDate } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
+import QuickLinks from './QuickLinks';
 
 const DONE = ['Approved', 'Posted'];
-
-const FIELDS: FieldDef[] = [
-  { key: 'title', label: 'Title / Desc', type: 'textarea', placeholder: 'Title / description' },
-  { key: 'format', label: 'Format', type: 'select', options: VIDEO_FORMATS },
-  { key: 'assigned_to', label: 'Assigned To', type: 'select', options: TEAM },
-  { key: 'status', label: 'Status', type: 'pill', options: VIDEO_STATUSES, colors: VIDEO_STATUS_COLORS },
-  { key: 'priority', label: 'Priority', type: 'pill', options: PRIORITIES, colors: PRIORITY_COLORS },
-  { key: 'brief_url', label: 'Brief', type: 'url' },
-  { key: 'raw_files_url', label: 'Raw Files', type: 'url' },
-  { key: 'final_url', label: 'Final Product', type: 'url' },
-  { key: 'deadline', label: 'Deadline', type: 'date' },
-  { key: 'revision_count', label: 'Revisions', type: 'readonly' },
-  { key: 'notes', label: 'Notes', type: 'textarea', placeholder: 'Add notes…' },
-];
 
 interface Props {
   videos: StudioVideo[];
   comments: StudioComment[];
   activity: StudioActivity[];
+  quickLinks: StudioQuickLink[];
+  dropdownOptions: StudioDropdownOption[];
   onReload: () => void;
   showToast: (msg: string) => void;
 }
 
-export default function VideoReview({ videos, comments, activity, onReload, showToast }: Props) {
+export default function VideoReview({ videos, comments, activity, quickLinks, dropdownOptions, onReload, showToast }: Props) {
   const [fStatus, setFStatus] = usePersistedState<string>('studio_v_status', 'All');
   const [fAssigned, setFAssigned] = usePersistedState<string>('studio_v_assigned', 'All');
   const [fFormat, setFFormat] = usePersistedState<string>('studio_v_format', 'All');
   const [fPriority, setFPriority] = usePersistedState<string>('studio_v_priority', 'All');
   const [sortDir, setSortDir] = usePersistedState<'asc' | 'desc'>('studio_v_sortdir', 'asc');
+  const [dateFrom, setDateFrom] = usePersistedState<string>('studio_v_from', '');
+  const [dateTo, setDateTo] = usePersistedState<string>('studio_v_to', '');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const custom = (field: string) => dropdownOptions.filter(o => o.field === field).map(o => o.value);
+  const formatOpts = mergeOptions(VIDEO_FORMATS, custom('video_format'));
+  const assignedOpts = mergeOptions(TEAM, custom('video_assigned_to'));
+  const statusOpts = mergeOptions(VIDEO_STATUSES, custom('video_status'));
+  const priorityOpts = mergeOptions(PRIORITIES, custom('video_priority'));
+
+  async function addOption(field: string, value: string) {
+    if (!dropdownOptions.some(o => o.field === field && o.value.toLowerCase() === value.toLowerCase())) {
+      await supabase.from('studio_dropdown_options').insert([{ field, value }]);
+    }
+    onReload();
+  }
 
   async function patch(id: string, p: Partial<StudioVideo>) {
     await supabase.from('studio_videos').update(p).eq('id', id);
@@ -59,9 +63,11 @@ export default function VideoReview({ videos, comments, activity, onReload, show
     // Automation: spawn an Ad Creative entry when a video needs an ad variation
     if (status === 'Ad Variation Needed') {
       await supabase.from('studio_ad_creatives').insert([{
-        source_video_title: v.title,
+        creative_id: v.title,
         source_video_url: v.final_url || null,
-        status: 'Pending',
+        date_added: todayISO(),
+        ad_format: 'Video',
+        status: 'Paused',
       }]);
       showToast(`Ad variation created for ${v.title}`);
     }
@@ -80,10 +86,12 @@ export default function VideoReview({ videos, comments, activity, onReload, show
     onReload();
   }
 
-  const assignedOptions = useMemo(
-    () => ['All', ...Array.from(new Set([...TEAM, ...videos.map(v => v.assigned_to).filter(Boolean) as string[]]))],
-    [videos]
-  );
+  // Filter dropdowns only offer values actually present in the data
+  const present = (vals: (string | undefined)[]) => ['All', ...Array.from(new Set(vals.filter(Boolean) as string[]))];
+  const statusPresent = present(videos.map(v => v.status));
+  const assignedPresent = present(videos.map(v => v.assigned_to));
+  const formatPresent = present(videos.map(v => v.format));
+  const priorityPresent = present(videos.map(v => v.priority || 'Normal'));
 
   const filtered = useMemo(() => {
     let r = videos;
@@ -91,6 +99,7 @@ export default function VideoReview({ videos, comments, activity, onReload, show
     if (fAssigned !== 'All') r = r.filter(v => (v.assigned_to || '') === fAssigned);
     if (fFormat !== 'All') r = r.filter(v => (v.format || '') === fFormat);
     if (fPriority !== 'All') r = r.filter(v => (v.priority || 'Normal') === fPriority);
+    if (dateFrom || dateTo) r = r.filter(v => inDateRange(v.deadline, dateFrom, dateTo));
     return [...r].sort((a, b) => {
       const ad = a.deadline ? a.deadline.slice(0, 10) : '';
       const bd = b.deadline ? b.deadline.slice(0, 10) : '';
@@ -99,36 +108,48 @@ export default function VideoReview({ videos, comments, activity, onReload, show
       if (!bd) return -1;
       return sortDir === 'asc' ? ad.localeCompare(bd) : bd.localeCompare(ad);
     });
-  }, [videos, fStatus, fAssigned, fFormat, fPriority, sortDir]);
+  }, [videos, fStatus, fAssigned, fFormat, fPriority, sortDir, dateFrom, dateTo]);
+
+  const fields: FieldDef[] = useMemo(() => [
+    { key: 'title', label: 'Title / Desc', type: 'textarea', placeholder: 'Title / description' },
+    { key: 'format', label: 'Format', type: 'select', field: 'video_format', options: formatOpts },
+    { key: 'assigned_to', label: 'Assigned To', type: 'select', field: 'video_assigned_to', options: assignedOpts },
+    { key: 'status', label: 'Status', type: 'pill', field: 'video_status', options: statusOpts, colors: VIDEO_STATUS_COLORS },
+    { key: 'priority', label: 'Priority', type: 'pill', field: 'video_priority', options: priorityOpts, colors: PRIORITY_COLORS },
+    { key: 'brief_url', label: 'Brief', type: 'url' },
+    { key: 'raw_files_url', label: 'Raw Files', type: 'url' },
+    { key: 'final_url', label: 'Final Product', type: 'url' },
+    { key: 'deadline', label: 'Deadline', type: 'date' },
+    { key: 'revision_count', label: 'Revisions', type: 'readonly' },
+    { key: 'notes', label: 'Notes', type: 'textarea', placeholder: 'Add notes…' },
+  ], [formatOpts, assignedOpts, statusOpts, priorityOpts]);
 
   const selected = selectedId ? videos.find(v => v.id === selectedId) : null;
 
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
+        <QuickLinks context="video-review" links={quickLinks} onReload={onReload} />
+
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-          <MiniSelect value={fStatus} options={['All', ...VIDEO_STATUSES]} onChange={setFStatus} />
-          <MiniSelect value={fAssigned} options={assignedOptions} onChange={setFAssigned} />
-          <MiniSelect value={fFormat} options={['All', ...VIDEO_FORMATS]} onChange={setFFormat} />
-          <MiniSelect value={fPriority} options={['All', ...PRIORITIES]} onChange={setFPriority} />
-          <button
-            className="btn-ghost"
-            style={{ fontSize: 11, padding: '4px 10px' }}
-            onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))}
-            title="Sort by deadline"
-          >
-            Deadline {sortDir === 'asc' ? '↑' : '↓'}
+          <MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} />
+          <MiniSelect value={fAssigned} options={assignedPresent} onChange={setFAssigned} />
+          <MiniSelect value={fFormat} options={formatPresent} onChange={setFFormat} />
+          <MiniSelect value={fPriority} options={priorityPresent} onChange={setFPriority} />
+          <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))} title="Sort by deadline">
+            Deadline {sortDir === 'asc' ? '↑ oldest' : '↓ newest'}
           </button>
+          <span style={{ fontSize: 10, color: '#444' }}>From</span>
+          <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+          <span style={{ fontSize: 10, color: '#444' }}>To</span>
+          <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
+          {(dateFrom || dateTo) && <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>clear</button>}
           <span style={{ fontSize: 11, color: '#555' }}>{filtered.length} {filtered.length === 1 ? 'video' : 'videos'}</span>
-          <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={addVideo}>
-            + Add Video
-          </button>
+          <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={addVideo}>+ Add Video</button>
         </div>
 
         {filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', color: '#333', padding: '40px 0', fontSize: 12 }}>
-            No videos match. Add a video or adjust filters.
-          </div>
+          <div style={{ textAlign: 'center', color: '#333', padding: '40px 0', fontSize: 12 }}>No videos match. Add a video or adjust filters.</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
@@ -155,21 +176,11 @@ export default function VideoReview({ videos, comments, activity, onReload, show
                     <Fragment key={v.id}>
                       <tr style={overdue ? { background: 'rgba(239,68,68,0.06)', boxShadow: 'inset 3px 0 0 #ef4444' } : (selectedId === v.id ? { background: '#0f0f0f' } : undefined)}>
                         <td style={{ minWidth: 180 }}>
-                          <button
-                            onClick={() => setSelectedId(v.id)}
-                            style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                            title="Open details"
-                          >{v.title}</button>
+                          <button onClick={() => setSelectedId(v.id)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{v.title}</button>
                         </td>
-                        <td>
-                          <MiniSelect value={v.format} options={VIDEO_FORMATS} onChange={f => patch(v.id, { format: f })} placeholder="—" />
-                        </td>
-                        <td>
-                          <MiniSelect value={v.assigned_to} options={TEAM} onChange={a => patch(v.id, { assigned_to: a })} placeholder="—" />
-                        </td>
-                        <td>
-                          <PillSelect value={v.status} options={VIDEO_STATUSES} colors={VIDEO_STATUS_COLORS} onChange={s => changeStatus(v, s)} />
-                        </td>
+                        <td><EditSelect field="video_format" value={v.format} options={formatOpts} onChange={f => patch(v.id, { format: f })} onAddOption={addOption} placeholder="—" /></td>
+                        <td><EditSelect field="video_assigned_to" value={v.assigned_to} options={assignedOpts} onChange={a => patch(v.id, { assigned_to: a })} onAddOption={addOption} placeholder="—" /></td>
+                        <td><EditPillSelect field="video_status" value={v.status} options={statusOpts} colors={VIDEO_STATUS_COLORS} onChange={s => changeStatus(v, s)} onAddOption={addOption} /></td>
                         <td><UrlCell value={v.brief_url} onCommit={u => patch(v.id, { brief_url: u })} /></td>
                         <td><UrlCell value={v.raw_files_url} onCommit={u => patch(v.id, { raw_files_url: u })} /></td>
                         <td><UrlCell value={v.final_url} onCommit={u => patch(v.id, { final_url: u })} /></td>
@@ -179,27 +190,18 @@ export default function VideoReview({ videos, comments, activity, onReload, show
                             {overdue && <span style={{ color: '#ef4444', fontSize: 9, fontWeight: 700, whiteSpace: 'nowrap' }}>OVERDUE</span>}
                           </div>
                         </td>
-                        <td>
-                          <PillSelect value={v.priority || 'Normal'} options={PRIORITIES} colors={PRIORITY_COLORS} onChange={p => patch(v.id, { priority: p })} />
-                        </td>
+                        <td><EditPillSelect field="video_priority" value={v.priority || 'Normal'} options={priorityOpts} colors={PRIORITY_COLORS} onChange={p => patch(v.id, { priority: p })} onAddOption={addOption} /></td>
                         <td style={{ textAlign: 'center' }}>
                           {v.revision_count > 0
                             ? <span className="badge" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }} title={`${v.revision_count} revision round(s)`}>{v.revision_count}</span>
                             : <span style={{ color: '#333' }}>0</span>}
                         </td>
                         <td>
-                          <button
-                            onClick={() => setExpanded(e => (e === v.id ? null : v.id))}
-                            className="btn-ghost"
-                            style={{ fontSize: 10, padding: '3px 8px', color: v.notes ? '#a5b4fc' : '#555' }}
-                            title="Expand notes"
-                          >
+                          <button onClick={() => setExpanded(e => (e === v.id ? null : v.id))} className="btn-ghost" style={{ fontSize: 10, padding: '3px 8px', color: v.notes ? '#a5b4fc' : '#555' }} title="Expand notes">
                             {v.notes ? '📝' : '+'} {expanded === v.id ? '▲' : '▾'}
                           </button>
                         </td>
-                        <td>
-                          <button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteVideo(v.id)}>✕</button>
-                        </td>
+                        <td><button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteVideo(v.id)}>✕</button></td>
                       </tr>
                       {expanded === v.id && (
                         <tr>
@@ -225,9 +227,10 @@ export default function VideoReview({ videos, comments, activity, onReload, show
           itemType="video"
           itemId={selected.id}
           title={selected.title}
-          fields={FIELDS}
+          fields={fields}
           values={selected}
           onChangeField={(key, value) => { if (key === 'status') changeStatus(selected, value); else patch(selected.id, { [key]: value }); }}
+          onAddOption={addOption}
           comments={comments}
           activity={activity}
           onReload={onReload}

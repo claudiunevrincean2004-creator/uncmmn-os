@@ -1,11 +1,12 @@
 import { supabase } from './supabase';
 
-export async function checkSchema(): Promise<{ missing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[] }> {
+export async function checkSchema(): Promise<{ missing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[]; adColumnsMissing: string[] }> {
   const requiredTables = [
     'clients', 'posts', 'goals', 'drive_folders',
     'subscriber_snapshots', 'research_items', 'revenue_entries',
     'studio_videos', 'studio_sequences', 'studio_sessions',
     'studio_ad_creatives', 'studio_comments', 'studio_activity',
+    'studio_quick_links', 'studio_dropdown_options',
   ];
 
   const missing: string[] = [];
@@ -34,10 +35,22 @@ export async function checkSchema(): Promise<{ missing: string[]; postColumnsMis
     }
   }
 
-  return { missing, postColumnsMissing, researchColumnsMissing };
+  // New columns added to the (already-existing) studio_ad_creatives table.
+  // Probe each column directly so we detect them even when the table is empty.
+  const adColumnsMissing: string[] = [];
+  if (!missing.includes('studio_ad_creatives')) {
+    for (const col of ['creative_id', 'date_added', 'angle', 'hook', 'buyer_feedback']) {
+      const { error } = await supabase.from('studio_ad_creatives').select(col).limit(0);
+      if (error && (error.code === '42703' || error.code === 'PGRST204' || /column/i.test(error.message))) {
+        adColumnsMissing.push(col);
+      }
+    }
+  }
+
+  return { missing, postColumnsMissing, researchColumnsMissing, adColumnsMissing };
 }
 
-export function getMigrationSQL(missing: string[], postColumnsMissing: string[] = [], researchColumnsMissing: string[] = []): string {
+export function getMigrationSQL(missing: string[], postColumnsMissing: string[] = [], researchColumnsMissing: string[] = [], adColumnsMissing: string[] = []): string {
   const parts: string[] = [];
 
   if (missing.includes('clients')) {
@@ -195,12 +208,17 @@ create policy "anon_all_studio_sessions" on studio_sessions for all to anon usin
   if (missing.includes('studio_ad_creatives')) {
     parts.push(`create table if not exists studio_ad_creatives (
   id uuid primary key default gen_random_uuid(),
+  creative_id text,
+  date_added date default current_date,
+  ad_format text,
+  angle text,
+  hook text,
+  buyer_feedback text,
+  status text default 'Paused',
   source_video_title text,
   source_video_url text,
-  ad_format text,
   cta_type text,
   custom_cta text,
-  status text default 'Pending',
   creative_url text,
   platform text,
   deadline date,
@@ -239,6 +257,43 @@ create policy "anon_all_studio_comments" on studio_comments for all to anon usin
 alter table studio_activity enable row level security;
 drop policy if exists "anon_all_studio_activity" on studio_activity;
 create policy "anon_all_studio_activity" on studio_activity for all to anon using (true) with check (true);`);
+  }
+
+  if (missing.includes('studio_quick_links')) {
+    parts.push(`create table if not exists studio_quick_links (
+  id uuid primary key default gen_random_uuid(),
+  context text not null,
+  label text,
+  url text,
+  created_at timestamptz default now()
+);
+alter table studio_quick_links enable row level security;
+drop policy if exists "Allow all for anon" on studio_quick_links;
+create policy "Allow all for anon" on studio_quick_links for all using (true) with check (true);`);
+  }
+
+  if (missing.includes('studio_dropdown_options')) {
+    parts.push(`create table if not exists studio_dropdown_options (
+  id uuid primary key default gen_random_uuid(),
+  field text not null,
+  value text not null,
+  created_at timestamptz default now()
+);
+alter table studio_dropdown_options enable row level security;
+drop policy if exists "Allow all for anon" on studio_dropdown_options;
+create policy "Allow all for anon" on studio_dropdown_options for all using (true) with check (true);`);
+  }
+
+  // New columns on the existing studio_ad_creatives table
+  if (adColumnsMissing.length > 0) {
+    const colTypes: Record<string, string> = {
+      creative_id: 'text',
+      date_added: 'date default current_date',
+      angle: 'text',
+      hook: 'text',
+      buyer_feedback: 'text',
+    };
+    parts.push(adColumnsMissing.map(c => `alter table studio_ad_creatives add column if not exists ${c} ${colTypes[c]};`).join('\n'));
   }
 
   if (researchColumnsMissing.includes('title')) {
