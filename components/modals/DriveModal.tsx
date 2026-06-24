@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { DriveFolder, Client } from '@/lib/types';
+import { useDismiss } from '@/lib/use-dismiss';
 
 interface Props {
   folder?: DriveFolder | null;
@@ -15,6 +16,9 @@ export default function DriveModal({ folder, client, onClose, onSaved }: Props) 
   const [url, setUrl] = useState('');
   const [category, setCategory] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Escape closes (backdrop click is already handled by the overlay); matches Cancel/✕
+  useDismiss(null, onClose, { outside: false });
 
   useEffect(() => {
     if (folder) {

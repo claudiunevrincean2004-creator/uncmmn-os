@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Post, Client } from '@/lib/types';
+import { useDismiss } from '@/lib/use-dismiss';
 
 interface Props {
   post?: Post | null;
@@ -27,6 +28,9 @@ export default function PostModal({ post, client, onClose, onSaved }: Props) {
   const [driveLink, setDriveLink] = useState('');
   const [postUrl, setPostUrl] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Escape closes (backdrop click is already handled by the overlay); matches Cancel/✕
+  useDismiss(null, onClose, { outside: false });
 
   useEffect(() => {
     if (post) {

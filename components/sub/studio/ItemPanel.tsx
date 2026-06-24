@@ -1,8 +1,9 @@
 'use client';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StudioComment, StudioActivity } from '@/lib/types';
 import { formatActivityTime } from '@/lib/studio';
+import { useDismiss } from '@/lib/use-dismiss';
 import { InlineText, MiniSelect, PillSelect, EditSelect, EditPillSelect, InlineDate, InlineNumber } from './cells';
 
 export interface FieldDef {
@@ -69,6 +70,10 @@ function FieldControl({ field, values, onChangeField, onAddOption }: { field: Fi
 export default function ItemPanel({ itemType, itemId, title, fields, values, onChangeField, onAddOption, comments, activity, onReload, onClose }: Props) {
   const [newComment, setNewComment] = useState('');
   const [saving, setSaving] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Close on click-outside / Escape, committing pending field edits like the ✕ does
+  useDismiss(panelRef, onClose);
 
   const itemComments = comments
     .filter(c => c.item_type === itemType && c.item_id === itemId)
@@ -94,6 +99,7 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
 
   return (
     <div
+      ref={panelRef}
       style={{
         width: '40%',
         minWidth: 340,

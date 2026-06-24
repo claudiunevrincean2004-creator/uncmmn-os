@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { CustomProperty, CustomPropertyOption } from '@/lib/types';
 import { pillStyle } from '@/lib/studio';
+import { useDismiss } from '@/lib/use-dismiss';
 import { InlineText } from './cells';
 
 // Palette offered for option color chips (same family as the status pills)
@@ -121,6 +122,9 @@ export function PropertyManagerModal({
   const optionsByProp = groupOptions(options);
   const [newName, setNewName] = useState('');
   const [busy, setBusy] = useState(false);
+
+  // Escape closes (backdrop click is already handled by the overlay)
+  useDismiss(null, onClose, { outside: false });
 
   async function run(fn: () => Promise<void>) {
     if (busy) return;
