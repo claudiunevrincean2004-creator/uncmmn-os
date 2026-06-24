@@ -1,5 +1,6 @@
 'use client';
 import { MainPage } from '@/lib/types';
+import StarLogo from '@/components/StarLogo';
 
 interface NavItem {
   key: MainPage;
@@ -66,14 +67,9 @@ export default function Sidebar({ activeMP, collapsed, onToggleCollapse, onSelec
       </button>
 
       <div style={{ padding: collapsed ? '18px 8px 14px' : '18px 14px 14px', borderBottom: '0.5px solid #111', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-        {collapsed ? (
-          <div style={{ fontSize: 16, fontWeight: 800, textAlign: 'center', letterSpacing: '-0.5px', lineHeight: 1 }}>N</div>
-        ) : (
-          <>
-            <div style={{ fontSize: 19, fontWeight: 800, letterSpacing: '-0.5px', lineHeight: 1 }}>NATHAN</div>
-            <div style={{ fontSize: 9, color: '#333', marginTop: 3, letterSpacing: '0.1em', textTransform: 'uppercase' }}>OS</div>
-          </>
-        )}
+        <div style={{ display: 'flex', justifyContent: collapsed ? 'center' : 'flex-start', lineHeight: 1 }}>
+          <StarLogo size={collapsed ? 28 : 30} />
+        </div>
       </div>
 
       <div style={{ padding: collapsed ? '10px 4px' : '10px 8px', flex: 1 }}>
