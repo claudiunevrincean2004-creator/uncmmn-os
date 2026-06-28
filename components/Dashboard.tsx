@@ -46,6 +46,29 @@ function followerGain(snaps: SubscriberSnapshot[], startISO: string): number | n
   return null;
 }
 
+// Uppercase KPI label (Plus Jakarta Sans) with an optional faint qualifier, e.g. "TOTAL VIEWS · THIS MONTH".
+function StatLabel({ label, qualifier }: { label: string; qualifier?: string }) {
+  return (
+    <div style={{ fontFamily: 'var(--font-ui)', fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, marginBottom: 6 }}>
+      {label}{qualifier && <span style={{ opacity: 0.75 }}> · {qualifier}</span>}
+    </div>
+  );
+}
+
+// Rounded delta chip: up/down arrow + percent change, then a faint qualifier. Renders nothing when the delta is null.
+function DeltaPill({ delta, qualifier }: { delta: { pct: number } | null; qualifier: string }) {
+  if (!delta) return null;
+  const up = delta.pct >= 0;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+      <span className={`delta-pill ${up ? 'up' : 'down'}`}>
+        <span aria-hidden="true">{up ? '↑' : '↓'}</span>{Math.abs(delta.pct).toFixed(1)}%
+      </span>
+      <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{qualifier}</span>
+    </div>
+  );
+}
+
 export default function Dashboard({ client, posts, subscriberSnapshots, userEmail }: Props) {
   // Greeting name derived solely from the email local-part (before "@"), capitalized.
   const greetingName = (() => {
@@ -74,6 +97,16 @@ export default function Dashboard({ client, posts, subscriberSnapshots, userEmai
   const monthPosts = useMemo(() => clientPosts.filter(p => p.date?.startsWith(monthStartISO.slice(0, 7))), [clientPosts, monthStartISO]);
   const totalViews = monthPosts.reduce((s, p) => s + (p.views || 0), 0);
   const totalPosts = monthPosts.length;
+
+  // Previous calendar month — real basis for period-over-period deltas.
+  const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevMonthPrefix = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}`;
+  const prevMonthPosts = useMemo(() => clientPosts.filter(p => p.date?.startsWith(prevMonthPrefix)), [clientPosts, prevMonthPrefix]);
+  const prevViews = prevMonthPosts.reduce((s, p) => s + (p.views || 0), 0);
+  const prevPosts = prevMonthPosts.length;
+  // Percent change vs last month; only valid when there's a non-zero baseline to compare against.
+  const viewsDelta = prevViews > 0 ? { pct: ((totalViews - prevViews) / prevViews) * 100 } : null;
+  const postsDelta = prevPosts > 0 ? { pct: ((totalPosts - prevPosts) / prevPosts) * 100 } : null;
 
   const tiktokSnaps = useMemo(() => clientSnaps.filter(s => s.platform.toLowerCase() === 'tiktok'), [clientSnaps]);
   const youtubeSnaps = useMemo(() => clientSnaps.filter(s => s.platform.toLowerCase() === 'youtube'), [clientSnaps]);
@@ -137,19 +170,22 @@ export default function Dashboard({ client, posts, subscriberSnapshots, userEmai
 
       {/* Top metrics */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-        <div className="metric-chip">
-          <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>Total Views</div>
+        <div className="stat-card">
+          <StatLabel label="Total Views" qualifier="This Month" />
           <div className="kpi-num" style={{ fontSize: 30 }}>{fn(totalViews)}</div>
+          <DeltaPill delta={viewsDelta} qualifier="vs last month" />
         </div>
-        <div className="metric-chip">
-          <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>Followers Gained</div>
+        <div className="stat-card">
+          <StatLabel label="Followers Gained" qualifier="This Month" />
           <div className="kpi-num" style={{ fontSize: 30, color: followersGainedAvailable ? (followersGained >= 0 ? 'var(--pos)' : 'var(--neg)') : 'var(--text-faint)' }}>
             {followersGainedAvailable ? `${followersGained >= 0 ? '+' : ''}${fn(followersGained)}` : '—'}
           </div>
+          {/* No prior-period baseline for follower gain — delta omitted rather than faked. */}
         </div>
-        <div className="metric-chip">
-          <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>Total Posts</div>
+        <div className="stat-card">
+          <StatLabel label="Total Posts" qualifier="This Month" />
           <div className="kpi-num" style={{ fontSize: 30 }}>{totalPosts}</div>
+          <DeltaPill delta={postsDelta} qualifier="vs last month" />
         </div>
       </div>
 
