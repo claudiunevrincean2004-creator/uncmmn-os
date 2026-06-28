@@ -52,22 +52,21 @@ export default function Dashboard({ client, posts, subscriberSnapshots, userEmai
     const local = (userEmail || '').split('@')[0].trim();
     return local ? local.charAt(0).toUpperCase() + local.slice(1) : '';
   })();
-  // Time-of-day greeting based on the user's local browser hour.
-  const greeting = (() => {
+  // Time-of-day greeting based on the user's local browser hour. Each slot pairs
+  // the greeting phrase with a matching emoji and its subtle animation class.
+  const tod = (() => {
     const h = new Date().getHours();
-    let prefix: string, suffix: string;
-    if (h >= 5 && h < 8) { prefix = 'Early bird'; suffix = '!'; }
-    else if (h >= 8 && h < 12) { prefix = 'Morning'; suffix = '! ☕'; }
-    else if (h >= 12 && h < 17) { prefix = 'Back at it'; suffix = '!'; }
-    else if (h >= 17 && h < 22) { prefix = 'Winding down'; suffix = '?'; }
-    else if (h >= 22 || h < 1) { prefix = 'Night owl'; suffix = '!'; }
-    else { prefix = 'Sleep is for the weak'; suffix = '!'; }
-    return greetingName ? `${prefix}, ${greetingName}${suffix}` : `${prefix}${suffix}`;
+    if (h >= 5 && h < 8) return { prefix: 'Early bird', suffix: '!', emoji: '🐦', anim: 'emoji-hop' };
+    if (h >= 8 && h < 12) return { prefix: 'Morning', suffix: '!', emoji: '☕', anim: 'emoji-steam' };
+    if (h >= 12 && h < 17) return { prefix: 'Back at it', suffix: '!', emoji: '☀️', anim: 'emoji-sun' };
+    if (h >= 17 && h < 22) return { prefix: 'Winding down', suffix: '?', emoji: '🌆', anim: 'emoji-fade' };
+    if (h >= 22 || h < 1) return { prefix: 'Night owl', suffix: '!', emoji: '🦉', anim: 'emoji-sway' };
+    return { prefix: 'Sleep is for the weak', suffix: '!', emoji: '🌙', anim: 'emoji-glow' };
   })();
 
   const now = new Date();
   const monthStartISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-  const monthLabel = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+  const fullDateLabel = now.toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric' });
 
   const clientPosts = useMemo(() => posts.filter(p => p.client_id === client.id), [posts, client.id]);
   const clientSnaps = useMemo(() => subscriberSnapshots.filter(s => s.client_id === client.id), [subscriberSnapshots, client.id]);
@@ -121,9 +120,23 @@ export default function Dashboard({ client, posts, subscriberSnapshots, userEmai
 
   return (
     <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div>
-        <div className="font-head" style={{ fontSize: 36, fontWeight: 700, color: 'var(--accent)', lineHeight: 1.1, letterSpacing: '-0.02em' }}>{greeting}</div>
-        <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: 8 }}>{monthLabel}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {/* Date line: accent dot + full local date */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'var(--text-dim)' }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block', flexShrink: 0 }} />
+          {fullDateLabel}
+        </div>
+        {/* Hero greeting: words in text color, name in accent, animated time-of-day emoji */}
+        <div className="font-head" style={{ fontSize: 36, fontWeight: 700, color: 'var(--text)', lineHeight: 1.1, letterSpacing: '-0.02em' }}>
+          {tod.prefix}
+          {greetingName && <>, <span style={{ color: 'var(--accent)' }}>{greetingName}</span></>}
+          {tod.suffix}{' '}
+          <span className={tod.anim} style={{ display: 'inline-block' }}>{tod.emoji}</span>
+        </div>
+        {/* Static momentum message */}
+        <div style={{ fontSize: 15, color: 'var(--text-dim)' }}>
+          {"You're up 18% this week and 3 posts just broke 1.5× your average. Nice momentum — here's what's working."}
+        </div>
       </div>
 
       {/* Top metrics */}

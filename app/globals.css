@@ -361,6 +361,74 @@ html, body {
   }
 }
 
+/* Dashboard greeting emoji — subtle, tasteful time-of-day motions */
+.emoji-hop,
+.emoji-steam,
+.emoji-sun,
+.emoji-fade,
+.emoji-sway,
+.emoji-glow {
+  display: inline-block;
+  will-change: transform, opacity, filter;
+}
+
+/* 🐦 soft hop */
+.emoji-hop {
+  animation: emojiHop 2.4s ease-in-out infinite;
+}
+@keyframes emojiHop {
+  0%, 70%, 100% { transform: translateY(0); }
+  80% { transform: translateY(-5px); }
+  90% { transform: translateY(-2px); }
+}
+
+/* ☕ gentle rise/wobble, like steam */
+.emoji-steam {
+  animation: emojiSteam 3s ease-in-out infinite;
+}
+@keyframes emojiSteam {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-3px) rotate(-3deg); }
+}
+
+/* ☀️ slow rotate + glow */
+.emoji-sun {
+  animation: emojiSun 9s linear infinite;
+}
+@keyframes emojiSun {
+  0% { transform: rotate(0deg); filter: drop-shadow(0 0 0 transparent); }
+  50% { filter: drop-shadow(0 0 6px rgba(250, 204, 21, 0.7)); }
+  100% { transform: rotate(360deg); filter: drop-shadow(0 0 0 transparent); }
+}
+
+/* 🌆 gentle fade/pulse */
+.emoji-fade {
+  animation: emojiFade 3.5s ease-in-out infinite;
+}
+@keyframes emojiFade {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.96); }
+}
+
+/* 🦉 slow sway */
+.emoji-sway {
+  animation: emojiSway 4s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+@keyframes emojiSway {
+  0%, 100% { transform: rotate(-6deg); }
+  50% { transform: rotate(6deg); }
+}
+
+/* 🌙 soft glow pulse */
+.emoji-glow {
+  animation: emojiGlow 3.5s ease-in-out infinite;
+}
+@keyframes emojiGlow {
+  0%, 100% { filter: drop-shadow(0 0 1px rgba(226, 232, 240, 0.3)); }
+  50% { filter: drop-shadow(0 0 7px rgba(226, 232, 240, 0.9)); }
+}
+
 /* Theme toggle — quiet, icon-only */
 .theme-toggle {
   display: inline-flex;
