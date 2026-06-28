@@ -66,6 +66,8 @@ export default function Home() {
   const [theme, setTheme] = useState<'aurora' | 'midnight'>('aurora');
   const router = useRouter();
   const [role, setRole] = useState<Role | null>(null);
+  // Read-only: email for the dashboard greeting. Independent of role/access logic.
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   // Sync theme from storage on mount (the layout script already applied it pre-paint)
   useEffect(() => {
@@ -96,6 +98,17 @@ export default function Home() {
     })();
     return () => { cancelled = true; };
   }, [router]);
+
+  // Read-only greeting source: pull the email from the already-established auth
+  // session. Purely presentational — does not affect role or tab visibility.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!cancelled) setUserEmail(user?.email ?? null);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   async function signOut() {
     await supabase.auth.signOut();
@@ -292,6 +305,7 @@ export default function Home() {
               client={client}
               posts={posts}
               subscriberSnapshots={subscriberSnapshots}
+              userEmail={userEmail}
               onReload={loadData}
             />
           )}
