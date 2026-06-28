@@ -66,6 +66,7 @@ export default function Home() {
   const [theme, setTheme] = useState<'aurora' | 'midnight'>('aurora');
   const router = useRouter();
   const [role, setRole] = useState<Role | null>(null);
+  const [greetingName, setGreetingName] = useState<string | null>(null);
 
   // Sync theme from storage on mount (the layout script already applied it pre-paint)
   useEffect(() => {
@@ -90,9 +91,17 @@ export default function Home() {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.replace('/login'); return; }
-      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+      const { data: profile } = await supabase.from('profiles').select('role, display_name, email').eq('id', user.id).single();
       if (cancelled) return;
       setRole(profile?.role === 'admin' ? 'admin' : 'editor');
+
+      // Derive a first name for the dashboard greeting: profile display name →
+      // auth metadata name → email local-part → nothing (renders a plain "Welcome!").
+      const metaName = (user.user_metadata?.full_name || user.user_metadata?.name) as string | undefined;
+      const fullName = (profile?.display_name || metaName || '').trim();
+      const emailLocal = (profile?.email || user.email || '').split('@')[0].trim();
+      const first = (fullName || emailLocal).split(/\s+/)[0] || '';
+      setGreetingName(first || null);
     })();
     return () => { cancelled = true; };
   }, [router]);
@@ -292,6 +301,7 @@ export default function Home() {
               client={client}
               posts={posts}
               subscriberSnapshots={subscriberSnapshots}
+              greetingName={greetingName}
               onReload={loadData}
             />
           )}

@@ -9,6 +9,7 @@ interface Props {
   client: Client;
   posts: Post[];
   subscriberSnapshots: SubscriberSnapshot[];
+  greetingName?: string | null;
   onReload: () => void;
 }
 
@@ -45,7 +46,8 @@ function followerGain(snaps: SubscriberSnapshot[], startISO: string): number | n
   return null;
 }
 
-export default function Dashboard({ client, posts, subscriberSnapshots }: Props) {
+export default function Dashboard({ client, posts, subscriberSnapshots, greetingName }: Props) {
+  const greeting = greetingName ? `Welcome, ${greetingName}!` : 'Welcome!';
   const now = new Date();
   const monthStartISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
   const monthLabel = now.toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -103,6 +105,7 @@ export default function Dashboard({ client, posts, subscriberSnapshots }: Props)
   return (
     <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div>
+        <div className="font-head" style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', marginBottom: 2 }}>{greeting}</div>
         <div className="font-head" style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>Dashboard</div>
         <div style={{ fontSize: 12, color: 'var(--text-faint)' }}>{client.name} — {monthLabel}</div>
       </div>
