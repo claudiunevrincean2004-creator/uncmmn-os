@@ -122,9 +122,8 @@ export default function Dashboard({ client, posts, subscriberSnapshots, userEmai
   return (
     <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div>
-        <div className="font-head" style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', marginBottom: 2 }}>{greeting}</div>
-        <div className="font-head" style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>Dashboard</div>
-        <div style={{ fontSize: 12, color: 'var(--text-faint)' }}>{client.name} — {monthLabel}</div>
+        <div className="font-head" style={{ fontSize: 36, fontWeight: 700, color: 'var(--accent)', lineHeight: 1.1, letterSpacing: '-0.02em' }}>{greeting}</div>
+        <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: 8 }}>{monthLabel}</div>
       </div>
 
       {/* Top metrics */}
