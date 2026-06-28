@@ -52,7 +52,18 @@ export default function Dashboard({ client, posts, subscriberSnapshots, userEmai
     const local = (userEmail || '').split('@')[0].trim();
     return local ? local.charAt(0).toUpperCase() + local.slice(1) : '';
   })();
-  const greeting = greetingName ? `Welcome, ${greetingName}!` : 'Welcome!';
+  // Time-of-day greeting based on the user's local browser hour.
+  const greeting = (() => {
+    const h = new Date().getHours();
+    let prefix: string, suffix: string;
+    if (h >= 5 && h < 8) { prefix = 'Early bird'; suffix = '!'; }
+    else if (h >= 8 && h < 12) { prefix = 'Morning'; suffix = '! ☕'; }
+    else if (h >= 12 && h < 17) { prefix = 'Back at it'; suffix = '!'; }
+    else if (h >= 17 && h < 22) { prefix = 'Winding down'; suffix = '?'; }
+    else if (h >= 22 || h < 1) { prefix = 'Night owl'; suffix = '!'; }
+    else { prefix = 'Sleep is for the weak'; suffix = '!'; }
+    return greetingName ? `${prefix}, ${greetingName}${suffix}` : `${prefix}${suffix}`;
+  })();
 
   const now = new Date();
   const monthStartISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
