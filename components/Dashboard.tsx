@@ -133,10 +133,6 @@ export default function Dashboard({ client, posts, subscriberSnapshots, userEmai
           {tod.suffix}{' '}
           <span className={tod.anim} style={{ display: 'inline-block' }}>{tod.emoji}</span>
         </div>
-        {/* Static momentum message */}
-        <div style={{ fontSize: 15, color: 'var(--text-dim)' }}>
-          {"You're up 18% this week and 3 posts just broke 1.5× your average. Nice momentum — here's what's working."}
-        </div>
       </div>
 
       {/* Top metrics */}
