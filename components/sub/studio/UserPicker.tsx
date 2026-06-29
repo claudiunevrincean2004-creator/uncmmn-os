@@ -27,7 +27,8 @@ export function resolveAssignee(assignedTo: string | undefined | null, profiles:
   return byText ? profileName(byText) : null;
 }
 
-// Searchable picker backed by real platform users (profiles where assignable !== false).
+// Searchable picker backed by all real platform users. Everyone is assignable;
+// the legacy `assignable` flag is ignored (kept in the DB, no longer used).
 export function UserPicker({
   value, profiles, onChange,
 }: {
@@ -45,11 +46,10 @@ export function UserPicker({
   const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number } | null>(null);
 
   const display = resolveAssignee(value, profiles);
-  const assignable = profiles.filter(p => p.assignable !== false);
   const q = query.trim().toLowerCase();
   const filtered = q
-    ? assignable.filter(p => profileName(p).toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q))
-    : assignable;
+    ? profiles.filter(p => profileName(p).toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q))
+    : profiles;
 
   function reposition() {
     const el = btnRef.current;

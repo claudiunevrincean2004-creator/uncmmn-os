@@ -22,6 +22,7 @@ export default function AccountPanel({
   onSaved: () => void;
   onManageUsers: () => void;
 }) {
+  const [editing, setEditing] = useState(false);
   const [name, setName] = useState(profile.display_name ?? '');
   const [jobTitle, setJobTitle] = useState(profile.job_title ?? '');
   const [saving, setSaving] = useState(false);
@@ -33,8 +34,20 @@ export default function AccountPanel({
   const roleLabel = profile.role === 'admin' ? 'Admin' : 'Editor';
   const loginEmail = profile.email || email || '';
 
+  function startEdit() {
+    setName(profile.display_name ?? '');
+    setJobTitle(profile.job_title ?? '');
+    setEditing(true);
+  }
+
+  function cancel() {
+    setName(profile.display_name ?? '');
+    setJobTitle(profile.job_title ?? '');
+    setEditing(false);
+  }
+
   async function save() {
-    if (saving || !changed) return;
+    if (saving || !changed) { setEditing(false); return; }
     setSaving(true);
     // Each field has its own caller-scoped RPC; stop at the first failure.
     let error: { message?: string } | null = null;
@@ -48,10 +61,12 @@ export default function AccountPanel({
       alert(`Couldn't save your changes: ${error.message || 'Unknown error'}`);
       return;
     }
+    setEditing(false);
     onSaved();
   }
 
   const labelStyle: React.CSSProperties = { fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, marginBottom: 6 };
+  const valueStyle: React.CSSProperties = { fontSize: 13, color: 'var(--text)', marginBottom: 14 };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -94,33 +109,50 @@ export default function AccountPanel({
           {loginEmail || '—'}
         </div>
 
-        {/* Display name — editable */}
-        <div style={labelStyle}>Display name</div>
-        <input
-          autoFocus
-          className="form-input"
-          value={name}
-          onChange={e => setName(e.target.value)}
-          placeholder={profileName(profile)}
-          style={{ width: '100%', fontSize: 13, marginBottom: 14 }}
-          onKeyDown={e => { if (e.key === 'Enter') save(); }}
-        />
+        {/* Display name + Job title — read-only by default, editable via Edit */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div style={{ ...labelStyle, marginBottom: 0 }}>Profile</div>
+          {!editing && (
+            <button className="btn-ghost" style={{ fontSize: 11, padding: '3px 12px' }} onClick={startEdit}>Edit</button>
+          )}
+        </div>
 
-        {/* Job title — editable */}
-        <div style={labelStyle}>Job title</div>
-        <input
-          className="form-input"
-          value={jobTitle}
-          onChange={e => setJobTitle(e.target.value)}
-          placeholder="e.g. Media Buyer, Editor, Creator"
-          style={{ width: '100%', fontSize: 13, marginBottom: 6 }}
-          onKeyDown={e => { if (e.key === 'Enter') save(); }}
-        />
-        <div style={{ fontSize: 11, color: 'var(--text-faint)', marginBottom: 16 }}>Your display name and job title are shown across the workspace.</div>
-
-        <button className="btn-primary" style={{ fontSize: 12, padding: '8px 14px', width: '100%' }} onClick={save} disabled={saving || !changed}>
-          {saving ? 'Saving…' : 'Save'}
-        </button>
+        {editing ? (
+          <>
+            <div style={labelStyle}>Display name</div>
+            <input
+              autoFocus
+              className="form-input"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder={profileName(profile)}
+              style={{ width: '100%', fontSize: 13, marginBottom: 14 }}
+              onKeyDown={e => { if (e.key === 'Enter') save(); else if (e.key === 'Escape') cancel(); }}
+            />
+            <div style={labelStyle}>Job title</div>
+            <input
+              className="form-input"
+              value={jobTitle}
+              onChange={e => setJobTitle(e.target.value)}
+              placeholder="e.g. Media Buyer, Editor, Creator"
+              style={{ width: '100%', fontSize: 13, marginBottom: 14 }}
+              onKeyDown={e => { if (e.key === 'Enter') save(); else if (e.key === 'Escape') cancel(); }}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn-primary" style={{ fontSize: 12, padding: '8px 14px' }} onClick={save} disabled={saving}>
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+              <button className="btn-ghost" style={{ fontSize: 12, padding: '8px 14px' }} onClick={cancel} disabled={saving}>Cancel</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={labelStyle}>Display name</div>
+            <div style={valueStyle}>{profile.display_name?.trim() || <span style={{ color: 'var(--text-faint)' }}>—</span>}</div>
+            <div style={labelStyle}>Job title</div>
+            <div style={valueStyle}>{profile.job_title?.trim() || <span style={{ color: 'var(--text-faint)' }}>—</span>}</div>
+          </>
+        )}
 
         {isAdmin && (
           <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
