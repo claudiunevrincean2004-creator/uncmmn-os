@@ -60,6 +60,14 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
   }
 
   async function patch(id: string, p: Partial<StudioSession>) {
+    // Detect the not-Filmed → "Filmed" transition from the pre-update row BEFORE
+    // writing. Doing it here (rather than only in changeStatus) means the Slack
+    // notify fires no matter which handler set the status — the inline Status
+    // pill, the detail panel, or any future caller — and never on other status
+    // changes or on a re-save while already Filmed.
+    const prev = sessions.find(x => x.id === id);
+    const becomingFilmed = p.status === 'Filmed' && prev?.status !== 'Filmed';
+
     const { error } = await supabase.from('studio_sessions').update(p).eq('id', id);
     if (error) {
       // Surface write failures (e.g. a missing column or RLS denial) instead of
@@ -68,24 +76,23 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
       alert(`Couldn't save change: ${error.message}`);
     }
     onReload();
+
+    if (!error && becomingFilmed) {
+      notifyFilmed({
+        id,
+        name: prev?.name ?? '',
+        // Prefer a value included in this same patch, else the current row value.
+        type: (p.type ?? prev?.type) ?? '',
+        footageLink: (p.footage_link ?? prev?.footage_link) ?? '',
+      });
+    }
   }
 
   async function changeStatus(s: StudioSession, status: string) {
     if (status === s.status) return;
-    // Only the (not-Filmed) → "Filmed" transition pings Slack — never other
-    // status changes, and never a repeated save while already Filmed (the guard
-    // above already returns early when the status is unchanged). Capture the
-    // payload now, from the pre-update row, before any awaits.
-    const justFilmed = status === 'Filmed' && s.status !== 'Filmed';
-    const notifyPayload = {
-      id: s.id,
-      name: s.name,
-      type: s.type ?? '',
-      footageLink: s.footage_link ?? '',
-    };
     await logActivity('session', s.id, 'Status changed', s.status, status);
+    // patch() detects the → "Filmed" transition and fires the Slack notify.
     await patch(s.id, { status });
-    if (justFilmed) notifyFilmed(notifyPayload);
   }
 
   // Fire-and-forget POST to the server route, which holds the Slack webhook URL
