@@ -90,6 +90,7 @@ export interface StudioAdCreative {
   hook?: string;
   buyer_feedback?: string;
   status: string;
+  final_link?: string; // Google Drive link to the final product (shown as "Final")
   // legacy columns kept on the table but no longer surfaced in the UI
   source_video_title?: string;
   source_video_url?: string;

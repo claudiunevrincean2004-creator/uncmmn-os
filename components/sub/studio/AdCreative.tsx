@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { AD_FORMATS, AD_STATUSES, AD_STATUS_COLORS, todayISO, logActivity, mergeOptions, inDateRange, getFieldOptions, colorMap, buildAddOptionRows } from '@/lib/studio';
-import { EditPillSelect, EditSelect, MiniSelect, InlineText, InlineDate } from './cells';
+import { EditPillSelect, EditSelect, MiniSelect, InlineText, InlineDate, UrlCell } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import QuickLinks from './QuickLinks';
 import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal } from './CustomColumns';
@@ -31,6 +31,7 @@ interface AdDraft {
   ad_format: string;
   angle: string;
   hook: string;
+  final_link: string;
   buyer_feedback: string;
   status: string;
 }
@@ -40,6 +41,7 @@ const EMPTY_DRAFT: AdDraft = {
   ad_format: '',
   angle: '',
   hook: '',
+  final_link: '',
   buyer_feedback: '',
   status: 'Paused',
 };
@@ -114,6 +116,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
       ad_format: draft.ad_format || null,
       angle: draft.angle.trim() || null,
       hook: draft.hook.trim() || null,
+      final_link: draft.final_link.trim() || null,
       buyer_feedback: draft.buyer_feedback.trim() || null,
       status: draft.status || 'Paused',
     };
@@ -179,6 +182,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
     { key: 'ad_format', label: 'Format', type: 'pill', field: 'ad_format', options: formatValues, colors: formatColors, allowAdd: isAdmin, allowEmpty: true },
     { key: 'angle', label: 'Angle', type: 'select', field: 'ad_angle', options: angleOpts, allowAdd: isAdmin },
     { key: 'hook', label: 'Hook', type: 'text', placeholder: 'Hook' },
+    { key: 'final_link', label: 'Final', type: 'url' },
     { key: 'buyer_feedback', label: 'Buyer Feedback', type: 'textarea', placeholder: 'Buyer feedback…' },
     { key: 'status', label: 'Status', type: 'pill', field: 'ad_status', options: statusValues, colors: statusColors, allowAdd: isAdmin },
   ], [formatValues, formatColors, angleOpts, statusValues, statusColors, isAdmin]);
@@ -224,6 +228,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                   <th onClick={isAdmin ? () => setOptsField({ field: 'ad_format', title: 'Format' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Format{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <th>Angle</th>
                   <th>Hook</th>
+                  <th>Final</th>
                   <th>Buyer Feedback</th>
                   <th>Iterate</th>
                   <th onClick={isAdmin ? () => setOptsField({ field: 'ad_status', title: 'Status' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Status{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
@@ -242,6 +247,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                       <td><EditPillSelect field="ad_format" value={a.ad_format || ''} options={formatValues} colors={formatColors} onChange={f => patch(a.id, { ad_format: f })} onAddOption={addOption} allowAdd={isAdmin} allowEmpty /></td>
                       <td><EditSelect field="ad_angle" value={a.angle} options={angleOpts} onChange={x => patch(a.id, { angle: x })} onAddOption={addOption} placeholder="—" allowAdd={isAdmin} /></td>
                       <td><InlineText value={a.hook} onCommit={t => patch(a.id, { hook: t })} placeholder="—" style={{ width: 110 }} /></td>
+                      <td><UrlCell value={a.final_link} onCommit={u => patch(a.id, { final_link: u })} /></td>
                       <td>
                         <button onClick={() => setExpanded(e => (e === a.id ? null : a.id))} className="btn-ghost" style={{ fontSize: 10, padding: '3px 8px', color: a.buyer_feedback ? 'var(--accent)' : 'var(--text-faint)' }} title="Expand feedback">
                           {a.buyer_feedback ? '📝' : '+'} {expanded === a.id ? '▲' : '▾'}
@@ -256,7 +262,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                     </tr>
                     {expanded === a.id && (
                       <tr>
-                        <td colSpan={9 + cprops.length} style={{ background: 'var(--surface-2)' }}>
+                        <td colSpan={10 + cprops.length} style={{ background: 'var(--surface-2)' }}>
                           <div style={{ padding: '4px 2px' }}>
                             <div className="form-label" style={{ marginBottom: 4 }}>Buyer Feedback</div>
                             <InlineText value={a.buyer_feedback} onCommit={t => patch(a.id, { buyer_feedback: t })} placeholder="Buyer feedback…" multiline style={{ width: '100%' }} />
@@ -311,6 +317,9 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
               </DraftField>
               <DraftField label="Hook">
                 <input className="form-input" value={draft.hook} onChange={e => setDraft(d => ({ ...d, hook: e.target.value }))} placeholder="Hook" style={{ width: '100%', fontSize: 12 }} />
+              </DraftField>
+              <DraftField label="Final">
+                <input className="form-input" value={draft.final_link} onChange={e => setDraft(d => ({ ...d, final_link: e.target.value }))} placeholder="https://…" style={{ width: '100%', fontSize: 12 }} />
               </DraftField>
               <DraftField label="Buyer Feedback">
                 <textarea className="form-input" value={draft.buyer_feedback} onChange={e => setDraft(d => ({ ...d, buyer_feedback: e.target.value }))} placeholder="Buyer feedback…" rows={2} style={{ resize: 'vertical', fontSize: 12, lineHeight: 1.4, width: '100%' }} />
