@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { AD_FORMATS, AD_STATUSES, AD_STATUS_COLORS, todayISO, logActivity, mergeOptions, inDateRange, getFieldOptions, colorMap, buildAddOptionRows } from '@/lib/studio';
-import { EditPillSelect, EditSelect, MiniSelect, InlineText, InlineDate, UrlCell } from './cells';
+import { EditPillSelect, EditSelect, MiniSelect, InlineText, InlineDate, UrlCell, NoteEditor } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import QuickLinks from './QuickLinks';
 import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal } from './CustomColumns';
@@ -300,7 +300,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                         <td colSpan={10 + cprops.length} style={{ background: 'var(--surface-2)' }}>
                           <div style={{ padding: '4px 2px' }}>
                             <div className="form-label" style={{ marginBottom: 4 }}>Buyer Feedback</div>
-                            <InlineText value={a.buyer_feedback} onCommit={t => patch(a.id, { buyer_feedback: t })} placeholder="Buyer feedback…" multiline style={{ width: '100%' }} />
+                            <NoteEditor value={a.buyer_feedback} onCommit={t => patch(a.id, { buyer_feedback: t })} onClose={() => setExpanded(null)} placeholder="Buyer feedback…" />
                           </div>
                         </td>
                       </tr>

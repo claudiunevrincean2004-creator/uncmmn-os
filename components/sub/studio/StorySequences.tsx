@@ -7,7 +7,7 @@ import {
   SEQUENCE_STATUSES, SEQUENCE_STATUS_COLORS,
   isOverdue, logActivity, inDateRange, getFieldOptions, colorMap, buildAddOptionRows,
 } from '@/lib/studio';
-import { InlineText, EditPillSelect, MiniSelect, UrlCell, InlineDate } from './cells';
+import { EditPillSelect, MiniSelect, UrlCell, InlineDate, NoteEditor } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal } from './CustomColumns';
 import FieldOptionsManager from './FieldOptionsManager';
@@ -250,7 +250,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
                           <td colSpan={6 + cprops.length} style={{ background: 'var(--surface-2)' }}>
                             <div style={{ padding: '4px 2px' }}>
                               <div className="form-label" style={{ marginBottom: 4 }}>Notes</div>
-                              <InlineText value={s.notes} onCommit={n => patch(s.id, { notes: n })} placeholder="Add notes…" multiline style={{ width: '100%' }} />
+                              <NoteEditor value={s.notes} onCommit={n => patch(s.id, { notes: n })} onClose={() => setExpanded(null)} placeholder="Add notes…" />
                             </div>
                           </td>
                         </tr>

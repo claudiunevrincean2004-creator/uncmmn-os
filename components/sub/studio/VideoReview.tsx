@@ -9,7 +9,7 @@ import {
   isOverdue, logActivity, todayISO, mergeOptions, inDateRange,
   getFieldOptions, colorMap, buildAddOptionRows,
 } from '@/lib/studio';
-import { InlineText, EditPillSelect, MiniSelect, UrlCell, InlineDate } from './cells';
+import { EditPillSelect, MiniSelect, UrlCell, InlineDate, NoteEditor } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import QuickLinks from './QuickLinks';
 import { UserPicker, resolveAssignee } from './UserPicker';
@@ -284,7 +284,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                           <td colSpan={12} style={{ background: 'var(--surface-2)' }}>
                             <div style={{ padding: '4px 2px' }}>
                               <div className="form-label" style={{ marginBottom: 4 }}>Notes</div>
-                              <InlineText value={v.notes} onCommit={n => patch(v.id, { notes: n })} placeholder="Add notes…" multiline style={{ width: '100%' }} />
+                              <NoteEditor value={v.notes} onCommit={n => patch(v.id, { notes: n })} onClose={() => setExpanded(null)} placeholder="Add notes…" />
                             </div>
                           </td>
                         </tr>
