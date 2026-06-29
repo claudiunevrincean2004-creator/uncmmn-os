@@ -6,6 +6,7 @@ import { formatActivityTime } from '@/lib/studio';
 import { useDismiss } from '@/lib/use-dismiss';
 import { InlineText, MiniSelect, PillSelect, EditSelect, EditPillSelect, InlineDate, InlineNumber } from './cells';
 import { UserPicker, profileName } from './UserPicker';
+import Avatar from '@/components/Avatar';
 
 export interface FieldDef {
   key: string;
@@ -233,7 +234,10 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
               const editing = editingId === c.id;
               return (
                 <div key={c.id} style={{ background: 'var(--surface-2)', border: '0.5px solid var(--border)', borderRadius: 8, padding: '8px 10px' }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{who || 'Unknown'}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+                    <Avatar name={who || 'Unknown'} size={18} />
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)' }}>{who || 'Unknown'}</div>
+                  </div>
                   {editing ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 5 }}>
                       <textarea

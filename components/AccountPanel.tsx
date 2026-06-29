@@ -4,10 +4,12 @@ import { supabase } from '@/lib/supabase';
 import { Profile } from '@/lib/types';
 import { useDismiss } from '@/lib/use-dismiss';
 import { profileName } from '@/lib/profile-name';
+import Avatar from '@/components/Avatar';
 
-// The current user's account panel (opened from the sidebar). Lets them view and
-// change their own display name anytime via the self-service RPC. Admins get a
-// button to open full user management (display names + assignable).
+// The current user's account panel (opened from the sidebar). Shows their avatar,
+// email (read-only login), role badge (read-only), and lets them edit their own
+// display name + job title via the self-service RPCs. Admins get a button to
+// open full user management.
 export default function AccountPanel({
   profile, isAdmin, onClose, onSaved, onManageUsers,
 }: {
@@ -18,51 +20,112 @@ export default function AccountPanel({
   onManageUsers: () => void;
 }) {
   const [name, setName] = useState(profile.display_name ?? '');
+  const [jobTitle, setJobTitle] = useState(profile.job_title ?? '');
   const [saving, setSaving] = useState(false);
   useDismiss(null, onClose, { outside: false });
 
-  const changed = name.trim() !== (profile.display_name ?? '').trim();
+  const nameChanged = name.trim() !== (profile.display_name ?? '').trim();
+  const titleChanged = jobTitle.trim() !== (profile.job_title ?? '').trim();
+  const changed = nameChanged || titleChanged;
+  const roleLabel = profile.role === 'admin' ? 'Admin' : 'Editor';
 
   async function save() {
     if (saving || !changed) return;
     setSaving(true);
-    const { error } = await supabase.rpc('set_my_display_name', { new_name: name.trim() });
-    setSaving(false);
-    if (error) {
-      console.error('[AccountPanel] failed to save display name', error);
-      alert(`Couldn't save your name: ${error.message}`);
+    try {
+      if (nameChanged) {
+        const { error } = await supabase.rpc('set_my_display_name', { new_name: name.trim() });
+        if (error) throw error;
+      }
+      if (titleChanged) {
+        const { error } = await supabase.rpc('set_my_job_title', { new_title: jobTitle.trim() });
+        if (error) throw error;
+      }
+    } catch (err: unknown) {
+      setSaving(false);
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[AccountPanel] failed to save profile', err);
+      alert(`Couldn't save your changes: ${msg}`);
       return;
     }
+    setSaving(false);
     onSaved();
   }
+
+  const labelStyle: React.CSSProperties = { fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, marginBottom: 6 };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box" style={{ width: 400 }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <div className="font-head" style={{ fontSize: 17, fontWeight: 700 }}>Your account</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>✕</button>
         </div>
 
-        <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, marginBottom: 6 }}>Display name</div>
+        {/* Identity header: avatar + name + role badge */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
+          <Avatar name={profileName(profile)} size={46} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profileName(profile)}</div>
+            <span
+              style={{
+                display: 'inline-block', marginTop: 4, fontSize: 9, fontWeight: 700,
+                textTransform: 'uppercase', letterSpacing: '0.05em',
+                padding: '2px 8px', borderRadius: 20,
+                background: profile.role === 'admin' ? 'rgba(139,92,246,0.16)' : 'var(--surface-2)',
+                color: profile.role === 'admin' ? '#8b5cf6' : 'var(--text-faint)',
+                border: '0.5px solid var(--border)',
+              }}
+            >
+              {roleLabel}
+            </span>
+          </div>
+        </div>
+
+        {/* Email — read-only login */}
+        <div style={labelStyle}>Email</div>
+        <div
+          style={{
+            width: '100%', fontSize: 13, padding: '7px 9px', marginBottom: 14,
+            background: 'var(--surface-2)', border: '0.5px solid var(--border)', borderRadius: 8,
+            color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}
+          title={profile.email ?? ''}
+        >
+          {profile.email || '—'}
+        </div>
+
+        {/* Display name — editable */}
+        <div style={labelStyle}>Display name</div>
         <input
           autoFocus
           className="form-input"
           value={name}
           onChange={e => setName(e.target.value)}
           placeholder={profileName(profile)}
+          style={{ width: '100%', fontSize: 13, marginBottom: 14 }}
+          onKeyDown={e => { if (e.key === 'Enter') save(); }}
+        />
+
+        {/* Job title — editable */}
+        <div style={labelStyle}>Job title</div>
+        <input
+          className="form-input"
+          value={jobTitle}
+          onChange={e => setJobTitle(e.target.value)}
+          placeholder="e.g. Media Buyer, Editor, Creator"
           style={{ width: '100%', fontSize: 13, marginBottom: 6 }}
           onKeyDown={e => { if (e.key === 'Enter') save(); }}
         />
-        <div style={{ fontSize: 11, color: 'var(--text-faint)', marginBottom: 14 }}>Shown on your comments and across the workspace.{profile.email ? ` Signed in as ${profile.email}.` : ''}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-faint)', marginBottom: 16 }}>Your display name and job title are shown across the workspace.</div>
 
-        <button className="btn-primary" style={{ fontSize: 12, padding: '8px 14px', width: '100%' }} onClick={save} disabled={saving || !changed || !name.trim()}>
+        <button className="btn-primary" style={{ fontSize: 12, padding: '8px 14px', width: '100%' }} onClick={save} disabled={saving || !changed}>
           {saving ? 'Saving…' : 'Save'}
         </button>
 
         {isAdmin && (
           <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
-            <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, marginBottom: 8 }}>Admin</div>
+            <div style={{ ...labelStyle, marginBottom: 8 }}>Admin</div>
             <button className="btn-ghost" style={{ fontSize: 12, padding: '8px 14px', width: '100%' }} onClick={onManageUsers}>Manage all users</button>
           </div>
         )}

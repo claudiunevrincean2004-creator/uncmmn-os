@@ -2,6 +2,7 @@
 import { MainPage } from '@/lib/types';
 import { Role, canAccess } from '@/lib/auth-config';
 import StarLogo from '@/components/StarLogo';
+import Avatar from '@/components/Avatar';
 
 interface NavItem {
   key: MainPage;
@@ -101,16 +102,7 @@ export default function Sidebar({ activeMP, collapsed, role, userName, onToggleC
           title={`${userName} — account`}
           style={collapsed ? { justifyContent: 'center', padding: '8px 0' } : { gap: 8 }}
         >
-          <span
-            style={{
-              width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
-              background: 'var(--surface-2)', border: '0.5px solid var(--border)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 10, fontWeight: 700, color: 'var(--text)', textTransform: 'uppercase',
-            }}
-          >
-            {(userName || '?').charAt(0)}
-          </span>
+          <Avatar name={userName} size={20} />
           {!collapsed && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userName}</span>}
         </div>
         <div

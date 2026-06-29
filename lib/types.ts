@@ -128,6 +128,7 @@ export interface Profile {
   assignable?: boolean;
   email?: string | null;
   display_name?: string | null;
+  job_title?: string | null;
   created_at?: string;
 }
 
