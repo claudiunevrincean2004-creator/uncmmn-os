@@ -177,12 +177,51 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
     onReload();
   }
 
-  // ACTION TRIGGER: wire up iteration automation here
-  function handleIterate(a: StudioAdCreative) {
-    const name = a.creative_id || 'Untitled';
-    // eslint-disable-next-line no-console
-    console.log('[studio] iterate triggered for ad creative', a.id, name);
-    showToast(`Iteration triggered for ${name}`);
+  // Fire-and-forget POST to the server route (holds the Slack webhook URL, skips
+  // silently if unset). Never blocks the UI or throws.
+  function notifyIterate(payload: { originalName: string; variationName: string }) {
+    fetch('/api/ads-iterate-notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).catch(err => console.warn('[AdCreative] /api/ads-iterate-notify call failed', err));
+  }
+
+  // Iterate: spawn a new Draft variation of the clicked creative, copying its
+  // format/angle/hook (Final left blank), then ping the pipeline channel.
+  async function handleIterate(a: StudioAdCreative) {
+    const rawName = (a.creative_id || 'Untitled').trim();
+    // Number variations off the ROOT name (strip any existing " — Variation N")
+    // so iterating a variation doesn't nest names, and numbers never collide.
+    const base = rawName.replace(/\s+—\s+Variation\s+\d+$/, '').trim() || rawName;
+    const escaped = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`^${escaped}\\s+—\\s+Variation\\s+(\\d+)$`);
+    // The original implicitly counts as "1", so the first variation is N=2.
+    let maxN = 1;
+    for (const c of adCreatives) {
+      const m = (c.creative_id || '').trim().match(re);
+      if (m) maxN = Math.max(maxN, parseInt(m[1], 10));
+    }
+    const variationName = `${base} — Variation ${maxN + 1}`;
+
+    const row = {
+      creative_id: variationName,
+      date_added: todayISO(),
+      ad_format: a.ad_format || null,
+      angle: a.angle || null,
+      hook: a.hook || null,
+      final_link: null,        // start blank — this is a fresh draft to make
+      status: 'Draft',
+    };
+    const { error } = await supabase.from('studio_ad_creatives').insert([row]);
+    if (error) {
+      console.error('[AdCreative] failed to create variation', { row, error });
+      alert(`Couldn't create variation: ${error.message}`);
+      return;
+    }
+    notifyIterate({ originalName: rawName, variationName });
+    showToast(`Variation created: ${variationName}`);
+    onReload();
   }
 
   const present = (vals: (string | undefined)[]) => ['All', ...Array.from(new Set(vals.filter(Boolean) as string[]))];
