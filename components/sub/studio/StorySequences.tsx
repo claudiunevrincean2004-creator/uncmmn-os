@@ -1,5 +1,5 @@
 'use client';
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StudioSequence, StudioComment, StudioActivity, StudioDropdownOption, CustomProperty, CustomPropertyOption } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
@@ -19,6 +19,23 @@ const TABLE_KEY = 'sequence';
 // backfill them as rows instead of dropping them (see buildAddOptionRows).
 const FIELD_FALLBACKS: Record<string, { values: string[]; colors?: Record<string, string> }> = {
   sequence_status: { values: SEQUENCE_STATUSES, colors: SEQUENCE_STATUS_COLORS },
+};
+
+// Draft for the "Add Sequence" form. The row is only written to the database
+// when the user clicks Create; closing/cancelling resets back to this.
+interface SequenceDraft {
+  title: string;
+  status: string;
+  final_url: string;
+  scheduled_date: string;
+  notes: string;
+}
+const EMPTY_DRAFT: SequenceDraft = {
+  title: '',
+  status: 'Draft',
+  final_url: '',
+  scheduled_date: '',
+  notes: '',
 };
 
 interface Props {
@@ -42,6 +59,9 @@ export default function StorySequences({ sequences, comments, activity, dropdown
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mgrOpen, setMgrOpen] = useState(false);
   const [optsField, setOptsField] = useState<{ field: string; title: string } | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [draft, setDraft] = useState<SequenceDraft>(EMPTY_DRAFT);
+  const [creating, setCreating] = useState(false);
 
   const cprops = useMemo(() => sortProps(properties, TABLE_KEY), [properties]);
   const optsByProp = useMemo(() => groupOptions(customOptions), [customOptions]);
@@ -68,9 +88,30 @@ export default function StorySequences({ sequences, comments, activity, dropdown
     await patch(s.id, { status });
   }
 
-  async function addSequence() {
-    await supabase.from('studio_sequences').insert([{ title: 'Untitled Sequence', status: 'Draft' }]);
+  async function createSequence() {
+    if (creating) return;
+    setCreating(true);
+    const row = {
+      title: draft.title.trim() || 'Untitled Sequence',
+      status: draft.status || 'Draft',
+      final_url: draft.final_url.trim() || null,
+      scheduled_date: draft.scheduled_date || null,
+      notes: draft.notes.trim() || null,
+    };
+    const { error } = await supabase.from('studio_sequences').insert([row]);
+    setCreating(false);
+    if (error) {
+      console.error('[StorySequences] failed to create sequence', { row, error });
+      alert(`Couldn't create sequence: ${error.message}`);
+      return;
+    }
+    closeAdd();
     onReload();
+  }
+
+  function closeAdd() {
+    setAddOpen(false);
+    setDraft(EMPTY_DRAFT);
   }
 
   async function deleteSequence(id: string) {
@@ -125,7 +166,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
           <CustomFilterControls props={cprops} optionsByProp={optsByProp} filters={custFilters} setFilters={setCustFilters} />
           {isAdmin && <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setMgrOpen(true)}>+ Add property</button>}
           <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{rows.length} {rows.length === 1 ? 'sequence' : 'sequences'}</span>
-          <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={addSequence}>+ Add Sequence</button>
+          <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={() => { setDraft(EMPTY_DRAFT); setAddOpen(true); }}>+ Add Sequence</button>
         </div>
 
         {rows.length === 0 ? (
@@ -204,12 +245,56 @@ export default function StorySequences({ sequences, comments, activity, dropdown
         />
       )}
 
+      {addOpen && (
+        <div className="modal-overlay" onClick={closeAdd}>
+          <div className="modal-box" style={{ width: 520 }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div className="font-head" style={{ fontSize: 17, fontWeight: 700 }}>New Story Sequence</div>
+              <button onClick={closeAdd} style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>✕</button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <DraftField label="Title / Desc">
+                <textarea className="form-input" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} placeholder="Title / description" rows={2} style={{ resize: 'vertical', fontSize: 12, lineHeight: 1.4, width: '100%' }} />
+              </DraftField>
+              <DraftField label="Status">
+                <EditPillSelect field="sequence_status" value={draft.status} options={statusValues} colors={statusColors} onChange={st => setDraft(d => ({ ...d, status: st }))} onAddOption={addOption} allowAdd={isAdmin} />
+              </DraftField>
+              <DraftField label="Final Product">
+                <input className="form-input" value={draft.final_url} onChange={e => setDraft(d => ({ ...d, final_url: e.target.value }))} placeholder="https://…" style={{ width: '100%', fontSize: 12 }} />
+              </DraftField>
+              <DraftField label="Scheduled">
+                <input className="form-input" type="date" value={draft.scheduled_date} onChange={e => setDraft(d => ({ ...d, scheduled_date: e.target.value }))} style={{ width: 160, fontSize: 12 }} />
+              </DraftField>
+              <DraftField label="Notes">
+                <textarea className="form-input" value={draft.notes} onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))} placeholder="Add notes…" rows={2} style={{ resize: 'vertical', fontSize: 12, lineHeight: 1.4, width: '100%' }} />
+              </DraftField>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+              <button className="btn-ghost" style={{ fontSize: 12, padding: '8px 14px' }} onClick={closeAdd}>Cancel</button>
+              <button className="btn-primary" style={{ fontSize: 12, padding: '8px 14px' }} onClick={createSequence} disabled={creating}>{creating ? 'Creating…' : 'Create'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {mgrOpen && (
         <PropertyManagerModal tableKey={TABLE_KEY} properties={properties} options={customOptions} onClose={() => setMgrOpen(false)} onReload={onReload} />
       )}
       {optsField && (
         <FieldOptionsManager field={optsField.field} title={optsField.title} options={dropdownOptions} onClose={() => setOptsField(null)} onReload={onReload} />
       )}
+    </div>
+  );
+}
+
+// Label + control row for the Add Sequence form, matching the detail panel layout.
+function DraftField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 10, alignItems: 'start' }}>
+      <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, paddingTop: 6 }}>{label}</div>
+      <div>{children}</div>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 'use client';
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
@@ -20,6 +20,28 @@ const FIELD_FALLBACKS: Record<string, { values: string[]; colors?: Record<string
   ad_status: { values: AD_STATUSES, colors: AD_STATUS_COLORS },
   ad_format: { values: AD_FORMATS },
   ad_angle: { values: [] },
+};
+
+// Draft for the "Add Ad Creative" form. The row is only written to the database
+// when the user clicks Create; closing/cancelling resets back to this. date_added
+// is seeded with today when the form opens (see the add button handler).
+interface AdDraft {
+  creative_id: string;
+  date_added: string;
+  ad_format: string;
+  angle: string;
+  hook: string;
+  buyer_feedback: string;
+  status: string;
+}
+const EMPTY_DRAFT: AdDraft = {
+  creative_id: '',
+  date_added: '',
+  ad_format: '',
+  angle: '',
+  hook: '',
+  buyer_feedback: '',
+  status: 'Paused',
 };
 
 interface Props {
@@ -48,6 +70,9 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mgrOpen, setMgrOpen] = useState(false);
   const [optsField, setOptsField] = useState<{ field: string; title: string } | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [draft, setDraft] = useState<AdDraft>(EMPTY_DRAFT);
+  const [creating, setCreating] = useState(false);
 
   const cprops = useMemo(() => sortProps(properties, TABLE_KEY), [properties]);
   const optsByProp = useMemo(() => groupOptions(customOptions), [customOptions]);
@@ -80,9 +105,32 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
     await patch(a.id, { status });
   }
 
-  async function addAd() {
-    await supabase.from('studio_ad_creatives').insert([{ creative_id: 'New Creative', date_added: todayISO(), ad_format: 'Video', status: 'Paused' }]);
+  async function createAd() {
+    if (creating) return;
+    setCreating(true);
+    const row = {
+      creative_id: draft.creative_id.trim() || 'New Creative',
+      date_added: draft.date_added || null,
+      ad_format: draft.ad_format || null,
+      angle: draft.angle.trim() || null,
+      hook: draft.hook.trim() || null,
+      buyer_feedback: draft.buyer_feedback.trim() || null,
+      status: draft.status || 'Paused',
+    };
+    const { error } = await supabase.from('studio_ad_creatives').insert([row]);
+    setCreating(false);
+    if (error) {
+      console.error('[AdCreative] failed to create ad creative', { row, error });
+      alert(`Couldn't create ad creative: ${error.message}`);
+      return;
+    }
+    closeAdd();
     onReload();
+  }
+
+  function closeAdd() {
+    setAddOpen(false);
+    setDraft(EMPTY_DRAFT);
   }
 
   async function deleteAd(id: string) {
@@ -161,7 +209,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
           <CustomFilterControls props={cprops} optionsByProp={optsByProp} filters={custFilters} setFilters={setCustFilters} />
           {isAdmin && <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setMgrOpen(true)}>+ Add property</button>}
           <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{rows.length} {rows.length === 1 ? 'creative' : 'creatives'}</span>
-          <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={addAd}>+ Add Ad Creative</button>
+          <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={() => { setDraft({ ...EMPTY_DRAFT, date_added: todayISO() }); setAddOpen(true); }}>+ Add Ad Creative</button>
         </div>
 
         {rows.length === 0 ? (
@@ -240,12 +288,62 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
         />
       )}
 
+      {addOpen && (
+        <div className="modal-overlay" onClick={closeAdd}>
+          <div className="modal-box" style={{ width: 520 }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div className="font-head" style={{ fontSize: 17, fontWeight: 700 }}>New Ad Creative</div>
+              <button onClick={closeAdd} style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>✕</button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <DraftField label="Creative ID">
+                <input className="form-input" value={draft.creative_id} onChange={e => setDraft(d => ({ ...d, creative_id: e.target.value }))} placeholder="Name / identifier" style={{ width: '100%', fontSize: 12 }} />
+              </DraftField>
+              <DraftField label="Date Added">
+                <input className="form-input" type="date" value={draft.date_added} onChange={e => setDraft(d => ({ ...d, date_added: e.target.value }))} style={{ width: 160, fontSize: 12 }} />
+              </DraftField>
+              <DraftField label="Format">
+                <EditPillSelect field="ad_format" value={draft.ad_format} options={formatValues} colors={formatColors} onChange={f => setDraft(d => ({ ...d, ad_format: f }))} onAddOption={addOption} allowAdd={isAdmin} allowEmpty />
+              </DraftField>
+              <DraftField label="Angle">
+                <EditSelect field="ad_angle" value={draft.angle} options={angleOpts} onChange={x => setDraft(d => ({ ...d, angle: x }))} onAddOption={addOption} placeholder="—" allowAdd={isAdmin} />
+              </DraftField>
+              <DraftField label="Hook">
+                <input className="form-input" value={draft.hook} onChange={e => setDraft(d => ({ ...d, hook: e.target.value }))} placeholder="Hook" style={{ width: '100%', fontSize: 12 }} />
+              </DraftField>
+              <DraftField label="Buyer Feedback">
+                <textarea className="form-input" value={draft.buyer_feedback} onChange={e => setDraft(d => ({ ...d, buyer_feedback: e.target.value }))} placeholder="Buyer feedback…" rows={2} style={{ resize: 'vertical', fontSize: 12, lineHeight: 1.4, width: '100%' }} />
+              </DraftField>
+              <DraftField label="Status">
+                <EditPillSelect field="ad_status" value={draft.status} options={statusValues} colors={statusColors} onChange={s => setDraft(d => ({ ...d, status: s }))} onAddOption={addOption} allowAdd={isAdmin} />
+              </DraftField>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+              <button className="btn-ghost" style={{ fontSize: 12, padding: '8px 14px' }} onClick={closeAdd}>Cancel</button>
+              <button className="btn-primary" style={{ fontSize: 12, padding: '8px 14px' }} onClick={createAd} disabled={creating}>{creating ? 'Creating…' : 'Create'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {mgrOpen && (
         <PropertyManagerModal tableKey={TABLE_KEY} properties={properties} options={customOptions} onClose={() => setMgrOpen(false)} onReload={onReload} />
       )}
       {optsField && (
         <FieldOptionsManager field={optsField.field} title={optsField.title} options={dropdownOptions} onClose={() => setOptsField(null)} onReload={onReload} />
       )}
+    </div>
+  );
+}
+
+// Label + control row for the Add Ad Creative form, matching the detail panel layout.
+function DraftField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 10, alignItems: 'start' }}>
+      <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, paddingTop: 6 }}>{label}</div>
+      <div>{children}</div>
     </div>
   );
 }
