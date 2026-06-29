@@ -72,8 +72,21 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
 
   async function changeStatus(s: StudioSession, status: string) {
     if (status === s.status) return;
+    // Only the (not-Filmed) → "Filmed" transition pings Slack — never other
+    // status changes, and never a repeated save while already Filmed (the guard
+    // above already returns early when the status is unchanged).
+    const justFilmed = status === 'Filmed' && s.status !== 'Filmed';
     await logActivity('session', s.id, 'Status changed', s.status, status);
     await patch(s.id, { status });
+    if (justFilmed) {
+      // Fire-and-forget; the server route holds the webhook URL and skips
+      // silently if it's unset. Never block the UI or throw on failure.
+      fetch('/api/filming-notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: s.type, footageLink: s.footage_link }),
+      }).catch(() => {});
+    }
   }
 
   async function addSession() {
