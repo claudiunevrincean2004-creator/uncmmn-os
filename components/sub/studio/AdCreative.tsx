@@ -6,7 +6,7 @@ import { usePersistedState } from '@/lib/use-persisted-state';
 import { usePagedRows } from '@/lib/use-paged-rows';
 import LoadMore from './LoadMore';
 import { AD_FORMATS, AD_STATUSES, AD_STATUS_COLORS, todayISO, logActivity, mergeOptions, inDateRange, getFieldOptions, colorMap, buildAddOptionRows } from '@/lib/studio';
-import { EditPillSelect, EditSelect, MiniSelect, InlineText, InlineDate, UrlCell } from './cells';
+import { EditPillSelect, MiniSelect, InlineText, InlineDate, UrlCell } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import QuickLinks from './QuickLinks';
 import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal } from './CustomColumns';
@@ -49,6 +49,10 @@ const EMPTY_DRAFT: AdDraft = {
   status: 'Paused',
 };
 
+// Inline filter group + label styling, so each control reads "Label [control]".
+const FILTER_GROUP: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 5 };
+const FILTER_LABEL: React.CSSProperties = { fontSize: 10, color: 'var(--text-faint)' };
+
 interface Props {
   adCreatives: StudioAdCreative[];
   comments: StudioComment[];
@@ -72,6 +76,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   const [dateFrom, setDateFrom] = usePersistedState<string>('studio_ad_from', '');
   const [dateTo, setDateTo] = usePersistedState<string>('studio_ad_to', '');
   const [custFilters, setCustFilters] = usePersistedState<Record<string, string>>('studio_ad_custfilters', {});
+  const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mgrOpen, setMgrOpen] = useState(false);
   const [optsField, setOptsField] = useState<{ field: string; title: string } | null>(null);
@@ -82,7 +87,6 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   const cprops = useMemo(() => sortProps(properties, TABLE_KEY), [properties]);
   const optsByProp = useMemo(() => groupOptions(customOptions), [customOptions]);
 
-  const custom = (field: string) => dropdownOptions.filter(o => o.field === field).map(o => o.value);
   const presentAngles = Array.from(new Set(adCreatives.map(a => a.angle).filter(Boolean) as string[]));
   const statusFieldOpts = getFieldOptions(dropdownOptions, 'ad_status', AD_STATUSES, AD_STATUS_COLORS);
   const statusValues = statusFieldOpts.map(o => o.value);
@@ -90,7 +94,12 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   const formatFieldOpts = getFieldOptions(dropdownOptions, 'ad_format', AD_FORMATS);
   const formatValues = formatFieldOpts.map(o => o.value);
   const formatColors = colorMap(formatFieldOpts);
-  const angleOpts = mergeOptions(custom('ad_angle'), presentAngles);
+  // Angle is an admin-managed select like Format/Status (editable options + colors
+  // via FieldOptionsManager). Merge any angles already present in data so legacy
+  // free-text values stay selectable even before they're saved as options.
+  const angleFieldOpts = getFieldOptions(dropdownOptions, 'ad_angle', []);
+  const angleColors = colorMap(angleFieldOpts);
+  const angleOpts = mergeOptions(angleFieldOpts.map(o => o.value), presentAngles);
 
   async function addOption(field: string, value: string) {
     const fb = FIELD_FALLBACKS[field] ?? { values: [] };
@@ -231,6 +240,8 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
 
   const filtered = useMemo(() => {
     let r = adCreatives;
+    const q = search.trim().toLowerCase();
+    if (q) r = r.filter(a => (a.creative_id || '').toLowerCase().includes(q));
     if (fStatus !== 'All') r = r.filter(a => a.status === fStatus);
     if (fFormat !== 'All') r = r.filter(a => (a.ad_format || '') === fFormat);
     if (fAngle !== 'All') r = r.filter(a => (a.angle || '') === fAngle);
@@ -245,25 +256,25 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
       if (!bv) return -1;
       return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
     });
-  }, [adCreatives, fStatus, fFormat, fAngle, sortKey, sortDir, dateFrom, dateTo]);
+  }, [adCreatives, search, fStatus, fFormat, fAngle, sortKey, sortDir, dateFrom, dateTo]);
 
   const rows = useMemo(() => applyCustomFilters(filtered, cprops, custFilters), [filtered, cprops, custFilters]);
 
   // "Load more" pagination — resets to the first page on filter/sort change only.
   const { visible, hasMore, remaining, loadMore } = usePagedRows(
     rows,
-    [fStatus, fFormat, fAngle, sortKey, sortDir, dateFrom, dateTo, JSON.stringify(custFilters)].join('|'),
+    [search, fStatus, fFormat, fAngle, sortKey, sortDir, dateFrom, dateTo, JSON.stringify(custFilters)].join('|'),
   );
 
   const fields: FieldDef[] = useMemo(() => [
     { key: 'creative_id', label: 'Creative ID', type: 'text', placeholder: 'Name / identifier' },
     { key: 'date_added', label: 'Date Added', type: 'date' },
     { key: 'ad_format', label: 'Format', type: 'pill', field: 'ad_format', options: formatValues, colors: formatColors, allowAdd: isAdmin, allowEmpty: true },
-    { key: 'angle', label: 'Angle', type: 'select', field: 'ad_angle', options: angleOpts, allowAdd: isAdmin },
+    { key: 'angle', label: 'Angle', type: 'pill', field: 'ad_angle', options: angleOpts, colors: angleColors, allowAdd: isAdmin, allowEmpty: true },
     { key: 'hook', label: 'Hook', type: 'text', placeholder: 'Hook' },
     { key: 'final_link', label: 'Final', type: 'url' },
     { key: 'status', label: 'Status', type: 'pill', field: 'ad_status', options: statusValues, colors: statusColors, allowAdd: isAdmin },
-  ], [formatValues, formatColors, angleOpts, statusValues, statusColors, isAdmin]);
+  ], [formatValues, formatColors, angleOpts, angleColors, statusValues, statusColors, isAdmin]);
 
   const selected = selectedId ? adCreatives.find(a => a.id === selectedId) : null;
 
@@ -272,25 +283,55 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
       <div style={{ flex: 1, minWidth: 0 }}>
         <QuickLinks context="ad-creative" links={quickLinks} onReload={onReload} />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-          <MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} />
-          <MiniSelect value={fFormat} options={formatPresent} onChange={setFFormat} />
-          <MiniSelect value={fAngle} options={anglePresent} onChange={setFAngle} />
-          <select className="form-input" style={{ width: 'auto', padding: '4px 7px', fontSize: 11 }} value={sortKey} onChange={e => setSortKey(e.target.value as SortKey)}>
-            <option value="date_added">Sort: Date Added</option>
-            <option value="angle">Sort: Angle</option>
-          </select>
-          <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))} title="Sort direction">
-            {sortDir === 'asc' ? '↑ asc' : '↓ desc'}
-          </button>
-          <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>From</span>
-          <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-          <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>To</span>
-          <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+          {/* Search by Creative ID (real-time) */}
+          <input
+            className="form-input"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search Creative ID…"
+            style={{ width: 200, padding: '5px 9px', fontSize: 11 }}
+          />
+
+          {/* Labeled filters */}
+          <label style={FILTER_GROUP}>
+            <span style={FILTER_LABEL}>Format</span>
+            <MiniSelect value={fFormat} options={formatPresent} onChange={setFFormat} />
+          </label>
+          <label style={FILTER_GROUP}>
+            <span style={FILTER_LABEL}>Angle</span>
+            <MiniSelect value={fAngle} options={anglePresent} onChange={setFAngle} />
+          </label>
+          <label style={FILTER_GROUP}>
+            <span style={FILTER_LABEL}>Status</span>
+            <MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} />
+          </label>
+
+          {/* Sort by + direction */}
+          <label style={FILTER_GROUP}>
+            <span style={FILTER_LABEL}>Sort</span>
+            <select className="form-input" style={{ width: 'auto', padding: '4px 7px', fontSize: 11 }} value={sortKey} onChange={e => setSortKey(e.target.value as SortKey)}>
+              <option value="date_added">Date Added</option>
+              <option value="angle">Angle</option>
+            </select>
+            <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))} title="Toggle sort direction">
+              {sortDir === 'asc' ? '↑ Ascending' : '↓ Descending'}
+            </button>
+          </label>
+
+          {/* Date range (kept) */}
+          <label style={FILTER_GROUP}>
+            <span style={FILTER_LABEL}>From</span>
+            <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+          </label>
+          <label style={FILTER_GROUP}>
+            <span style={FILTER_LABEL}>To</span>
+            <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
+          </label>
           {(dateFrom || dateTo) && <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>clear</button>}
+
           <CustomFilterControls props={cprops} optionsByProp={optsByProp} filters={custFilters} setFilters={setCustFilters} />
           {isAdmin && <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setMgrOpen(true)}>+ Add property</button>}
-          <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{rows.length} {rows.length === 1 ? 'creative' : 'creatives'}</span>
           <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={() => { setDraft({ ...EMPTY_DRAFT, date_added: todayISO() }); setAddOpen(true); }}>+ Add Ad Creative</button>
         </div>
 
@@ -305,7 +346,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                   <th style={{ minWidth: 160 }}>Creative ID</th>
                   <th>Date Added</th>
                   <th onClick={isAdmin ? () => setOptsField({ field: 'ad_format', title: 'Format' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Format{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
-                  <th>Angle</th>
+                  <th onClick={isAdmin ? () => setOptsField({ field: 'ad_angle', title: 'Angle' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Angle{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <th>Hook</th>
                   <th>Final</th>
                   <th>Iterate</th>
@@ -323,7 +364,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                       </td>
                       <td><InlineDate value={a.date_added} onCommit={d => patch(a.id, { date_added: d || undefined })} /></td>
                       <td><EditPillSelect field="ad_format" value={a.ad_format || ''} options={formatValues} colors={formatColors} onChange={f => patch(a.id, { ad_format: f })} onAddOption={addOption} allowAdd={isAdmin} allowEmpty /></td>
-                      <td><EditSelect field="ad_angle" value={a.angle} options={angleOpts} onChange={x => patch(a.id, { angle: x })} onAddOption={addOption} placeholder="—" allowAdd={isAdmin} /></td>
+                      <td><EditPillSelect field="ad_angle" value={a.angle || ''} options={angleOpts} colors={angleColors} onChange={x => patch(a.id, { angle: x })} onAddOption={addOption} allowAdd={isAdmin} allowEmpty /></td>
                       <td><InlineText value={a.hook} onCommit={t => patch(a.id, { hook: t })} placeholder="—" style={{ width: 110 }} /></td>
                       <td><UrlCell value={a.final_link} onCommit={u => patch(a.id, { final_link: u })} /></td>
                       <td>
@@ -380,7 +421,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                 <EditPillSelect field="ad_format" value={draft.ad_format} options={formatValues} colors={formatColors} onChange={f => setDraft(d => ({ ...d, ad_format: f }))} onAddOption={addOption} allowAdd={isAdmin} allowEmpty />
               </DraftField>
               <DraftField label="Angle">
-                <EditSelect field="ad_angle" value={draft.angle} options={angleOpts} onChange={x => setDraft(d => ({ ...d, angle: x }))} onAddOption={addOption} placeholder="—" allowAdd={isAdmin} />
+                <EditPillSelect field="ad_angle" value={draft.angle} options={angleOpts} colors={angleColors} onChange={x => setDraft(d => ({ ...d, angle: x }))} onAddOption={addOption} allowAdd={isAdmin} allowEmpty />
               </DraftField>
               <DraftField label="Hook">
                 <input className="form-input" value={draft.hook} onChange={e => setDraft(d => ({ ...d, hook: e.target.value }))} placeholder="Hook" style={{ width: '100%', fontSize: 12 }} />
