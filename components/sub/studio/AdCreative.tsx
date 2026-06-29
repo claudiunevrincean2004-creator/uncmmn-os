@@ -13,6 +13,9 @@ import FieldOptionsManager from './FieldOptionsManager';
 type SortKey = 'date_added' | 'angle';
 const TABLE_KEY = 'ad';
 
+// Statuses whose transition fires a Slack notification (see /api/ads-notify).
+const ADS_NOTIFY_STATUSES = ['Ready to test', 'Revision Requested'];
+
 // In-code fallback options per built-in select field, so adding an option can
 // backfill them as rows instead of dropping them (see buildAddOptionRows).
 // ad_angle has no built-in defaults (its options are entirely user-defined).
@@ -97,14 +100,46 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   }
 
   async function patch(id: string, p: Partial<StudioAdCreative>) {
-    await supabase.from('studio_ad_creatives').update(p).eq('id', id);
+    // Detect a transition INTO a notify status from the pre-update row BEFORE
+    // writing. Doing it here (rather than only in changeStatus) means the Slack
+    // notify fires no matter which handler set the status — the inline Status
+    // pill or the detail panel — and never on a re-save while already in it.
+    const prev = adCreatives.find(x => x.id === id);
+    const becoming = p.status && ADS_NOTIFY_STATUSES.includes(p.status) && prev?.status !== p.status ? p.status : null;
+
+    const { error } = await supabase.from('studio_ad_creatives').update(p).eq('id', id);
+    if (error) {
+      // Surface write failures instead of silently reverting on the next reload.
+      console.error('[AdCreative] failed to update ad creative', { id, patch: p, error });
+      alert(`Couldn't save change: ${error.message}`);
+    }
     onReload();
+
+    if (!error && becoming) {
+      notifyStatus({
+        status: becoming,
+        name: prev?.creative_id ?? '',
+        // Prefer a value included in this same patch, else the current row value.
+        finalUrl: (p.final_link ?? prev?.final_link) ?? '',
+      });
+    }
   }
 
   async function changeStatus(a: StudioAdCreative, status: string) {
     if (status === a.status) return;
     await logActivity('ad', a.id, 'Status changed', a.status, status);
+    // patch() detects the transition into a notify status and fires the Slack notify.
     await patch(a.id, { status });
+  }
+
+  // Fire-and-forget POST to the server route, which holds the Slack webhook URL
+  // and skips silently if it's unset. Never blocks the UI or throws.
+  function notifyStatus(payload: { status: string; name: string; finalUrl: string }) {
+    fetch('/api/ads-notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).catch(err => console.warn('[AdCreative] /api/ads-notify call failed', err));
   }
 
   async function createAd() {
