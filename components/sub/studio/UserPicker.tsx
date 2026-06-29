@@ -2,17 +2,11 @@
 import { useRef, useState } from 'react';
 import { Profile } from '@/lib/types';
 import { useDismiss } from '@/lib/use-dismiss';
+import { profileName } from '@/lib/profile-name';
 
-// Preferred display for a user: explicit display_name, else the capitalized
-// email prefix (e.g. "jane.doe@x.com" → "Jane.doe"), else a short id fallback.
-export function profileName(p: Profile): string {
-  if (p.display_name && p.display_name.trim()) return p.display_name.trim();
-  if (p.email) {
-    const prefix = p.email.split('@')[0];
-    if (prefix) return prefix.charAt(0).toUpperCase() + prefix.slice(1);
-  }
-  return `User ${p.id.slice(0, 6)}`;
-}
+// Re-export so existing `./UserPicker` importers (AssigneeSettings, ItemPanel)
+// keep working off the shared helper.
+export { profileName };
 
 // Resolve a stored assigned_to (a profile id, or legacy plain text) to a display name.
 // Returns null when it can't be mapped to a real user (→ shown as Unassigned).

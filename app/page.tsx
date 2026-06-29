@@ -13,6 +13,10 @@ import ContentTab from '@/components/sub/ContentTab';
 import ResearchTab from '@/components/sub/ResearchTab';
 import DriveTab from '@/components/sub/DriveTab';
 import StudioTab from '@/components/sub/StudioTab';
+import DisplayNamePrompt from '@/components/DisplayNamePrompt';
+import AccountPanel from '@/components/AccountPanel';
+import AssigneeSettings from '@/components/sub/studio/AssigneeSettings';
+import { profileName } from '@/lib/profile-name';
 
 async function safeSelect(table: string, orderCol: string, ascending = true) {
   const { data, error } = await supabase.from(table).select('*').order(orderCol, { ascending });
@@ -68,6 +72,11 @@ export default function Home() {
   const [role, setRole] = useState<Role | null>(null);
   // Read-only: email for the dashboard greeting. Independent of role/access logic.
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  // Current user's id, used only to surface their own profile (display name).
+  // Does not affect role or tab access.
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [adminUsersOpen, setAdminUsersOpen] = useState(false);
 
   // Sync theme from storage on mount (the layout script already applied it pre-paint)
   useEffect(() => {
@@ -94,6 +103,7 @@ export default function Home() {
       if (!user) { router.replace('/login'); return; }
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
       if (cancelled) return;
+      setCurrentUserId(user.id);
       setRole(profile?.role === 'admin' ? 'admin' : 'editor');
     })();
     return () => { cancelled = true; };
@@ -199,14 +209,23 @@ export default function Home() {
     );
   }
 
+  // The signed-in user's own profile row (for display name editing / first-login
+  // prompt). Null until both the auth id and profiles have loaded.
+  const currentProfile = currentUserId ? studioProfiles.find(p => p.id === currentUserId) ?? null : null;
+  const currentName = currentProfile ? profileName(currentProfile) : (userEmail ?? 'Account');
+  // First-login: prompt until the user has actually set a display name.
+  const needsDisplayName = !!currentProfile && !(currentProfile.display_name && currentProfile.display_name.trim());
+
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       <Sidebar
         activeMP={mainPage}
         collapsed={sidebarCollapsed}
         role={role}
+        userName={currentName}
         onToggleCollapse={() => setSidebarCollapsed(v => !v)}
         onSelectMain={setMainPage}
+        onOpenAccount={() => setAccountOpen(true)}
         onLogout={signOut}
       />
 
@@ -306,6 +325,7 @@ export default function Home() {
               posts={posts}
               subscriberSnapshots={subscriberSnapshots}
               userEmail={userEmail}
+              userName={currentProfile ? currentName : null}
               onReload={loadData}
             />
           )}
@@ -350,6 +370,26 @@ export default function Home() {
           )}
         </div>
       </div>
+
+      {/* First-login: force a display name before anything else is usable */}
+      {needsDisplayName && <DisplayNamePrompt onSaved={loadData} />}
+
+      {/* Current user's account panel (opened from the sidebar) */}
+      {accountOpen && currentProfile && (
+        <AccountPanel
+          profile={currentProfile}
+          isAdmin={role === 'admin'}
+          onClose={() => setAccountOpen(false)}
+          onSaved={loadData}
+          onManageUsers={() => { setAccountOpen(false); setAdminUsersOpen(true); }}
+        />
+      )}
+
+      {/* Admin: manage every user's display name + assignable (relocated here
+          from the old Video Review "Users" button) */}
+      {adminUsersOpen && role === 'admin' && (
+        <AssigneeSettings profiles={studioProfiles} onClose={() => setAdminUsersOpen(false)} onReload={loadData} />
+      )}
     </div>
   );
 }

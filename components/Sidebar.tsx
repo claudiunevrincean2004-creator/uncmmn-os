@@ -21,12 +21,14 @@ interface Props {
   activeMP: MainPage;
   collapsed: boolean;
   role: Role;
+  userName: string;
   onToggleCollapse: () => void;
   onSelectMain: (page: MainPage) => void;
+  onOpenAccount: () => void;
   onLogout: () => void;
 }
 
-export default function Sidebar({ activeMP, collapsed, role, onToggleCollapse, onSelectMain, onLogout }: Props) {
+export default function Sidebar({ activeMP, collapsed, role, userName, onToggleCollapse, onSelectMain, onOpenAccount, onLogout }: Props) {
   const w = collapsed ? 56 : 210;
   // Layer 3 — only render the tabs this role is allowed to see
   const nav = NAV.filter(item => canAccess(role, item.key));
@@ -93,6 +95,24 @@ export default function Sidebar({ activeMP, collapsed, role, onToggleCollapse, o
       </div>
 
       <div style={{ padding: collapsed ? '10px 4px' : '10px 8px', borderTop: '0.5px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div
+          className="nav-item"
+          onClick={onOpenAccount}
+          title={`${userName} — account`}
+          style={collapsed ? { justifyContent: 'center', padding: '8px 0' } : { gap: 8 }}
+        >
+          <span
+            style={{
+              width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+              background: 'var(--surface-2)', border: '0.5px solid var(--border)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 10, fontWeight: 700, color: 'var(--text)', textTransform: 'uppercase',
+            }}
+          >
+            {(userName || '?').charAt(0)}
+          </span>
+          {!collapsed && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userName}</span>}
+        </div>
         <div
           className="nav-item"
           onClick={onLogout}

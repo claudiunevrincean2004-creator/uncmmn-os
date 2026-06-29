@@ -14,7 +14,6 @@ import ItemPanel, { FieldDef } from './ItemPanel';
 import QuickLinks from './QuickLinks';
 import { UserPicker, resolveAssignee } from './UserPicker';
 import FieldOptionsManager from './FieldOptionsManager';
-import AssigneeSettings from './AssigneeSettings';
 
 const DONE = ['Approved', 'Posted'];
 
@@ -73,7 +72,6 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   const [dateTo, setDateTo] = usePersistedState<string>('studio_v_to', '');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [optsField, setOptsField] = useState<{ field: string; title: string } | null>(null);
-  const [assigneeSettings, setAssigneeSettings] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState<VideoDraft>(EMPTY_DRAFT);
   const [creating, setCreating] = useState(false);
@@ -214,7 +212,6 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
           <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>To</span>
           <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
           {(dateFrom || dateTo) && <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>clear</button>}
-          {isAdmin && <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setAssigneeSettings(true)}>Users</button>}
           <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{filtered.length} {filtered.length === 1 ? 'video' : 'videos'}</span>
           <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={() => { setDraft(EMPTY_DRAFT); setAddOpen(true); }}>+ Add Video</button>
         </div>
@@ -343,9 +340,6 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
 
       {optsField && (
         <FieldOptionsManager field={optsField.field} title={optsField.title} options={dropdownOptions} onClose={() => setOptsField(null)} onReload={onReload} />
-      )}
-      {assigneeSettings && (
-        <AssigneeSettings profiles={profiles} onClose={() => setAssigneeSettings(false)} onReload={onReload} />
       )}
     </div>
   );

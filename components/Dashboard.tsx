@@ -10,6 +10,7 @@ interface Props {
   posts: Post[];
   subscriberSnapshots: SubscriberSnapshot[];
   userEmail?: string | null;
+  userName?: string | null;
   onReload: () => void;
 }
 
@@ -69,9 +70,11 @@ function DeltaPill({ delta, qualifier }: { delta: { pct: number } | null; qualif
   );
 }
 
-export default function Dashboard({ client, posts, subscriberSnapshots, userEmail }: Props) {
-  // Greeting name derived solely from the email local-part (before "@"), capitalized.
+export default function Dashboard({ client, posts, subscriberSnapshots, userEmail, userName }: Props) {
+  // Greeting: prefer the user's display name; fall back to the capitalized email
+  // local-part (before "@") when no display name is set yet.
   const greetingName = (() => {
+    if (userName && userName.trim()) return userName.trim();
     const local = (userEmail || '').split('@')[0].trim();
     return local ? local.charAt(0).toUpperCase() + local.slice(1) : '';
   })();
