@@ -60,7 +60,13 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
   }
 
   async function patch(id: string, p: Partial<StudioSession>) {
-    await supabase.from('studio_sessions').update(p).eq('id', id);
+    const { error } = await supabase.from('studio_sessions').update(p).eq('id', id);
+    if (error) {
+      // Surface write failures (e.g. a missing column or RLS denial) instead of
+      // silently reverting the cell to its previous value on the next reload.
+      console.error('[FilmingSessions] failed to update session', { id, patch: p, error });
+      alert(`Couldn't save change: ${error.message}`);
+    }
     onReload();
   }
 

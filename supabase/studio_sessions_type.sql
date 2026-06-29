@@ -24,3 +24,9 @@ insert into public.studio_dropdown_options (field, value, color, position) value
   ('session_type', 'Scripted', '#8b5cf6', 0),
   ('session_type', 'Raw talk', '#14b8a6', 1)
 on conflict (field, value) do nothing;
+
+-- 4) Refresh PostgREST's schema cache so writes to studio_sessions.type take
+--    effect immediately (otherwise updates fail with PGRST204 "column not found
+--    in schema cache" until the cache reloads — which looks like the Type cell
+--    reverting instead of saving).
+notify pgrst, 'reload schema';

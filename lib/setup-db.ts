@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 
-export async function checkSchema(): Promise<{ missing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[]; adColumnsMissing: string[]; dropdownColsMissing: boolean }> {
+export async function checkSchema(): Promise<{ missing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[]; adColumnsMissing: string[]; sessionColumnsMissing: string[]; dropdownColsMissing: boolean }> {
   const requiredTables = [
     'clients', 'posts', 'goals', 'drive_folders',
     'subscriber_snapshots', 'research_items', 'revenue_entries',
@@ -48,6 +48,20 @@ export async function checkSchema(): Promise<{ missing: string[]; postColumnsMis
     }
   }
 
+  // New columns added to the (already-existing) studio_sessions table. Probe
+  // each directly so they're detected even when the table is empty — otherwise
+  // the column never gets created on existing installs and writes to it silently
+  // fail (e.g. the Type select reverting instead of saving).
+  const sessionColumnsMissing: string[] = [];
+  if (!missing.includes('studio_sessions')) {
+    for (const col of ['type', 'footage_link']) {
+      const { error } = await supabase.from('studio_sessions').select(col).limit(0);
+      if (error && (error.code === '42703' || error.code === 'PGRST204' || /column/i.test(error.message))) {
+        sessionColumnsMissing.push(col);
+      }
+    }
+  }
+
   // Built-in Format/Status options become DB-backed: detect the `color` column.
   let dropdownColsMissing = false;
   if (!missing.includes('studio_dropdown_options')) {
@@ -57,10 +71,10 @@ export async function checkSchema(): Promise<{ missing: string[]; postColumnsMis
     }
   }
 
-  return { missing, postColumnsMissing, researchColumnsMissing, adColumnsMissing, dropdownColsMissing };
+  return { missing, postColumnsMissing, researchColumnsMissing, adColumnsMissing, sessionColumnsMissing, dropdownColsMissing };
 }
 
-export function getMigrationSQL(missing: string[], postColumnsMissing: string[] = [], researchColumnsMissing: string[] = [], adColumnsMissing: string[] = [], dropdownColsMissing = false): string {
+export function getMigrationSQL(missing: string[], postColumnsMissing: string[] = [], researchColumnsMissing: string[] = [], adColumnsMissing: string[] = [], sessionColumnsMissing: string[] = [], dropdownColsMissing = false): string {
   const parts: string[] = [];
 
   if (missing.includes('clients')) {
@@ -306,6 +320,18 @@ create policy "Allow all for anon" on studio_dropdown_options for all using (tru
       buyer_feedback: 'text',
     };
     parts.push(adColumnsMissing.map(c => `alter table studio_ad_creatives add column if not exists ${c} ${colTypes[c]};`).join('\n'));
+  }
+
+  // New columns on the existing studio_sessions table
+  if (sessionColumnsMissing.length > 0) {
+    const colTypes: Record<string, string> = {
+      type: "text default 'Scripted'",
+      footage_link: 'text',
+    };
+    parts.push(sessionColumnsMissing.map(c => `alter table studio_sessions add column if not exists ${c} ${colTypes[c]};`).join('\n')
+      // Refresh PostgREST's schema cache so writes to the new column don't fail
+      // with PGRST204 ("column not found in schema cache") until the next reload.
+      + `\nnotify pgrst, 'reload schema';`);
   }
 
   if (researchColumnsMissing.includes('title')) {
