@@ -15,6 +15,9 @@ import FieldOptionsManager from './FieldOptionsManager';
 const DONE = ['Posted'];
 const TABLE_KEY = 'sequence';
 
+// Statuses whose transition fires a Slack notification (see /api/story-notify).
+const STORY_NOTIFY_STATUSES = ['Ready for Review', 'Approved', 'Revision Requested'];
+
 // In-code fallback options per built-in select field, so adding an option can
 // backfill them as rows instead of dropping them (see buildAddOptionRows).
 const FIELD_FALLBACKS: Record<string, { values: string[]; colors?: Record<string, string> }> = {
@@ -78,14 +81,46 @@ export default function StorySequences({ sequences, comments, activity, dropdown
   }
 
   async function patch(id: string, p: Partial<StudioSequence>) {
-    await supabase.from('studio_sequences').update(p).eq('id', id);
+    // Detect a transition INTO a notify status from the pre-update row BEFORE
+    // writing. Doing it here (rather than only in changeStatus) means the Slack
+    // notify fires no matter which handler set the status — the inline Status
+    // pill or the detail panel — and never on a re-save while already in it.
+    const prev = sequences.find(x => x.id === id);
+    const becoming = p.status && STORY_NOTIFY_STATUSES.includes(p.status) && prev?.status !== p.status ? p.status : null;
+
+    const { error } = await supabase.from('studio_sequences').update(p).eq('id', id);
+    if (error) {
+      // Surface write failures instead of silently reverting on the next reload.
+      console.error('[StorySequences] failed to update sequence', { id, patch: p, error });
+      alert(`Couldn't save change: ${error.message}`);
+    }
     onReload();
+
+    if (!error && becoming) {
+      notifyStatus({
+        status: becoming,
+        name: prev?.title ?? '',
+        // Prefer a value included in this same patch, else the current row value.
+        finalUrl: (p.final_url ?? prev?.final_url) ?? '',
+      });
+    }
   }
 
   async function changeStatus(s: StudioSequence, status: string) {
     if (status === s.status) return;
     await logActivity('sequence', s.id, 'Status changed', s.status, status);
+    // patch() detects the transition into a notify status and fires the Slack notify.
     await patch(s.id, { status });
+  }
+
+  // Fire-and-forget POST to the server route, which holds the Slack webhook URL
+  // and skips silently if it's unset. Never blocks the UI or throws.
+  function notifyStatus(payload: { status: string; name: string; finalUrl: string }) {
+    fetch('/api/story-notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).catch(err => console.warn('[StorySequences] /api/story-notify call failed', err));
   }
 
   async function createSequence() {
