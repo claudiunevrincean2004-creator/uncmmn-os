@@ -4,20 +4,15 @@ import { NextResponse } from 'next/server';
 // marked "Filmed". The webhook URL is read from SLACK_FILMING_WEBHOOK_URL (no
 // NEXT_PUBLIC_ prefix) so it never reaches the browser bundle.
 
-// Time-based opener, chosen by the current hour in Central European Time
-// (Europe/Berlin) regardless of the server's own timezone. Name is hardcoded.
-function timeOpener(): string {
-  const hour = Number(
-    new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Europe/Berlin',
-      hour: '2-digit',
-      hourCycle: 'h23', // guarantees 00–23 (avoids the "24" midnight quirk)
-    }).format(new Date()),
-  );
-  if (hour >= 5 && hour < 12) return 'Morning, Claudiu! ☕';
-  if (hour >= 12 && hour < 17) return 'Midday drop, Claudiu!';
-  if (hour >= 17 && hour < 22) return 'Winding down? Not yet, Claudiu —';
-  return "Night shift, Claudiu — Nathan doesn't sleep apparently."; // 22:00–4:59
+// Random opener — one of these is picked at random on each notification.
+const OPENERS = [
+  "Nathan's been cooking, Claudiu! 🔥",
+  'Nathan cooked again, Claudiu! 👨‍🍳',
+  "Nathan's at it again, Claudiu! 🎬",
+];
+
+function randomOpener(): string {
+  return OPENERS[Math.floor(Math.random() * OPENERS.length)];
 }
 
 export async function POST(request: Request) {
@@ -38,10 +33,10 @@ export async function POST(request: Request) {
   }
 
   const lines = [
-    timeOpener(),
+    randomOpener(),
     '',
-    `Nathan just filmed a new ${type || 'video'}.`,
-    footageLink ? `Find the RAW files here: ${footageLink}` : '⚠️ No footage link added yet.',
+    `Fresh ${type || 'video'} session, ready just for you.`,
+    footageLink ? `Find the RAW files here: ${footageLink}` : '⚠️ No footage link added tho!',
   ];
 
   try {
