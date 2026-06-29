@@ -38,37 +38,12 @@ export async function POST(request: Request) {
     `Fresh ${type || 'video'} session, ready just for you.`,
     footageLink ? `Find the RAW files here: ${footageLink}` : '⚠️ No footage link added tho!',
   ];
-  const text = lines.join('\n');
-
-  const gifUrl =
-    'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNnVja2s1ZTVoaG1yNGZkMnlleWhyang5bXB6MXliaGFmaXNoOXFpMyZlcD12MV9naWZzX3NlYXJjaCZjdD1n/IHWWbqfkIhRzPq4uCP/giphy.gif';
-
-  const blocks = [
-    {
-      type: 'section',
-      text: { type: 'mrkdwn', text: lines[0] },
-    },
-    {
-      type: 'section',
-      text: { type: 'mrkdwn', text: lines[2] },
-    },
-    {
-      type: 'section',
-      text: { type: 'mrkdwn', text: lines[3] },
-    },
-    {
-      type: 'image',
-      image_url: gifUrl,
-      alt_text: 'Fresh footage',
-    },
-  ];
 
   try {
     await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // `text` is the notification/fallback; `blocks` renders the message + GIF.
-      body: JSON.stringify({ text, blocks }),
+      body: JSON.stringify({ text: lines.join('\n') }),
     });
   } catch {
     // Never let a Slack delivery failure surface to the user / crash the request.
