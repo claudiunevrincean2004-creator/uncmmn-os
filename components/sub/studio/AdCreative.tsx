@@ -6,7 +6,7 @@ import { usePersistedState } from '@/lib/use-persisted-state';
 import { usePagedRows } from '@/lib/use-paged-rows';
 import LoadMore from './LoadMore';
 import { AD_FORMATS, AD_STATUSES, AD_STATUS_COLORS, todayISO, logActivity, mergeOptions, inDateRange, getFieldOptions, colorMap, buildAddOptionRows } from '@/lib/studio';
-import { EditPillSelect, MiniSelect, InlineText, InlineDate, UrlCell } from './cells';
+import { EditPillSelect, MiniSelect, InlineDate, UrlCell } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import QuickLinks from './QuickLinks';
 import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal } from './CustomColumns';
@@ -36,7 +36,6 @@ interface AdDraft {
   date_added: string;
   ad_format: string;
   angle: string;
-  hook: string;
   final_link: string;
   status: string;
 }
@@ -45,7 +44,6 @@ const EMPTY_DRAFT: AdDraft = {
   date_added: '',
   ad_format: '',
   angle: '',
-  hook: '',
   final_link: '',
   status: 'Paused',
 };
@@ -157,7 +155,6 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
       date_added: draft.date_added || null,
       ad_format: draft.ad_format || null,
       angle: draft.angle.trim() || null,
-      hook: draft.hook.trim() || null,
       final_link: draft.final_link.trim() || null,
       status: draft.status || 'Paused',
     };
@@ -195,7 +192,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   }
 
   // Iterate: spawn a new Draft variation of the clicked creative, copying its
-  // format/angle/hook (Final left blank), then ping the pipeline channel.
+  // format/angle (Final left blank), then ping the pipeline channel.
   async function handleIterate(a: StudioAdCreative) {
     const rawName = (a.creative_id || 'Untitled').trim();
     // Number variations off the ROOT name (strip any existing " — Variation N")
@@ -216,7 +213,6 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
       date_added: todayISO(),
       ad_format: a.ad_format || null,
       angle: a.angle || null,
-      hook: a.hook || null,
       final_link: null,        // start blank — this is a fresh draft to make
       status: 'Draft',
     };
@@ -269,7 +265,6 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
     { key: 'date_added', label: 'Date Added', type: 'date' },
     { key: 'ad_format', label: 'Format', type: 'pill', field: 'ad_format', options: formatValues, colors: formatColors, allowAdd: isAdmin, allowEmpty: true },
     { key: 'angle', label: 'Angle', type: 'pill', field: 'ad_angle', options: angleOpts, colors: angleColors, allowAdd: isAdmin, allowEmpty: true },
-    { key: 'hook', label: 'Hook', type: 'text', placeholder: 'Hook' },
     { key: 'final_link', label: 'Final', type: 'url' },
     { key: 'status', label: 'Status', type: 'pill', field: 'ad_status', options: statusValues, colors: statusColors, allowAdd: isAdmin },
   ], [formatValues, formatColors, angleOpts, angleColors, statusValues, statusColors, isAdmin]);
@@ -329,7 +324,6 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                   <th>Date Added</th>
                   <th onClick={isAdmin ? () => setOptsField({ field: 'ad_format', title: 'Format' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Format{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <th onClick={isAdmin ? () => setOptsField({ field: 'ad_angle', title: 'Angle' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Angle{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
-                  <th>Hook</th>
                   <th>Final</th>
                   <th>Iterate</th>
                   <th onClick={isAdmin ? () => setOptsField({ field: 'ad_status', title: 'Status' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Status{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
@@ -347,7 +341,6 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                       <td><InlineDate value={a.date_added} onCommit={d => patch(a.id, { date_added: d || undefined })} /></td>
                       <td><EditPillSelect field="ad_format" value={a.ad_format || ''} options={formatValues} colors={formatColors} onChange={f => patch(a.id, { ad_format: f })} onAddOption={addOption} allowAdd={isAdmin} allowEmpty /></td>
                       <td><EditPillSelect field="ad_angle" value={a.angle || ''} options={angleOpts} colors={angleColors} onChange={x => patch(a.id, { angle: x })} onAddOption={addOption} allowAdd={isAdmin} allowEmpty /></td>
-                      <td><InlineText value={a.hook} onCommit={t => patch(a.id, { hook: t })} placeholder="—" style={{ width: 110 }} /></td>
                       <td><UrlCell value={a.final_link} onCommit={u => patch(a.id, { final_link: u })} /></td>
                       <td>
                         <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px', color: 'var(--accent)' }} onClick={() => handleIterate(a)} title="Trigger iteration">↻ Iterate</button>
@@ -404,9 +397,6 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
               </DraftField>
               <DraftField label="Angle">
                 <EditPillSelect field="ad_angle" value={draft.angle} options={angleOpts} colors={angleColors} onChange={x => setDraft(d => ({ ...d, angle: x }))} onAddOption={addOption} allowAdd={isAdmin} allowEmpty />
-              </DraftField>
-              <DraftField label="Hook">
-                <input className="form-input" value={draft.hook} onChange={e => setDraft(d => ({ ...d, hook: e.target.value }))} placeholder="Hook" style={{ width: '100%', fontSize: 12 }} />
               </DraftField>
               <DraftField label="Final">
                 <input className="form-input" value={draft.final_link} onChange={e => setDraft(d => ({ ...d, final_link: e.target.value }))} placeholder="https://…" style={{ width: '100%', fontSize: 12 }} />
