@@ -1,5 +1,5 @@
 'use client';
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StudioVideo, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
@@ -26,6 +26,33 @@ const FIELD_FALLBACKS: Record<string, { values: string[]; colors?: Record<string
   video_priority: { values: PRIORITIES, colors: PRIORITY_COLORS },
 };
 
+// Draft for the "Add Video" form. The row is only written to the database when
+// the user clicks Create; closing/cancelling resets back to this.
+interface VideoDraft {
+  title: string;
+  format: string;
+  assigned_to: string;
+  status: string;
+  priority: string;
+  brief_url: string;
+  raw_files_url: string;
+  final_url: string;
+  deadline: string;
+  notes: string;
+}
+const EMPTY_DRAFT: VideoDraft = {
+  title: '',
+  format: '',
+  assigned_to: '',
+  status: 'Scripting',
+  priority: 'Normal',
+  brief_url: '',
+  raw_files_url: '',
+  final_url: '',
+  deadline: '',
+  notes: '',
+};
+
 interface Props {
   videos: StudioVideo[];
   comments: StudioComment[];
@@ -50,6 +77,9 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [optsField, setOptsField] = useState<{ field: string; title: string } | null>(null);
   const [assigneeSettings, setAssigneeSettings] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [draft, setDraft] = useState<VideoDraft>(EMPTY_DRAFT);
+  const [creating, setCreating] = useState(false);
 
   // Built-in Format & Status options are DB-backed (admin-managed) with defaults
   const statusFieldOpts = getFieldOptions(dropdownOptions, 'video_status', VIDEO_STATUSES, VIDEO_STATUS_COLORS);
@@ -93,9 +123,35 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
     await patch(v.id, p);
   }
 
-  async function addVideo() {
-    await supabase.from('studio_videos').insert([{ title: 'Untitled Video', status: 'Scripting', priority: 'Normal' }]);
+  async function createVideo() {
+    if (creating) return;
+    setCreating(true);
+    const row = {
+      title: draft.title.trim() || 'Untitled Video',
+      format: draft.format || null,
+      assigned_to: draft.assigned_to || null,
+      status: draft.status || 'Scripting',
+      priority: draft.priority || 'Normal',
+      brief_url: draft.brief_url.trim() || null,
+      raw_files_url: draft.raw_files_url.trim() || null,
+      final_url: draft.final_url.trim() || null,
+      deadline: draft.deadline || null,
+      notes: draft.notes.trim() || null,
+    };
+    const { error } = await supabase.from('studio_videos').insert([row]);
+    setCreating(false);
+    if (error) {
+      console.error('[VideoReview] failed to create video', { row, error });
+      alert(`Couldn't create video: ${error.message}`);
+      return;
+    }
+    closeAdd();
     onReload();
+  }
+
+  function closeAdd() {
+    setAddOpen(false);
+    setDraft(EMPTY_DRAFT);
   }
 
   async function deleteVideo(id: string) {
@@ -165,7 +221,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
           {(dateFrom || dateTo) && <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>clear</button>}
           {isAdmin && <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setAssigneeSettings(true)}>Assignees</button>}
           <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{filtered.length} {filtered.length === 1 ? 'video' : 'videos'}</span>
-          <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={addVideo}>+ Add Video</button>
+          <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={() => { setDraft(EMPTY_DRAFT); setAddOpen(true); }}>+ Add Video</button>
         </div>
 
         {filtered.length === 0 ? (
@@ -259,12 +315,71 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
         />
       )}
 
+      {addOpen && (
+        <div className="modal-overlay" onClick={closeAdd}>
+          <div className="modal-box" style={{ width: 520 }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div className="font-head" style={{ fontSize: 17, fontWeight: 700 }}>New Video</div>
+              <button onClick={closeAdd} style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>✕</button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <DraftField label="Title / Desc">
+                <textarea className="form-input" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} placeholder="Title / description" rows={2} style={{ resize: 'vertical', fontSize: 12, lineHeight: 1.4, width: '100%' }} />
+              </DraftField>
+              <DraftField label="Format">
+                <EditPillSelect field="video_format" value={draft.format} options={formatValues} colors={formatColors} onChange={f => setDraft(d => ({ ...d, format: f }))} onAddOption={addOption} allowAdd={isAdmin} allowEmpty />
+              </DraftField>
+              <DraftField label="Assigned To">
+                <UserPicker value={draft.assigned_to} profiles={profiles} onChange={uid => setDraft(d => ({ ...d, assigned_to: uid }))} />
+              </DraftField>
+              <DraftField label="Status">
+                <EditPillSelect field="video_status" value={draft.status} options={statusValues} colors={statusColors} onChange={s => setDraft(d => ({ ...d, status: s }))} onAddOption={addOption} allowAdd={isAdmin} />
+              </DraftField>
+              <DraftField label="Priority">
+                <EditPillSelect field="video_priority" value={draft.priority} options={priorityOpts} colors={PRIORITY_COLORS} onChange={p => setDraft(d => ({ ...d, priority: p }))} onAddOption={addOption} allowAdd={isAdmin} />
+              </DraftField>
+              <DraftField label="Brief">
+                <input className="form-input" value={draft.brief_url} onChange={e => setDraft(d => ({ ...d, brief_url: e.target.value }))} placeholder="https://…" style={{ width: '100%', fontSize: 12 }} />
+              </DraftField>
+              <DraftField label="Raw Files">
+                <input className="form-input" value={draft.raw_files_url} onChange={e => setDraft(d => ({ ...d, raw_files_url: e.target.value }))} placeholder="https://…" style={{ width: '100%', fontSize: 12 }} />
+              </DraftField>
+              <DraftField label="Final Product">
+                <input className="form-input" value={draft.final_url} onChange={e => setDraft(d => ({ ...d, final_url: e.target.value }))} placeholder="https://…" style={{ width: '100%', fontSize: 12 }} />
+              </DraftField>
+              <DraftField label="Deadline">
+                <input className="form-input" type="date" value={draft.deadline} onChange={e => setDraft(d => ({ ...d, deadline: e.target.value }))} style={{ width: 160, fontSize: 12 }} />
+              </DraftField>
+              <DraftField label="Notes">
+                <textarea className="form-input" value={draft.notes} onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))} placeholder="Add notes…" rows={2} style={{ resize: 'vertical', fontSize: 12, lineHeight: 1.4, width: '100%' }} />
+              </DraftField>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+              <button className="btn-ghost" style={{ fontSize: 12, padding: '8px 14px' }} onClick={closeAdd}>Cancel</button>
+              <button className="btn-primary" style={{ fontSize: 12, padding: '8px 14px' }} onClick={createVideo} disabled={creating}>{creating ? 'Creating…' : 'Create'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {optsField && (
         <FieldOptionsManager field={optsField.field} title={optsField.title} options={dropdownOptions} onClose={() => setOptsField(null)} onReload={onReload} />
       )}
       {assigneeSettings && (
         <AssigneeSettings profiles={profiles} onClose={() => setAssigneeSettings(false)} onReload={onReload} />
       )}
+    </div>
+  );
+}
+
+// Label + control row for the Add Video form, matching the detail panel layout.
+function DraftField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 10, alignItems: 'start' }}>
+      <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, paddingTop: 6 }}>{label}</div>
+      <div>{children}</div>
     </div>
   );
 }
