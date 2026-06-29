@@ -1,10 +1,10 @@
 'use client';
 import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
-import { StudioSession, StudioComment, StudioActivity, StudioDropdownOption, CustomProperty, CustomPropertyOption } from '@/lib/types';
+import { StudioSession, StudioComment, StudioActivity, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { SESSION_STATUSES, SESSION_STATUS_COLORS, SESSION_TYPES, SESSION_TYPE_COLORS, todayISO, logActivity, inDateRange, getFieldOptions, colorMap, buildAddOptionRows } from '@/lib/studio';
-import { EditPillSelect, MiniSelect, UrlCell, InlineDate, InlineNumber, NoteEditor } from './cells';
+import { EditPillSelect, MiniSelect, UrlCell, InlineDate, InlineNumber } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal } from './CustomColumns';
 import FieldOptionsManager from './FieldOptionsManager';
@@ -29,7 +29,6 @@ interface SessionDraft {
   status: string;
   videos_planned: number;
   videos_filmed: number;
-  notes: string;
 }
 const EMPTY_DRAFT: SessionDraft = {
   name: '',
@@ -40,7 +39,6 @@ const EMPTY_DRAFT: SessionDraft = {
   status: 'Planned',
   videos_planned: 0,
   videos_filmed: 0,
-  notes: '',
 };
 
 interface Props {
@@ -50,18 +48,18 @@ interface Props {
   dropdownOptions: StudioDropdownOption[];
   properties: CustomProperty[];
   customOptions: CustomPropertyOption[];
+  profiles: Profile[];
   isAdmin: boolean;
   onReload: () => void;
 }
 
-export default function FilmingSessions({ sessions, comments, activity, dropdownOptions, properties, customOptions, isAdmin, onReload }: Props) {
+export default function FilmingSessions({ sessions, comments, activity, dropdownOptions, properties, customOptions, profiles, isAdmin, onReload }: Props) {
   const [fStatus, setFStatus] = usePersistedState<string>('studio_f_status', 'All');
   const [fType, setFType] = usePersistedState<string>('studio_f_type', 'All');
   const [sortDir, setSortDir] = usePersistedState<'asc' | 'desc'>('studio_f_sortdir', 'asc');
   const [dateFrom, setDateFrom] = usePersistedState<string>('studio_f_from', '');
   const [dateTo, setDateTo] = usePersistedState<string>('studio_f_to', '');
   const [custFilters, setCustFilters] = usePersistedState<Record<string, string>>('studio_f_custfilters', {});
-  const [expanded, setExpanded] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mgrOpen, setMgrOpen] = useState(false);
   const [optsField, setOptsField] = useState<{ field: string; title: string } | null>(null);
@@ -145,7 +143,6 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
       status: draft.status || 'Planned',
       videos_planned: draft.videos_planned || 0,
       videos_filmed: draft.videos_filmed || 0,
-      notes: draft.notes.trim() || null,
     };
     const { error } = await supabase.from('studio_sessions').insert([row]);
     setCreating(false);
@@ -200,7 +197,6 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
     { key: 'status', label: 'Status', type: 'pill', field: 'session_status', options: statusValues, colors: statusColors, allowAdd: isAdmin },
     { key: 'videos_planned', label: 'Videos to Film', type: 'number' },
     { key: 'videos_filmed', label: 'Videos Filmed', type: 'number' },
-    { key: 'notes', label: 'Notes', type: 'textarea', placeholder: 'Add notes…' },
   ], [statusValues, statusColors, typeValues, typeColors, isAdmin]);
 
   const selected = selectedId ? sessions.find(s => s.id === selectedId) : null;
@@ -241,7 +237,6 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                   <th>To Film</th>
                   <th>Filmed</th>
                   <th style={{ minWidth: 120 }}>Completion</th>
-                  <th>Notes</th>
                   <CustomHeaderCells props={cprops} isAdmin={isAdmin} onManage={() => setMgrOpen(true)} />
                   <th></th>
                 </tr>
@@ -273,24 +268,9 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                             <span style={{ fontSize: 10, color: 'var(--text-faint)', width: 30, textAlign: 'right' }}>{pct}%</span>
                           </div>
                         </td>
-                        <td>
-                          <button onClick={() => setExpanded(e => (e === s.id ? null : s.id))} className="btn-ghost" style={{ fontSize: 10, padding: '3px 8px', color: s.notes ? 'var(--accent)' : 'var(--text-faint)' }} title="Expand notes">
-                            {s.notes ? '📝' : '+'} {expanded === s.id ? '▲' : '▾'}
-                          </button>
-                        </td>
                         <CustomRowCells row={s} props={cprops} optionsByProp={optsByProp} onPatch={patch} />
                         <td><button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteSession(s.id)}>✕</button></td>
                       </tr>
-                      {expanded === s.id && (
-                        <tr>
-                          <td colSpan={11 + cprops.length} style={{ background: 'var(--surface-2)' }}>
-                            <div style={{ padding: '4px 2px' }}>
-                              <div className="form-label" style={{ marginBottom: 4 }}>Notes</div>
-                              <NoteEditor value={s.notes} onCommit={n => patch(s.id, { notes: n })} onClose={() => setExpanded(null)} placeholder="Add notes…" />
-                            </div>
-                          </td>
-                        </tr>
-                      )}
                     </Fragment>
                   );
                 })}
@@ -311,6 +291,8 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
           onAddOption={addOption}
           comments={comments}
           activity={activity}
+          profiles={profiles}
+          isAdmin={isAdmin}
           onReload={onReload}
           onClose={() => setSelectedId(null)}
         />
@@ -348,9 +330,6 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
               </DraftField>
               <DraftField label="Videos Filmed">
                 <input className="form-input" type="number" min={0} value={draft.videos_filmed} onChange={e => setDraft(d => ({ ...d, videos_filmed: Math.max(0, Number(e.target.value) || 0) }))} style={{ width: 90, fontSize: 12 }} />
-              </DraftField>
-              <DraftField label="Notes">
-                <textarea className="form-input" value={draft.notes} onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))} placeholder="Add notes…" rows={2} style={{ resize: 'vertical', fontSize: 12, lineHeight: 1.4, width: '100%' }} />
               </DraftField>
             </div>
 

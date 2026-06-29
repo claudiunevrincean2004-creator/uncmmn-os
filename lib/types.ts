@@ -136,6 +136,7 @@ export interface StudioComment {
   item_type: string;
   item_id: string;
   text: string;
+  author_id?: string | null;
   created_at?: string;
 }
 

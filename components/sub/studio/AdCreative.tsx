@@ -1,7 +1,7 @@
 'use client';
 import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
-import { StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption } from '@/lib/types';
+import { StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { AD_FORMATS, AD_STATUSES, AD_STATUS_COLORS, todayISO, logActivity, mergeOptions, inDateRange, getFieldOptions, colorMap, buildAddOptionRows } from '@/lib/studio';
 import { EditPillSelect, EditSelect, MiniSelect, InlineText, InlineDate, UrlCell, NoteEditor } from './cells';
@@ -57,12 +57,13 @@ interface Props {
   dropdownOptions: StudioDropdownOption[];
   properties: CustomProperty[];
   customOptions: CustomPropertyOption[];
+  profiles: Profile[];
   isAdmin: boolean;
   onReload: () => void;
   showToast: (msg: string) => void;
 }
 
-export default function AdCreative({ adCreatives, comments, activity, quickLinks, dropdownOptions, properties, customOptions, isAdmin, onReload, showToast }: Props) {
+export default function AdCreative({ adCreatives, comments, activity, quickLinks, dropdownOptions, properties, customOptions, profiles, isAdmin, onReload, showToast }: Props) {
   const [fStatus, setFStatus] = usePersistedState<string>('studio_ad_status', 'All');
   const [fFormat, setFFormat] = usePersistedState<string>('studio_ad_format', 'All');
   const [fAngle, setFAngle] = usePersistedState<string>('studio_ad_angle', 'All');
@@ -324,6 +325,8 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
           onAddOption={addOption}
           comments={comments}
           activity={activity}
+          profiles={profiles}
+          isAdmin={isAdmin}
           onReload={onReload}
           onClose={() => setSelectedId(null)}
         />

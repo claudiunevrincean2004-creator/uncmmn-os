@@ -9,7 +9,7 @@ import {
   isOverdue, logActivity, todayISO, mergeOptions, inDateRange,
   getFieldOptions, colorMap, buildAddOptionRows,
 } from '@/lib/studio';
-import { EditPillSelect, MiniSelect, UrlCell, InlineDate, NoteEditor } from './cells';
+import { EditPillSelect, MiniSelect, UrlCell, InlineDate } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import QuickLinks from './QuickLinks';
 import { UserPicker, resolveAssignee } from './UserPicker';
@@ -38,7 +38,6 @@ interface VideoDraft {
   raw_files_url: string;
   final_url: string;
   deadline: string;
-  notes: string;
 }
 const EMPTY_DRAFT: VideoDraft = {
   title: '',
@@ -50,7 +49,6 @@ const EMPTY_DRAFT: VideoDraft = {
   raw_files_url: '',
   final_url: '',
   deadline: '',
-  notes: '',
 };
 
 interface Props {
@@ -73,7 +71,6 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   const [sortDir, setSortDir] = usePersistedState<'asc' | 'desc'>('studio_v_sortdir', 'asc');
   const [dateFrom, setDateFrom] = usePersistedState<string>('studio_v_from', '');
   const [dateTo, setDateTo] = usePersistedState<string>('studio_v_to', '');
-  const [expanded, setExpanded] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [optsField, setOptsField] = useState<{ field: string; title: string } | null>(null);
   const [assigneeSettings, setAssigneeSettings] = useState(false);
@@ -136,7 +133,6 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
       raw_files_url: draft.raw_files_url.trim() || null,
       final_url: draft.final_url.trim() || null,
       deadline: draft.deadline || null,
-      notes: draft.notes.trim() || null,
     };
     const { error } = await supabase.from('studio_videos').insert([row]);
     setCreating(false);
@@ -196,7 +192,6 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
     { key: 'final_url', label: 'Final Product', type: 'url' },
     { key: 'deadline', label: 'Deadline', type: 'date' },
     { key: 'revision_count', label: 'Revisions', type: 'readonly' },
-    { key: 'notes', label: 'Notes', type: 'textarea', placeholder: 'Add notes…' },
   ], [formatValues, formatColors, statusValues, statusColors, priorityOpts, isAdmin]);
 
   const selected = selectedId ? videos.find(v => v.id === selectedId) : null;
@@ -219,7 +214,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
           <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>To</span>
           <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
           {(dateFrom || dateTo) && <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>clear</button>}
-          {isAdmin && <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setAssigneeSettings(true)}>Assignees</button>}
+          {isAdmin && <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setAssigneeSettings(true)}>Users</button>}
           <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{filtered.length} {filtered.length === 1 ? 'video' : 'videos'}</span>
           <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={() => { setDraft(EMPTY_DRAFT); setAddOpen(true); }}>+ Add Video</button>
         </div>
@@ -241,7 +236,6 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                   <th>Deadline</th>
                   <th>Priority</th>
                   <th>Rev.</th>
-                  <th>Notes</th>
                   <th></th>
                 </tr>
               </thead>
@@ -272,23 +266,8 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                             ? <span className="badge" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }} title={`${v.revision_count} revision round(s)`}>{v.revision_count}</span>
                             : <span style={{ color: 'var(--text-faint)' }}>0</span>}
                         </td>
-                        <td>
-                          <button onClick={() => setExpanded(e => (e === v.id ? null : v.id))} className="btn-ghost" style={{ fontSize: 10, padding: '3px 8px', color: v.notes ? 'var(--accent)' : 'var(--text-faint)' }} title="Expand notes">
-                            {v.notes ? '📝' : '+'} {expanded === v.id ? '▲' : '▾'}
-                          </button>
-                        </td>
                         <td><button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteVideo(v.id)}>✕</button></td>
                       </tr>
-                      {expanded === v.id && (
-                        <tr>
-                          <td colSpan={12} style={{ background: 'var(--surface-2)' }}>
-                            <div style={{ padding: '4px 2px' }}>
-                              <div className="form-label" style={{ marginBottom: 4 }}>Notes</div>
-                              <NoteEditor value={v.notes} onCommit={n => patch(v.id, { notes: n })} onClose={() => setExpanded(null)} placeholder="Add notes…" />
-                            </div>
-                          </td>
-                        </tr>
-                      )}
                     </Fragment>
                   );
                 })}
@@ -310,6 +289,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
           comments={comments}
           activity={activity}
           profiles={profiles}
+          isAdmin={isAdmin}
           onReload={onReload}
           onClose={() => setSelectedId(null)}
         />
@@ -350,9 +330,6 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
               </DraftField>
               <DraftField label="Deadline">
                 <input className="form-input" type="date" value={draft.deadline} onChange={e => setDraft(d => ({ ...d, deadline: e.target.value }))} style={{ width: 160, fontSize: 12 }} />
-              </DraftField>
-              <DraftField label="Notes">
-                <textarea className="form-input" value={draft.notes} onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))} placeholder="Add notes…" rows={2} style={{ resize: 'vertical', fontSize: 12, lineHeight: 1.4, width: '100%' }} />
               </DraftField>
             </div>
 

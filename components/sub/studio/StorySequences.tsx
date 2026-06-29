@@ -1,13 +1,13 @@
 'use client';
 import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
-import { StudioSequence, StudioComment, StudioActivity, StudioDropdownOption, CustomProperty, CustomPropertyOption } from '@/lib/types';
+import { StudioSequence, StudioComment, StudioActivity, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 import {
   SEQUENCE_STATUSES, SEQUENCE_STATUS_COLORS,
   isOverdue, logActivity, inDateRange, getFieldOptions, colorMap, buildAddOptionRows,
 } from '@/lib/studio';
-import { EditPillSelect, MiniSelect, UrlCell, InlineDate, NoteEditor } from './cells';
+import { EditPillSelect, MiniSelect, UrlCell, InlineDate } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal } from './CustomColumns';
 import FieldOptionsManager from './FieldOptionsManager';
@@ -31,14 +31,12 @@ interface SequenceDraft {
   status: string;
   final_url: string;
   scheduled_date: string;
-  notes: string;
 }
 const EMPTY_DRAFT: SequenceDraft = {
   title: '',
   status: 'Draft',
   final_url: '',
   scheduled_date: '',
-  notes: '',
 };
 
 interface Props {
@@ -48,17 +46,17 @@ interface Props {
   dropdownOptions: StudioDropdownOption[];
   properties: CustomProperty[];
   customOptions: CustomPropertyOption[];
+  profiles: Profile[];
   isAdmin: boolean;
   onReload: () => void;
 }
 
-export default function StorySequences({ sequences, comments, activity, dropdownOptions, properties, customOptions, isAdmin, onReload }: Props) {
+export default function StorySequences({ sequences, comments, activity, dropdownOptions, properties, customOptions, profiles, isAdmin, onReload }: Props) {
   const [fStatus, setFStatus] = usePersistedState<string>('studio_s_status', 'All');
   const [sortDir, setSortDir] = usePersistedState<'asc' | 'desc'>('studio_s_sortdir', 'asc');
   const [dateFrom, setDateFrom] = usePersistedState<string>('studio_s_from', '');
   const [dateTo, setDateTo] = usePersistedState<string>('studio_s_to', '');
   const [custFilters, setCustFilters] = usePersistedState<Record<string, string>>('studio_s_custfilters', {});
-  const [expanded, setExpanded] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mgrOpen, setMgrOpen] = useState(false);
   const [optsField, setOptsField] = useState<{ field: string; title: string } | null>(null);
@@ -131,7 +129,6 @@ export default function StorySequences({ sequences, comments, activity, dropdown
       status: draft.status || 'Draft',
       final_url: draft.final_url.trim() || null,
       scheduled_date: draft.scheduled_date || null,
-      notes: draft.notes.trim() || null,
     };
     const { error } = await supabase.from('studio_sequences').insert([row]);
     setCreating(false);
@@ -180,7 +177,6 @@ export default function StorySequences({ sequences, comments, activity, dropdown
     { key: 'status', label: 'Status', type: 'pill', field: 'sequence_status', options: statusValues, colors: statusColors, allowAdd: isAdmin },
     { key: 'final_url', label: 'Final Product', type: 'url' },
     { key: 'scheduled_date', label: 'Scheduled', type: 'date' },
-    { key: 'notes', label: 'Notes', type: 'textarea', placeholder: 'Add notes…' },
   ], [statusValues, statusColors, isAdmin]);
 
   const selected = selectedId ? sequences.find(s => s.id === selectedId) : null;
@@ -215,7 +211,6 @@ export default function StorySequences({ sequences, comments, activity, dropdown
                   <th onClick={isAdmin ? () => setOptsField({ field: 'sequence_status', title: 'Status' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Status{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <th>Final</th>
                   <th>Scheduled</th>
-                  <th>Notes</th>
                   <CustomHeaderCells props={cprops} isAdmin={isAdmin} onManage={() => setMgrOpen(true)} />
                   <th></th>
                 </tr>
@@ -237,24 +232,9 @@ export default function StorySequences({ sequences, comments, activity, dropdown
                             {overdue && <span style={{ color: '#ef4444', fontSize: 9, fontWeight: 700 }}>OVERDUE</span>}
                           </div>
                         </td>
-                        <td>
-                          <button onClick={() => setExpanded(e => (e === s.id ? null : s.id))} className="btn-ghost" style={{ fontSize: 10, padding: '3px 8px', color: s.notes ? 'var(--accent)' : 'var(--text-faint)' }} title="Expand notes">
-                            {s.notes ? '📝' : '+'} {expanded === s.id ? '▲' : '▾'}
-                          </button>
-                        </td>
                         <CustomRowCells row={s} props={cprops} optionsByProp={optsByProp} onPatch={patch} />
                         <td><button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteSequence(s.id)}>✕</button></td>
                       </tr>
-                      {expanded === s.id && (
-                        <tr>
-                          <td colSpan={6 + cprops.length} style={{ background: 'var(--surface-2)' }}>
-                            <div style={{ padding: '4px 2px' }}>
-                              <div className="form-label" style={{ marginBottom: 4 }}>Notes</div>
-                              <NoteEditor value={s.notes} onCommit={n => patch(s.id, { notes: n })} onClose={() => setExpanded(null)} placeholder="Add notes…" />
-                            </div>
-                          </td>
-                        </tr>
-                      )}
                     </Fragment>
                   );
                 })}
@@ -275,6 +255,8 @@ export default function StorySequences({ sequences, comments, activity, dropdown
           onAddOption={addOption}
           comments={comments}
           activity={activity}
+          profiles={profiles}
+          isAdmin={isAdmin}
           onReload={onReload}
           onClose={() => setSelectedId(null)}
         />
@@ -300,9 +282,6 @@ export default function StorySequences({ sequences, comments, activity, dropdown
               </DraftField>
               <DraftField label="Scheduled">
                 <input className="form-input" type="date" value={draft.scheduled_date} onChange={e => setDraft(d => ({ ...d, scheduled_date: e.target.value }))} style={{ width: 160, fontSize: 12 }} />
-              </DraftField>
-              <DraftField label="Notes">
-                <textarea className="form-input" value={draft.notes} onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))} placeholder="Add notes…" rows={2} style={{ resize: 'vertical', fontSize: 12, lineHeight: 1.4, width: '100%' }} />
               </DraftField>
             </div>
 

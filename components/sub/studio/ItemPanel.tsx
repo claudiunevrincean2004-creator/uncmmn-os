@@ -1,11 +1,11 @@
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StudioComment, StudioActivity, Profile } from '@/lib/types';
 import { formatActivityTime } from '@/lib/studio';
 import { useDismiss } from '@/lib/use-dismiss';
 import { InlineText, MiniSelect, PillSelect, EditSelect, EditPillSelect, InlineDate, InlineNumber } from './cells';
-import { UserPicker } from './UserPicker';
+import { UserPicker, profileName } from './UserPicker';
 
 export interface FieldDef {
   key: string;
@@ -31,6 +31,7 @@ interface Props {
   comments: StudioComment[];
   activity: StudioActivity[];
   profiles?: Profile[];
+  isAdmin?: boolean;
   onReload: () => void;
   onClose: () => void;
 }
@@ -73,13 +74,33 @@ function FieldControl({ field, values, onChangeField, onAddOption, profiles }: {
   }
 }
 
-export default function ItemPanel({ itemType, itemId, title, fields, values, onChangeField, onAddOption, comments, activity, profiles = [], onReload, onClose }: Props) {
+export default function ItemPanel({ itemType, itemId, title, fields, values, onChangeField, onAddOption, comments, activity, profiles = [], isAdmin = false, onReload, onClose }: Props) {
   const [newComment, setNewComment] = useState('');
   const [saving, setSaving] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Close on click-outside / Escape, committing pending field edits like the ✕ does
   useDismiss(panelRef, onClose);
+
+  // Resolve the signed-in user so we can stamp new comments with their author id
+  // and decide which comments they may edit/delete. Read-only — does not affect
+  // role or tab access.
+  useEffect(() => {
+    let cancelled = false;
+    supabase.auth.getUser().then(({ data }) => { if (!cancelled) setCurrentUserId(data.user?.id ?? null); });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Display name for a comment's author (falls back to email prefix via
+  // profileName); null when the comment predates author tracking.
+  const authorName = (authorId?: string | null): string | null => {
+    if (!authorId) return null;
+    const p = profiles.find(x => x.id === authorId);
+    return p ? profileName(p) : null;
+  };
 
   const itemComments = comments
     .filter(c => c.item_type === itemType && c.item_id === itemId)
@@ -92,9 +113,27 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
     const text = newComment.trim();
     if (!text || saving) return;
     setSaving(true);
-    await supabase.from('studio_comments').insert([{ item_type: itemType, item_id: itemId, text }]);
+    await supabase.from('studio_comments').insert([{ item_type: itemType, item_id: itemId, text, author_id: currentUserId }]);
     setSaving(false);
     setNewComment('');
+    onReload();
+  }
+
+  function startEdit(c: StudioComment) {
+    setEditingId(c.id);
+    setEditText(c.text);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditText('');
+  }
+
+  async function saveEdit(id: string) {
+    const text = editText.trim();
+    if (!text) return;
+    await supabase.from('studio_comments').update({ text }).eq('id', id);
+    cancelEdit();
     onReload();
   }
 
@@ -169,20 +208,58 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
           <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>No comments yet.</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {itemComments.map(c => (
-              <div key={c.id} style={{ background: 'var(--surface-2)', border: '0.5px solid var(--border)', borderRadius: 8, padding: '8px 10px' }}>
-                <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.4, whiteSpace: 'pre-wrap', marginBottom: 5 }}>{c.text}</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{formatActivityTime(c.created_at)}</span>
-                  <button
-                    onClick={() => deleteComment(c.id)}
-                    style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 10, padding: 0 }}
-                    onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; }}
-                    onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; }}
-                  >delete</button>
+            {itemComments.map(c => {
+              const who = authorName(c.author_id);
+              const isOwn = !!currentUserId && c.author_id === currentUserId;
+              const editing = editingId === c.id;
+              return (
+                <div key={c.id} style={{ background: 'var(--surface-2)', border: '0.5px solid var(--border)', borderRadius: 8, padding: '8px 10px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{who || 'Unknown'}</div>
+                  {editing ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 5 }}>
+                      <textarea
+                        className="form-input"
+                        value={editText}
+                        onChange={e => setEditText(e.target.value)}
+                        rows={2}
+                        autoFocus
+                        style={{ resize: 'vertical', fontSize: 12, lineHeight: 1.4 }}
+                        onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) saveEdit(c.id); }}
+                      />
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button className="btn-primary" style={{ fontSize: 10, padding: '4px 10px' }} onClick={() => saveEdit(c.id)} disabled={!editText.trim()}>Save</button>
+                        <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 10px' }} onClick={cancelEdit}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.4, whiteSpace: 'pre-wrap', marginBottom: 5 }}>{c.text}</div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{formatActivityTime(c.created_at)}</span>
+                    {!editing && (
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        {isOwn && (
+                          <button
+                            onClick={() => startEdit(c)}
+                            style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 10, padding: 0 }}
+                            onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; }}
+                          >edit</button>
+                        )}
+                        {(isAdmin || isOwn) && (
+                          <button
+                            onClick={() => deleteComment(c.id)}
+                            style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 10, padding: 0 }}
+                            onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; }}
+                            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; }}
+                          >delete</button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

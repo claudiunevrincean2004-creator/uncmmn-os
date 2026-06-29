@@ -138,9 +138,9 @@ export default function StudioTab({ videos, sequences, sessions, adCreatives, co
       </div>
 
       {sub === 'videos' && <VideoReview videos={videos} comments={comments} activity={activity} quickLinks={quickLinks} dropdownOptions={dropdownOptions} profiles={profiles} isAdmin={isAdmin} onReload={onReload} showToast={showToast} />}
-      {sub === 'sequences' && <StorySequences sequences={sequences} comments={comments} activity={activity} dropdownOptions={dropdownOptions} properties={properties} customOptions={customOptions} isAdmin={isAdmin} onReload={onReload} />}
-      {sub === 'sessions' && <FilmingSessions sessions={sessions} comments={comments} activity={activity} dropdownOptions={dropdownOptions} properties={properties} customOptions={customOptions} isAdmin={isAdmin} onReload={onReload} />}
-      {sub === 'ads' && <AdCreative adCreatives={adCreatives} comments={comments} activity={activity} quickLinks={quickLinks} dropdownOptions={dropdownOptions} properties={properties} customOptions={customOptions} isAdmin={isAdmin} onReload={onReload} showToast={showToast} />}
+      {sub === 'sequences' && <StorySequences sequences={sequences} comments={comments} activity={activity} dropdownOptions={dropdownOptions} properties={properties} customOptions={customOptions} profiles={profiles} isAdmin={isAdmin} onReload={onReload} />}
+      {sub === 'sessions' && <FilmingSessions sessions={sessions} comments={comments} activity={activity} dropdownOptions={dropdownOptions} properties={properties} customOptions={customOptions} profiles={profiles} isAdmin={isAdmin} onReload={onReload} />}
+      {sub === 'ads' && <AdCreative adCreatives={adCreatives} comments={comments} activity={activity} quickLinks={quickLinks} dropdownOptions={dropdownOptions} properties={properties} customOptions={customOptions} profiles={profiles} isAdmin={isAdmin} onReload={onReload} showToast={showToast} />}
 
       {/* Toast */}
       {toast && (
