@@ -378,6 +378,7 @@ export default function Home() {
       {accountOpen && currentProfile && (
         <AccountPanel
           profile={currentProfile}
+          email={userEmail}
           isAdmin={role === 'admin'}
           onClose={() => setAccountOpen(false)}
           onSaved={loadData}
@@ -388,7 +389,7 @@ export default function Home() {
       {/* Admin: manage every user's display name + assignable (relocated here
           from the old Video Review "Users" button) */}
       {adminUsersOpen && role === 'admin' && (
-        <AssigneeSettings profiles={studioProfiles} onClose={() => setAdminUsersOpen(false)} onReload={loadData} />
+        <AssigneeSettings profiles={studioProfiles} currentUserId={currentUserId} onClose={() => setAdminUsersOpen(false)} onReload={loadData} />
       )}
     </div>
   );

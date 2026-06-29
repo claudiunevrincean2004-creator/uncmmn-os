@@ -6,12 +6,13 @@ import { useDismiss } from '@/lib/use-dismiss';
 import { profileName } from './UserPicker';
 import { InlineText } from './cells';
 
-// Admin-only: set each user's display name and toggle whether they appear in
-// the assignee picker (profiles.display_name / profiles.assignable).
+// Admin-only: set each user's display name, toggle whether they appear in the
+// assignee picker (profiles.display_name / profiles.assignable), and remove users.
 export default function AssigneeSettings({
-  profiles, onClose, onReload,
+  profiles, currentUserId, onClose, onReload,
 }: {
   profiles: Profile[];
+  currentUserId?: string | null;
   onClose: () => void;
   onReload: () => void;
 }) {
@@ -32,6 +33,22 @@ export default function AssigneeSettings({
     const next = value.trim();
     if (next === (p.display_name ?? '').trim()) return;
     await supabase.from('profiles').update({ display_name: next || null }).eq('id', p.id);
+    onReload();
+  }
+
+  async function removeUser(p: Profile) {
+    if (busy) return;
+    if (!confirm(`Are you sure you want to remove ${profileName(p)}? This can't be undone.`)) return;
+    setBusy(p.id);
+    // Deletes auth user + profile (cascade); the function enforces admin-only and
+    // blocks self-deletion server-side too.
+    const { error } = await supabase.rpc('admin_delete_user', { target_id: p.id });
+    setBusy(null);
+    if (error) {
+      console.error('[AssigneeSettings] failed to remove user', error);
+      alert(`Couldn't remove user: ${error.message || 'Unknown error'}`);
+      return;
+    }
     onReload();
   }
 
@@ -62,6 +79,19 @@ export default function AssigneeSettings({
                 >
                   {on ? 'Assignable' : 'Hidden'}
                 </button>
+                {p.id === currentUserId ? (
+                  <span style={{ fontSize: 10, color: 'var(--text-faint)', flexShrink: 0, width: 56, textAlign: 'center' }} title="You can't remove your own account">You</span>
+                ) : (
+                  <button
+                    onClick={() => removeUser(p)}
+                    disabled={busy === p.id}
+                    className="btn-danger"
+                    style={{ fontSize: 11, padding: '4px 10px', flexShrink: 0 }}
+                    title={`Remove ${profileName(p)}`}
+                  >
+                    {busy === p.id ? '…' : 'Remove'}
+                  </button>
+                )}
               </div>
             );
           })}

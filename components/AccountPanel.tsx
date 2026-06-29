@@ -11,9 +11,12 @@ import Avatar from '@/components/Avatar';
 // display name + job title via the self-service RPCs. Admins get a button to
 // open full user management.
 export default function AccountPanel({
-  profile, isAdmin, onClose, onSaved, onManageUsers,
+  profile, email, isAdmin, onClose, onSaved, onManageUsers,
 }: {
   profile: Profile;
+  // The authenticated session email — authoritative login address, used when the
+  // profiles row's email column isn't populated.
+  email?: string | null;
   isAdmin: boolean;
   onClose: () => void;
   onSaved: () => void;
@@ -28,27 +31,23 @@ export default function AccountPanel({
   const titleChanged = jobTitle.trim() !== (profile.job_title ?? '').trim();
   const changed = nameChanged || titleChanged;
   const roleLabel = profile.role === 'admin' ? 'Admin' : 'Editor';
+  const loginEmail = profile.email || email || '';
 
   async function save() {
     if (saving || !changed) return;
     setSaving(true);
-    try {
-      if (nameChanged) {
-        const { error } = await supabase.rpc('set_my_display_name', { new_name: name.trim() });
-        if (error) throw error;
-      }
-      if (titleChanged) {
-        const { error } = await supabase.rpc('set_my_job_title', { new_title: jobTitle.trim() });
-        if (error) throw error;
-      }
-    } catch (err: unknown) {
-      setSaving(false);
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error('[AccountPanel] failed to save profile', err);
-      alert(`Couldn't save your changes: ${msg}`);
+    // Each field has its own caller-scoped RPC; stop at the first failure.
+    let error: { message?: string } | null = null;
+    if (nameChanged) ({ error } = await supabase.rpc('set_my_display_name', { new_name: name.trim() }));
+    if (!error && titleChanged) ({ error } = await supabase.rpc('set_my_job_title', { new_title: jobTitle.trim() }));
+    setSaving(false);
+    if (error) {
+      // PostgrestError is a plain object with `.message` — read it so the user
+      // sees a real reason (e.g. a missing function) instead of "[object Object]".
+      console.error('[AccountPanel] failed to save profile', error);
+      alert(`Couldn't save your changes: ${error.message || 'Unknown error'}`);
       return;
     }
-    setSaving(false);
     onSaved();
   }
 
@@ -90,9 +89,9 @@ export default function AccountPanel({
             background: 'var(--surface-2)', border: '0.5px solid var(--border)', borderRadius: 8,
             color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}
-          title={profile.email ?? ''}
+          title={loginEmail}
         >
-          {profile.email || '—'}
+          {loginEmail || '—'}
         </div>
 
         {/* Display name — editable */}
