@@ -5,7 +5,7 @@ import { StudioSequence, StudioComment, StudioActivity, StudioDropdownOption, Cu
 import { usePersistedState } from '@/lib/use-persisted-state';
 import {
   SEQUENCE_STATUSES, SEQUENCE_STATUS_COLORS,
-  isOverdue, logActivity, inDateRange, getFieldOptions, colorMap,
+  isOverdue, logActivity, inDateRange, getFieldOptions, colorMap, buildAddOptionRows,
 } from '@/lib/studio';
 import { InlineText, EditPillSelect, MiniSelect, UrlCell, InlineDate } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
@@ -14,6 +14,12 @@ import FieldOptionsManager from './FieldOptionsManager';
 
 const DONE = ['Posted'];
 const TABLE_KEY = 'sequence';
+
+// In-code fallback options per built-in select field, so adding an option can
+// backfill them as rows instead of dropping them (see buildAddOptionRows).
+const FIELD_FALLBACKS: Record<string, { values: string[]; colors?: Record<string, string> }> = {
+  sequence_status: { values: SEQUENCE_STATUSES, colors: SEQUENCE_STATUS_COLORS },
+};
 
 interface Props {
   sequences: StudioSequence[];
@@ -45,9 +51,9 @@ export default function StorySequences({ sequences, comments, activity, dropdown
   const statusColors = colorMap(statusFieldOpts);
 
   async function addOption(field: string, value: string) {
-    if (!dropdownOptions.some(o => o.field === field && o.value.toLowerCase() === value.toLowerCase())) {
-      await supabase.from('studio_dropdown_options').insert([{ field, value }]);
-    }
+    const fb = FIELD_FALLBACKS[field] ?? { values: [] };
+    const rows = buildAddOptionRows(field, value, fb.values, fb.colors, dropdownOptions);
+    if (rows.length) await supabase.from('studio_dropdown_options').insert(rows);
     onReload();
   }
 
@@ -95,11 +101,11 @@ export default function StorySequences({ sequences, comments, activity, dropdown
 
   const fields: FieldDef[] = useMemo(() => [
     { key: 'title', label: 'Title / Desc', type: 'textarea', placeholder: 'Title / description' },
-    { key: 'status', label: 'Status', type: 'pill', field: 'sequence_status', options: statusValues, colors: statusColors, allowAdd: false },
+    { key: 'status', label: 'Status', type: 'pill', field: 'sequence_status', options: statusValues, colors: statusColors, allowAdd: isAdmin },
     { key: 'final_url', label: 'Final Product', type: 'url' },
     { key: 'scheduled_date', label: 'Scheduled', type: 'date' },
     { key: 'notes', label: 'Notes', type: 'textarea', placeholder: 'Add notes…' },
-  ], [statusValues, statusColors]);
+  ], [statusValues, statusColors, isAdmin]);
 
   const selected = selectedId ? sequences.find(s => s.id === selectedId) : null;
 
@@ -147,7 +153,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
                         <td style={{ minWidth: 200 }}>
                           <button onClick={() => setSelectedId(s.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{s.title}</button>
                         </td>
-                        <td><EditPillSelect field="sequence_status" value={s.status} options={statusValues} colors={statusColors} onChange={st => changeStatus(s, st)} allowAdd={false} /></td>
+                        <td><EditPillSelect field="sequence_status" value={s.status} options={statusValues} colors={statusColors} onChange={st => changeStatus(s, st)} onAddOption={addOption} allowAdd={isAdmin} /></td>
                         <td><UrlCell value={s.final_url} onCommit={u => patch(s.id, { final_url: u })} /></td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>

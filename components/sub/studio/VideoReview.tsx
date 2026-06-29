@@ -7,7 +7,7 @@ import {
   VIDEO_FORMATS, VIDEO_STATUSES, VIDEO_STATUS_COLORS,
   PRIORITIES, PRIORITY_COLORS,
   isOverdue, logActivity, todayISO, mergeOptions, inDateRange,
-  getFieldOptions, colorMap,
+  getFieldOptions, colorMap, buildAddOptionRows,
 } from '@/lib/studio';
 import { InlineText, EditPillSelect, MiniSelect, UrlCell, InlineDate } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
@@ -17,6 +17,14 @@ import FieldOptionsManager from './FieldOptionsManager';
 import AssigneeSettings from './AssigneeSettings';
 
 const DONE = ['Approved', 'Posted'];
+
+// In-code fallback options per built-in select field, so adding an option can
+// backfill them as rows instead of dropping them (see buildAddOptionRows).
+const FIELD_FALLBACKS: Record<string, { values: string[]; colors?: Record<string, string> }> = {
+  video_status: { values: VIDEO_STATUSES, colors: VIDEO_STATUS_COLORS },
+  video_format: { values: VIDEO_FORMATS },
+  video_priority: { values: PRIORITIES, colors: PRIORITY_COLORS },
+};
 
 interface Props {
   videos: StudioVideo[];
@@ -53,9 +61,9 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   const priorityOpts = mergeOptions(PRIORITIES, dropdownOptions.filter(o => o.field === 'video_priority').map(o => o.value));
 
   async function addOption(field: string, value: string) {
-    if (!dropdownOptions.some(o => o.field === field && o.value.toLowerCase() === value.toLowerCase())) {
-      await supabase.from('studio_dropdown_options').insert([{ field, value }]);
-    }
+    const fb = FIELD_FALLBACKS[field] ?? { values: [] };
+    const rows = buildAddOptionRows(field, value, fb.values, fb.colors, dropdownOptions);
+    if (rows.length) await supabase.from('studio_dropdown_options').insert(rows);
     onReload();
   }
 
@@ -123,17 +131,17 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
 
   const fields: FieldDef[] = useMemo(() => [
     { key: 'title', label: 'Title / Desc', type: 'textarea', placeholder: 'Title / description' },
-    { key: 'format', label: 'Format', type: 'pill', field: 'video_format', options: formatValues, colors: formatColors, allowAdd: false, allowEmpty: true },
+    { key: 'format', label: 'Format', type: 'pill', field: 'video_format', options: formatValues, colors: formatColors, allowAdd: isAdmin, allowEmpty: true },
     { key: 'assigned_to', label: 'Assigned To', type: 'user' },
-    { key: 'status', label: 'Status', type: 'pill', field: 'video_status', options: statusValues, colors: statusColors, allowAdd: false },
-    { key: 'priority', label: 'Priority', type: 'pill', field: 'video_priority', options: priorityOpts, colors: PRIORITY_COLORS },
+    { key: 'status', label: 'Status', type: 'pill', field: 'video_status', options: statusValues, colors: statusColors, allowAdd: isAdmin },
+    { key: 'priority', label: 'Priority', type: 'pill', field: 'video_priority', options: priorityOpts, colors: PRIORITY_COLORS, allowAdd: isAdmin },
     { key: 'brief_url', label: 'Brief', type: 'url' },
     { key: 'raw_files_url', label: 'Raw Files', type: 'url' },
     { key: 'final_url', label: 'Final Product', type: 'url' },
     { key: 'deadline', label: 'Deadline', type: 'date' },
     { key: 'revision_count', label: 'Revisions', type: 'readonly' },
     { key: 'notes', label: 'Notes', type: 'textarea', placeholder: 'Add notes…' },
-  ], [formatValues, formatColors, statusValues, statusColors, priorityOpts]);
+  ], [formatValues, formatColors, statusValues, statusColors, priorityOpts, isAdmin]);
 
   const selected = selectedId ? videos.find(v => v.id === selectedId) : null;
 
@@ -190,9 +198,9 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                         <td style={{ minWidth: 180 }}>
                           <button onClick={() => setSelectedId(v.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{v.title}</button>
                         </td>
-                        <td><EditPillSelect field="video_format" value={v.format || ''} options={formatValues} colors={formatColors} onChange={f => patch(v.id, { format: f })} allowAdd={false} allowEmpty /></td>
+                        <td><EditPillSelect field="video_format" value={v.format || ''} options={formatValues} colors={formatColors} onChange={f => patch(v.id, { format: f })} onAddOption={addOption} allowAdd={isAdmin} allowEmpty /></td>
                         <td><UserPicker value={v.assigned_to} profiles={profiles} onChange={uid => patch(v.id, { assigned_to: uid })} /></td>
-                        <td><EditPillSelect field="video_status" value={v.status} options={statusValues} colors={statusColors} onChange={s => changeStatus(v, s)} allowAdd={false} /></td>
+                        <td><EditPillSelect field="video_status" value={v.status} options={statusValues} colors={statusColors} onChange={s => changeStatus(v, s)} onAddOption={addOption} allowAdd={isAdmin} /></td>
                         <td><UrlCell value={v.brief_url} onCommit={u => patch(v.id, { brief_url: u })} /></td>
                         <td><UrlCell value={v.raw_files_url} onCommit={u => patch(v.id, { raw_files_url: u })} /></td>
                         <td><UrlCell value={v.final_url} onCommit={u => patch(v.id, { final_url: u })} /></td>
@@ -202,7 +210,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                             {overdue && <span style={{ color: '#ef4444', fontSize: 9, fontWeight: 700, whiteSpace: 'nowrap' }}>OVERDUE</span>}
                           </div>
                         </td>
-                        <td><EditPillSelect field="video_priority" value={v.priority || 'Normal'} options={priorityOpts} colors={PRIORITY_COLORS} onChange={p => patch(v.id, { priority: p })} onAddOption={addOption} /></td>
+                        <td><EditPillSelect field="video_priority" value={v.priority || 'Normal'} options={priorityOpts} colors={PRIORITY_COLORS} onChange={p => patch(v.id, { priority: p })} onAddOption={addOption} allowAdd={isAdmin} /></td>
                         <td style={{ textAlign: 'center' }}>
                           {v.revision_count > 0
                             ? <span className="badge" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }} title={`${v.revision_count} revision round(s)`}>{v.revision_count}</span>

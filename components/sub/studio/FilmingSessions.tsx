@@ -3,13 +3,20 @@ import { Fragment, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StudioSession, StudioComment, StudioActivity, StudioDropdownOption, CustomProperty, CustomPropertyOption } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
-import { SESSION_STATUSES, SESSION_STATUS_COLORS, SESSION_TYPES, SESSION_TYPE_COLORS, todayISO, logActivity, inDateRange, getFieldOptions, colorMap } from '@/lib/studio';
+import { SESSION_STATUSES, SESSION_STATUS_COLORS, SESSION_TYPES, SESSION_TYPE_COLORS, todayISO, logActivity, inDateRange, getFieldOptions, colorMap, buildAddOptionRows } from '@/lib/studio';
 import { InlineText, EditPillSelect, MiniSelect, UrlCell, InlineDate, InlineNumber } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal } from './CustomColumns';
 import FieldOptionsManager from './FieldOptionsManager';
 
 const TABLE_KEY = 'session';
+
+// In-code fallback options per built-in select field, so adding an option can
+// backfill them as rows instead of dropping them (see buildAddOptionRows).
+const FIELD_FALLBACKS: Record<string, { values: string[]; colors?: Record<string, string> }> = {
+  session_status: { values: SESSION_STATUSES, colors: SESSION_STATUS_COLORS },
+  session_type: { values: SESSION_TYPES, colors: SESSION_TYPE_COLORS },
+};
 
 interface Props {
   sessions: StudioSession[];
@@ -46,9 +53,9 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
   const typeColors = colorMap(typeFieldOpts);
 
   async function addOption(field: string, value: string) {
-    if (!dropdownOptions.some(o => o.field === field && o.value.toLowerCase() === value.toLowerCase())) {
-      await supabase.from('studio_dropdown_options').insert([{ field, value }]);
-    }
+    const fb = FIELD_FALLBACKS[field] ?? { values: [] };
+    const rows = buildAddOptionRows(field, value, fb.values, fb.colors, dropdownOptions);
+    if (rows.length) await supabase.from('studio_dropdown_options').insert(rows);
     onReload();
   }
 
@@ -98,15 +105,15 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
 
   const fields: FieldDef[] = useMemo(() => [
     { key: 'name', label: 'Session / Desc', type: 'textarea', placeholder: 'Session name / description' },
-    { key: 'type', label: 'Type', type: 'pill', field: 'session_type', options: typeValues, colors: typeColors, allowAdd: false },
+    { key: 'type', label: 'Type', type: 'pill', field: 'session_type', options: typeValues, colors: typeColors, allowAdd: isAdmin },
     { key: 'script_url', label: 'Link to Script', type: 'url' },
     { key: 'footage_link', label: 'Footage', type: 'url' },
     { key: 'date', label: 'Date', type: 'date' },
-    { key: 'status', label: 'Status', type: 'pill', field: 'session_status', options: statusValues, colors: statusColors, allowAdd: false },
+    { key: 'status', label: 'Status', type: 'pill', field: 'session_status', options: statusValues, colors: statusColors, allowAdd: isAdmin },
     { key: 'videos_planned', label: 'Videos to Film', type: 'number' },
     { key: 'videos_filmed', label: 'Videos Filmed', type: 'number' },
     { key: 'notes', label: 'Notes', type: 'textarea', placeholder: 'Add notes…' },
-  ], [statusValues, statusColors, typeValues, typeColors]);
+  ], [statusValues, statusColors, typeValues, typeColors, isAdmin]);
 
   const selected = selectedId ? sessions.find(s => s.id === selectedId) : null;
 
@@ -163,11 +170,11 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                         <td style={{ minWidth: 180 }}>
                           <button onClick={() => setSelectedId(s.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{s.name}</button>
                         </td>
-                        <td><EditPillSelect field="session_type" value={s.type || ''} options={typeValues} colors={typeColors} onChange={t => patch(s.id, { type: t })} allowAdd={false} /></td>
+                        <td><EditPillSelect field="session_type" value={s.type || ''} options={typeValues} colors={typeColors} onChange={t => patch(s.id, { type: t })} onAddOption={addOption} allowAdd={isAdmin} /></td>
                         <td><UrlCell value={s.script_url} onCommit={u => patch(s.id, { script_url: u })} /></td>
                         <td><UrlCell value={s.footage_link} onCommit={u => patch(s.id, { footage_link: u })} /></td>
                         <td><InlineDate value={s.date} onCommit={d => patch(s.id, { date: d || undefined })} /></td>
-                        <td><EditPillSelect field="session_status" value={s.status} options={statusValues} colors={statusColors} onChange={st => changeStatus(s, st)} allowAdd={false} /></td>
+                        <td><EditPillSelect field="session_status" value={s.status} options={statusValues} colors={statusColors} onChange={st => changeStatus(s, st)} onAddOption={addOption} allowAdd={isAdmin} /></td>
                         <td style={{ textAlign: 'center' }}><InlineNumber value={planned} onCommit={n => patch(s.id, { videos_planned: n })} /></td>
                         <td style={{ textAlign: 'center' }}><InlineNumber value={filmed} onCommit={n => patch(s.id, { videos_filmed: n })} /></td>
                         <td style={{ minWidth: 120 }}>

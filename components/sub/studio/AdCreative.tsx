@@ -3,7 +3,7 @@ import { Fragment, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
-import { AD_FORMATS, AD_STATUSES, AD_STATUS_COLORS, todayISO, logActivity, mergeOptions, inDateRange, getFieldOptions, colorMap } from '@/lib/studio';
+import { AD_FORMATS, AD_STATUSES, AD_STATUS_COLORS, todayISO, logActivity, mergeOptions, inDateRange, getFieldOptions, colorMap, buildAddOptionRows } from '@/lib/studio';
 import { EditPillSelect, EditSelect, MiniSelect, InlineText, InlineDate } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import QuickLinks from './QuickLinks';
@@ -12,6 +12,15 @@ import FieldOptionsManager from './FieldOptionsManager';
 
 type SortKey = 'date_added' | 'angle';
 const TABLE_KEY = 'ad';
+
+// In-code fallback options per built-in select field, so adding an option can
+// backfill them as rows instead of dropping them (see buildAddOptionRows).
+// ad_angle has no built-in defaults (its options are entirely user-defined).
+const FIELD_FALLBACKS: Record<string, { values: string[]; colors?: Record<string, string> }> = {
+  ad_status: { values: AD_STATUSES, colors: AD_STATUS_COLORS },
+  ad_format: { values: AD_FORMATS },
+  ad_angle: { values: [] },
+};
 
 interface Props {
   adCreatives: StudioAdCreative[];
@@ -54,9 +63,9 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   const angleOpts = mergeOptions(custom('ad_angle'), presentAngles);
 
   async function addOption(field: string, value: string) {
-    if (!dropdownOptions.some(o => o.field === field && o.value.toLowerCase() === value.toLowerCase())) {
-      await supabase.from('studio_dropdown_options').insert([{ field, value }]);
-    }
+    const fb = FIELD_FALLBACKS[field] ?? { values: [] };
+    const rows = buildAddOptionRows(field, value, fb.values, fb.colors, dropdownOptions);
+    if (rows.length) await supabase.from('studio_dropdown_options').insert(rows);
     onReload();
   }
 
@@ -119,12 +128,12 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   const fields: FieldDef[] = useMemo(() => [
     { key: 'creative_id', label: 'Creative ID', type: 'text', placeholder: 'Name / identifier' },
     { key: 'date_added', label: 'Date Added', type: 'date' },
-    { key: 'ad_format', label: 'Format', type: 'pill', field: 'ad_format', options: formatValues, colors: formatColors, allowAdd: false, allowEmpty: true },
-    { key: 'angle', label: 'Angle', type: 'select', field: 'ad_angle', options: angleOpts },
+    { key: 'ad_format', label: 'Format', type: 'pill', field: 'ad_format', options: formatValues, colors: formatColors, allowAdd: isAdmin, allowEmpty: true },
+    { key: 'angle', label: 'Angle', type: 'select', field: 'ad_angle', options: angleOpts, allowAdd: isAdmin },
     { key: 'hook', label: 'Hook', type: 'text', placeholder: 'Hook' },
     { key: 'buyer_feedback', label: 'Buyer Feedback', type: 'textarea', placeholder: 'Buyer feedback…' },
-    { key: 'status', label: 'Status', type: 'pill', field: 'ad_status', options: statusValues, colors: statusColors, allowAdd: false },
-  ], [formatValues, formatColors, angleOpts, statusValues, statusColors]);
+    { key: 'status', label: 'Status', type: 'pill', field: 'ad_status', options: statusValues, colors: statusColors, allowAdd: isAdmin },
+  ], [formatValues, formatColors, angleOpts, statusValues, statusColors, isAdmin]);
 
   const selected = selectedId ? adCreatives.find(a => a.id === selectedId) : null;
 
@@ -182,8 +191,8 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                         <button onClick={() => setSelectedId(a.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{a.creative_id || 'Untitled'}</button>
                       </td>
                       <td><InlineDate value={a.date_added} onCommit={d => patch(a.id, { date_added: d || undefined })} /></td>
-                      <td><EditPillSelect field="ad_format" value={a.ad_format || ''} options={formatValues} colors={formatColors} onChange={f => patch(a.id, { ad_format: f })} allowAdd={false} allowEmpty /></td>
-                      <td><EditSelect field="ad_angle" value={a.angle} options={angleOpts} onChange={x => patch(a.id, { angle: x })} onAddOption={addOption} placeholder="—" /></td>
+                      <td><EditPillSelect field="ad_format" value={a.ad_format || ''} options={formatValues} colors={formatColors} onChange={f => patch(a.id, { ad_format: f })} onAddOption={addOption} allowAdd={isAdmin} allowEmpty /></td>
+                      <td><EditSelect field="ad_angle" value={a.angle} options={angleOpts} onChange={x => patch(a.id, { angle: x })} onAddOption={addOption} placeholder="—" allowAdd={isAdmin} /></td>
                       <td><InlineText value={a.hook} onCommit={t => patch(a.id, { hook: t })} placeholder="—" style={{ width: 110 }} /></td>
                       <td>
                         <button onClick={() => setExpanded(e => (e === a.id ? null : a.id))} className="btn-ghost" style={{ fontSize: 10, padding: '3px 8px', color: a.buyer_feedback ? 'var(--accent)' : 'var(--text-faint)' }} title="Expand feedback">
@@ -193,7 +202,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                       <td>
                         <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px', color: 'var(--accent)' }} onClick={() => handleIterate(a)} title="Trigger iteration">↻ Iterate</button>
                       </td>
-                      <td><EditPillSelect field="ad_status" value={a.status} options={statusValues} colors={statusColors} onChange={s => changeStatus(a, s)} allowAdd={false} /></td>
+                      <td><EditPillSelect field="ad_status" value={a.status} options={statusValues} colors={statusColors} onChange={s => changeStatus(a, s)} onAddOption={addOption} allowAdd={isAdmin} /></td>
                       <CustomRowCells row={a} props={cprops} optionsByProp={optsByProp} onPatch={patch} />
                       <td><button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteAd(a.id)}>✕</button></td>
                     </tr>

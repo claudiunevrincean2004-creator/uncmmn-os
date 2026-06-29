@@ -147,6 +147,42 @@ export function colorMap(opts: FieldOption[]): Record<string, string> {
   return m;
 }
 
+// Build the studio_dropdown_options rows to INSERT so that `newValue` is appended
+// to `field`'s option list without losing any existing options.
+//
+// getFieldOptions() treats the DB as authoritative the moment any positioned row
+// exists for a field, so persisting only the new value would make it the sole
+// row and silently drop the in-code fallback options that were never written
+// out — which looks like "adding an option wiped the others". To prevent that we
+// also backfill any fallback options that aren't persisted yet, and always give
+// rows an explicit trailing `position`. Existing persisted rows are left
+// untouched (rows already using an option keep their value). Returns [] when the
+// value is blank or already an option (a no-op add).
+export function buildAddOptionRows(
+  field: string,
+  newValue: string,
+  fallbackValues: string[],
+  fallbackColors: Record<string, string> | undefined,
+  dbRows: { field: string; value: string; position?: number | null }[],
+): { field: string; value: string; color: string | null; position: number }[] {
+  const v = newValue.trim();
+  if (!v) return [];
+  const fieldRows = dbRows.filter(r => r.field === field);
+  const persisted = new Set(fieldRows.map(r => r.value.toLowerCase()));
+  const lc = v.toLowerCase();
+  // Already an option (persisted, or an unpersisted built-in fallback)? No-op.
+  if (persisted.has(lc) || fallbackValues.some(x => x.toLowerCase() === lc)) return [];
+  let pos = fieldRows.reduce((m, r) => Math.max(m, r.position ?? 0), -1);
+  const rows: { field: string; value: string; color: string | null; position: number }[] = [];
+  fallbackValues.forEach(val => {
+    if (!persisted.has(val.toLowerCase())) {
+      rows.push({ field, value: val, color: fallbackColors?.[val] ?? null, position: ++pos });
+    }
+  });
+  rows.push({ field, value: v, color: null, position: ++pos });
+  return rows;
+}
+
 // True if a yyyy-mm-dd date falls within an optional [from, to] range.
 // When a bound is set, undated items are excluded.
 export function inDateRange(dateStr: string | undefined, from: string, to: string): boolean {
