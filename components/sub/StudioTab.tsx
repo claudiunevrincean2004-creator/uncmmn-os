@@ -76,7 +76,27 @@ export default function StudioTab({ videos, sequences, sessions, adCreatives, co
     { label: 'Filmed this month', value: String(sessionStats.filmedThisMonth), color: 'var(--text)' },
   ];
 
-  const activeOverview = sub === 'sessions' ? sessionOverviewItems : overviewItems;
+  // Story Sequences-specific cards. "In progress" = anything not yet in a
+  // done/approved state. Unknown status names simply don't match, leaving 0.
+  const sequenceStats = useMemo(() => {
+    const month = todayISO().slice(0, 7); // YYYY-MM
+    const DONE = ['Approved', 'Posted'];
+    const inProgress = sequences.filter(s => !DONE.includes(s.status)).length;
+    const approved = sequences.filter(s => s.status === 'Approved').length;
+    const thisMonth = sequences.filter(s => ((s.created_at || s.scheduled_date) || '').slice(0, 7) === month).length;
+    return { inProgress, approved, thisMonth };
+  }, [sequences]);
+
+  const sequenceOverviewItems: { label: string; value: string; color?: string }[] = [
+    { label: 'In progress', value: String(sequenceStats.inProgress), color: '#8b5cf6' },
+    { label: 'Approved', value: String(sequenceStats.approved), color: 'var(--text)' },
+    { label: 'This month', value: String(sequenceStats.thisMonth), color: 'var(--text)' },
+  ];
+
+  const activeOverview =
+    sub === 'sessions' ? sessionOverviewItems
+    : sub === 'sequences' ? sequenceOverviewItems
+    : overviewItems;
 
   return (
     <div style={{ position: 'relative' }}>
