@@ -3,7 +3,7 @@ import { Fragment, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StudioSession, StudioComment, StudioActivity, StudioDropdownOption, CustomProperty, CustomPropertyOption } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
-import { SESSION_STATUSES, SESSION_STATUS_COLORS, SESSION_TYPES, SESSION_TYPE_COLORS, sessionType, todayISO, logActivity, inDateRange, getFieldOptions, colorMap } from '@/lib/studio';
+import { SESSION_STATUSES, SESSION_STATUS_COLORS, SESSION_TYPES, SESSION_TYPE_COLORS, todayISO, logActivity, inDateRange, getFieldOptions, colorMap } from '@/lib/studio';
 import { InlineText, EditPillSelect, MiniSelect, UrlCell, InlineDate, InlineNumber } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal } from './CustomColumns';
@@ -40,6 +40,10 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
   const statusFieldOpts = getFieldOptions(dropdownOptions, 'session_status', SESSION_STATUSES, SESSION_STATUS_COLORS);
   const statusValues = statusFieldOpts.map(o => o.value);
   const statusColors = colorMap(statusFieldOpts);
+
+  const typeFieldOpts = getFieldOptions(dropdownOptions, 'session_type', SESSION_TYPES, SESSION_TYPE_COLORS);
+  const typeValues = typeFieldOpts.map(o => o.value);
+  const typeColors = colorMap(typeFieldOpts);
 
   async function addOption(field: string, value: string) {
     if (!dropdownOptions.some(o => o.field === field && o.value.toLowerCase() === value.toLowerCase())) {
@@ -78,7 +82,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
   const filtered = useMemo(() => {
     let r = sessions;
     if (fStatus !== 'All') r = r.filter(s => s.status === fStatus);
-    if (fType !== 'All') r = r.filter(s => sessionType(s.type) === fType);
+    if (fType !== 'All') r = r.filter(s => s.type === fType);
     if (dateFrom || dateTo) r = r.filter(s => inDateRange(s.date, dateFrom, dateTo));
     return [...r].sort((a, b) => {
       const ad = a.date ? a.date.slice(0, 10) : '';
@@ -94,7 +98,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
 
   const fields: FieldDef[] = useMemo(() => [
     { key: 'name', label: 'Session / Desc', type: 'textarea', placeholder: 'Session name / description' },
-    { key: 'type', label: 'Type', type: 'pill', field: 'session_type', options: SESSION_TYPES, colors: SESSION_TYPE_COLORS, allowAdd: false },
+    { key: 'type', label: 'Type', type: 'pill', field: 'session_type', options: typeValues, colors: typeColors, allowAdd: false },
     { key: 'script_url', label: 'Link to Script', type: 'url' },
     { key: 'footage_link', label: 'Footage', type: 'url' },
     { key: 'date', label: 'Date', type: 'date' },
@@ -102,7 +106,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
     { key: 'videos_planned', label: 'Videos to Film', type: 'number' },
     { key: 'videos_filmed', label: 'Videos Filmed', type: 'number' },
     { key: 'notes', label: 'Notes', type: 'textarea', placeholder: 'Add notes…' },
-  ], [statusValues, statusColors]);
+  ], [statusValues, statusColors, typeValues, typeColors]);
 
   const selected = selectedId ? sessions.find(s => s.id === selectedId) : null;
 
@@ -111,7 +115,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
           <MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} />
-          <MiniSelect value={fType} options={['All', ...SESSION_TYPES]} onChange={setFType} />
+          <MiniSelect value={fType} options={['All', ...typeValues]} onChange={setFType} />
           <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))} title="Sort by date">
             Date {sortDir === 'asc' ? '↑ oldest' : '↓ newest'}
           </button>
@@ -134,7 +138,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
               <thead>
                 <tr>
                   <th style={{ minWidth: 180 }}>Session / Description</th>
-                  <th>Type</th>
+                  <th onClick={isAdmin ? () => setOptsField({ field: 'session_type', title: 'Type' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Type{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <th>Script</th>
                   <th>Footage</th>
                   <th>Date</th>
@@ -159,7 +163,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                         <td style={{ minWidth: 180 }}>
                           <button onClick={() => setSelectedId(s.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{s.name}</button>
                         </td>
-                        <td><EditPillSelect field="session_type" value={sessionType(s.type)} options={SESSION_TYPES} colors={SESSION_TYPE_COLORS} onChange={t => patch(s.id, { type: t })} allowAdd={false} /></td>
+                        <td><EditPillSelect field="session_type" value={s.type || ''} options={typeValues} colors={typeColors} onChange={t => patch(s.id, { type: t })} allowAdd={false} /></td>
                         <td><UrlCell value={s.script_url} onCommit={u => patch(s.id, { script_url: u })} /></td>
                         <td><UrlCell value={s.footage_link} onCommit={u => patch(s.id, { footage_link: u })} /></td>
                         <td><InlineDate value={s.date} onCommit={d => patch(s.id, { date: d || undefined })} /></td>
@@ -207,7 +211,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
           itemId={selected.id}
           title={selected.name}
           fields={fields}
-          values={{ ...selected, type: sessionType(selected.type) }}
+          values={selected}
           onChangeField={(key, value) => { if (key === 'status') changeStatus(selected, value); else patch(selected.id, { [key]: value }); }}
           onAddOption={addOption}
           comments={comments}

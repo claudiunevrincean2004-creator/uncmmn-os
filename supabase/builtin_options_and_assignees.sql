@@ -37,6 +37,8 @@ insert into public.studio_dropdown_options (field, value, color, position) value
   ('session_status', 'Filming', '#f59e0b', 2),
   ('session_status', 'Filmed', '#10b981', 3),
   ('session_status', 'Cancelled', '#ef4444', 4),
+  ('session_type', 'Scripted', '#8b5cf6', 0),
+  ('session_type', 'Raw talk', '#14b8a6', 1),
   ('ad_status', 'Live', '#10b981', 0),
   ('ad_status', 'Paused', '#eab308', 1),
   ('ad_status', 'Winner', '#14b8a6', 2),

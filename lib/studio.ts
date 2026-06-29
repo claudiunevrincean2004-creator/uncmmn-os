@@ -73,20 +73,15 @@ export const SESSION_STATUS_COLORS: Record<string, string> = {
   Cancelled: '#ef4444',
 };
 
+// Pre-migration fallback for the editable "Type" select (field: session_type).
+// Once builtin_options_and_assignees-style seeding has run, the DB rows in
+// studio_dropdown_options are authoritative and admins manage them freely.
 export const SESSION_TYPES = ['Scripted', 'Raw talk'];
 
 export const SESSION_TYPE_COLORS: Record<string, string> = {
   Scripted: '#8b5cf6',
   'Raw talk': '#14b8a6',
 };
-
-// Normalize a stored session type to its canonical display value. Handles the
-// lowercase 'scripted' DB default and any casing drift so the pill always
-// matches an option (and its color); unknown values pass through unchanged.
-export function sessionType(v?: string): string {
-  if (!v) return 'Scripted';
-  return SESSION_TYPES.find(o => o.toLowerCase() === v.toLowerCase()) ?? v;
-}
 
 export function hexToRgba(hex: string, alpha: number): string {
   const h = hex.replace('#', '');

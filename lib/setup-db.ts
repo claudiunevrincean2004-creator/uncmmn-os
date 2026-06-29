@@ -201,7 +201,7 @@ create policy "anon_all_studio_sequences" on studio_sequences for all to anon us
     parts.push(`create table if not exists studio_sessions (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  type text default 'scripted',
+  type text default 'Scripted',
   script_url text,
   footage_link text,
   date date,
