@@ -99,13 +99,15 @@ export default function StudioTab({ videos, sequences, sessions, adCreatives, co
     const live = adCreatives.filter(a => a.status === 'Live').length;
     const winners = adCreatives.filter(a => a.status === 'Winner').length;
     const revisionRequested = adCreatives.filter(a => a.status === 'Revision Requested').length;
-    return { live, winners, revisionRequested };
+    const total = adCreatives.length;
+    return { live, winners, revisionRequested, total };
   }, [adCreatives]);
 
   const adOverviewItems: { label: string; value: string; color?: string }[] = [
     { label: 'Live', value: String(adStats.live), color: '#8b5cf6' },
     { label: 'Winners', value: String(adStats.winners), color: 'var(--text)' },
     { label: 'Revision Requested', value: String(adStats.revisionRequested), color: adStats.revisionRequested > 0 ? '#ef4444' : 'var(--text)' },
+    { label: 'Total creatives', value: String(adStats.total), color: 'var(--text)' },
   ];
 
   const activeOverview =
