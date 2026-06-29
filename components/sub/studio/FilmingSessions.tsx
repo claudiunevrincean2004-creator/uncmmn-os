@@ -213,23 +213,25 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
-          <FilterField label="Status"><MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} /></FilterField>
-          <FilterField label="Type"><MiniSelect value={fType} options={['All', ...typeValues]} onChange={setFType} /></FilterField>
-          <FilterField label="Sort">
-            <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))} title="Sort by date">
-              Date {sortDir === 'asc' ? '↑ Oldest' : '↓ Newest'}
-            </button>
-          </FilterField>
-          <FilterField label="From">
-            <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-          </FilterField>
-          <FilterField label="To">
-            <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
-          </FilterField>
-          {(dateFrom || dateTo) && <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>Clear dates</button>}
-          <CustomFilterControls props={cprops} optionsByProp={optsByProp} filters={custFilters} setFilters={setCustFilters} />
-          <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={() => { setDraft(EMPTY_DRAFT); setAddOpen(true); }}>+ Add Session</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
+            <FilterField label="Status"><MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} /></FilterField>
+            <FilterField label="Type"><MiniSelect value={fType} options={['All', ...typeValues]} onChange={setFType} /></FilterField>
+            <FilterField label="Sort">
+              <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))} title="Sort by date">
+                Date {sortDir === 'asc' ? '↑ Oldest' : '↓ Newest'}
+              </button>
+            </FilterField>
+            <FilterField label="From">
+              <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+            </FilterField>
+            <FilterField label="To">
+              <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
+            </FilterField>
+            {(dateFrom || dateTo) && <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>Clear dates</button>}
+            <CustomFilterControls props={cprops} optionsByProp={optsByProp} filters={custFilters} setFilters={setCustFilters} />
+          </div>
+          <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', flexShrink: 0 }} onClick={() => { setDraft(EMPTY_DRAFT); setAddOpen(true); }}>+ Add Session</button>
         </div>
 
         {rows.length === 0 ? (
