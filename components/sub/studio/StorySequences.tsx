@@ -11,7 +11,7 @@ import {
 } from '@/lib/studio';
 import { EditPillSelect, MiniSelect, UrlCell, InlineDate } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
-import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal } from './CustomColumns';
+import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal, AddPropertyButton } from './CustomColumns';
 import FieldOptionsManager from './FieldOptionsManager';
 import FilterField from './FilterField';
 
@@ -208,7 +208,6 @@ export default function StorySequences({ sequences, comments, activity, dropdown
           </FilterField>
           {(dateFrom || dateTo) && <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>Clear dates</button>}
           <CustomFilterControls props={cprops} optionsByProp={optsByProp} filters={custFilters} setFilters={setCustFilters} />
-          {isAdmin && <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setMgrOpen(true)}>+ Add property</button>}
           <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={() => { setDraft(EMPTY_DRAFT); setAddOpen(true); }}>+ Add Sequence</button>
         </div>
 
@@ -225,7 +224,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
                   <th>Final</th>
                   <th>Scheduled</th>
                   <CustomHeaderCells props={cprops} isAdmin={isAdmin} onManage={() => setMgrOpen(true)} />
-                  <th></th>
+                  <th style={{ textAlign: 'right' }}>{isAdmin && <AddPropertyButton onClick={() => setMgrOpen(true)} />}</th>
                 </tr>
               </thead>
               <tbody>

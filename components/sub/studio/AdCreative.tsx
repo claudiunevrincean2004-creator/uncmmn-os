@@ -9,7 +9,7 @@ import { AD_FORMATS, AD_STATUSES, AD_STATUS_COLORS, todayISO, logActivity, merge
 import { EditPillSelect, MiniSelect, InlineDate, UrlCell } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import QuickLinks from './QuickLinks';
-import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal } from './CustomColumns';
+import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal, AddPropertyButton } from './CustomColumns';
 import FieldOptionsManager from './FieldOptionsManager';
 import FilterField from './FilterField';
 
@@ -276,16 +276,20 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
       <div style={{ flex: 1, minWidth: 0 }}>
         <QuickLinks context="ad-creative" links={quickLinks} onReload={onReload} />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
-          {/* Search by Creative ID (real-time) */}
+        {/* Top row: search (left) + add (right) — kept off the filter row so it never wraps. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
           <input
             className="form-input"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search Creative ID…"
-            style={{ width: 200, padding: '5px 9px', fontSize: 11 }}
+            style={{ width: 240, padding: '5px 9px', fontSize: 11 }}
           />
+          <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={() => { setDraft({ ...EMPTY_DRAFT, date_added: todayISO() }); setAddOpen(true); }}>+ Add Ad Creative</button>
+        </div>
 
+        {/* Filter / sort row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
           {/* Labeled filters */}
           <FilterField label="Format"><MiniSelect value={fFormat} options={formatPresent} onChange={setFFormat} /></FilterField>
           <FilterField label="Angle"><MiniSelect value={fAngle} options={anglePresent} onChange={setFAngle} /></FilterField>
@@ -305,11 +309,9 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
           {/* Date range (kept) */}
           <FilterField label="From"><input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} /></FilterField>
           <FilterField label="To"><input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateTo} onChange={e => setDateTo(e.target.value)} /></FilterField>
-          {(dateFrom || dateTo) && <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>clear</button>}
+          {(dateFrom || dateTo) && <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>Clear dates</button>}
 
           <CustomFilterControls props={cprops} optionsByProp={optsByProp} filters={custFilters} setFilters={setCustFilters} />
-          {isAdmin && <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setMgrOpen(true)}>+ Add property</button>}
-          <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={() => { setDraft({ ...EMPTY_DRAFT, date_added: todayISO() }); setAddOpen(true); }}>+ Add Ad Creative</button>
         </div>
 
         {rows.length === 0 ? (
@@ -328,7 +330,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                   <th>Iterate</th>
                   <th onClick={isAdmin ? () => setOptsField({ field: 'ad_status', title: 'Status' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Status{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <CustomHeaderCells props={cprops} isAdmin={isAdmin} onManage={() => setMgrOpen(true)} />
-                  <th></th>
+                  <th style={{ textAlign: 'right' }}>{isAdmin && <AddPropertyButton onClick={() => setMgrOpen(true)} />}</th>
                 </tr>
               </thead>
               <tbody>

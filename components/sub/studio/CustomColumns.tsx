@@ -49,6 +49,22 @@ export function CustomHeaderCells({ props, isAdmin, onManage }: { props: CustomP
   );
 }
 
+// Notion-style compact "add column" button, dropped into the trailing (actions)
+// header cell of a Studio table so it sits inline at the end of the header row.
+export function AddPropertyButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      title="Add property"
+      aria-label="Add property"
+      className="btn-ghost"
+      style={{ fontSize: 14, lineHeight: 1, padding: '2px 9px', color: 'var(--text-faint)' }}
+    >
+      +
+    </button>
+  );
+}
+
 // ---- a single select cell (styled like the status/format pills) -----------
 function CustomCell({
   value, options, onChange,

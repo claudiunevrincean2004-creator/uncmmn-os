@@ -8,7 +8,7 @@ import LoadMore from './LoadMore';
 import { SESSION_STATUSES, SESSION_STATUS_COLORS, SESSION_TYPES, SESSION_TYPE_COLORS, todayISO, logActivity, inDateRange, getFieldOptions, colorMap, buildAddOptionRows } from '@/lib/studio';
 import { EditPillSelect, MiniSelect, UrlCell, InlineDate, InlineNumber } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
-import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal } from './CustomColumns';
+import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal, AddPropertyButton } from './CustomColumns';
 import FieldOptionsManager from './FieldOptionsManager';
 import FilterField from './FilterField';
 
@@ -229,7 +229,6 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
           </FilterField>
           {(dateFrom || dateTo) && <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>Clear dates</button>}
           <CustomFilterControls props={cprops} optionsByProp={optsByProp} filters={custFilters} setFilters={setCustFilters} />
-          {isAdmin && <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setMgrOpen(true)}>+ Add property</button>}
           <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={() => { setDraft(EMPTY_DRAFT); setAddOpen(true); }}>+ Add Session</button>
         </div>
 
@@ -251,7 +250,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                   <th>Filmed</th>
                   <th style={{ minWidth: 120 }}>Completion</th>
                   <CustomHeaderCells props={cprops} isAdmin={isAdmin} onManage={() => setMgrOpen(true)} />
-                  <th></th>
+                  <th style={{ textAlign: 'right' }}>{isAdmin && <AddPropertyButton onClick={() => setMgrOpen(true)} />}</th>
                 </tr>
               </thead>
               <tbody>
