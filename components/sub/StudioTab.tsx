@@ -62,11 +62,27 @@ export default function StudioTab({ videos, sequences, sessions, adCreatives, co
     { label: 'Overdue', value: String(stats.overdue), color: stats.overdue > 0 ? '#ef4444' : 'var(--text)' },
   ];
 
+  // Filming Sessions-specific cards: what's still ahead to film, and what shipped
+  // this calendar month. Only used while the Sessions sub-tab is active.
+  const sessionStats = useMemo(() => {
+    const month = todayISO().slice(0, 7); // YYYY-MM
+    const planned = sessions.filter(s => s.status === 'Planned').length;
+    const filmedThisMonth = sessions.filter(s => s.status === 'Filmed' && (s.date || '').slice(0, 7) === month).length;
+    return { planned, filmedThisMonth };
+  }, [sessions]);
+
+  const sessionOverviewItems: { label: string; value: string; color?: string }[] = [
+    { label: 'Planned', value: String(sessionStats.planned), color: '#8b5cf6' },
+    { label: 'Filmed this month', value: String(sessionStats.filmedThisMonth), color: 'var(--text)' },
+  ];
+
+  const activeOverview = sub === 'sessions' ? sessionOverviewItems : overviewItems;
+
   return (
     <div style={{ position: 'relative' }}>
       {/* Overview bar */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
-        {overviewItems.map(item => (
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${activeOverview.length}, 1fr)`, gap: 10, marginBottom: 16 }}>
+        {activeOverview.map(item => (
           <div key={item.label} className="metric-chip">
             <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>{item.label}</div>
             <div className="kpi-num" style={{ fontSize: item.value.length > 6 ? 18 : 30, color: item.color || 'var(--text)' }}>{item.value}</div>
