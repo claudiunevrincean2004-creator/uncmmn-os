@@ -1,8 +1,12 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { pillStyle } from '@/lib/studio';
 
-// Inline text/textarea that commits on blur (only if the value actually changed)
+// Inline text/textarea editor with uniform keyboard behavior across every table:
+//   • Enter           → commit the value and blur (single-line and multi-line)
+//   • Shift+Enter      → insert a newline (multi-line only)
+//   • Escape           → revert to the previous value and blur (no commit)
+// Commit still happens on blur too, and only when the value actually changed.
 export function InlineText({
   value,
   onCommit,
@@ -18,14 +22,31 @@ export function InlineText({
 }) {
   const [v, setV] = useState(value ?? '');
   useEffect(() => { setV(value ?? ''); }, [value]);
+  // Set when Escape reverts, so the blur it triggers doesn't commit the change.
+  const skipCommit = useRef(false);
 
-  const commit = () => { if ((v ?? '') !== (value ?? '')) onCommit(v.trim()); };
+  const commit = () => {
+    if (skipCommit.current) { skipCommit.current = false; return; }
+    if ((v ?? '') !== (value ?? '')) onCommit(v.trim());
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (e.key === 'Escape') {
+      skipCommit.current = true;
+      setV(value ?? '');           // revert to the previous value
+      e.currentTarget.blur();      // commit() bails out via skipCommit
+    } else if (e.key === 'Enter' && (!multiline || !e.shiftKey)) {
+      e.preventDefault();          // don't insert a newline / submit a form
+      e.currentTarget.blur();      // blur triggers commit()
+    }
+  };
 
   const shared = {
     value: v,
     placeholder,
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setV(e.target.value),
     onBlur: commit,
+    onKeyDown,
     className: 'form-input',
     style: { padding: '4px 7px', fontSize: 12, ...style },
   };
@@ -33,12 +54,7 @@ export function InlineText({
   if (multiline) {
     return <textarea {...shared} rows={3} style={{ ...shared.style, resize: 'vertical' as const, lineHeight: 1.4 }} />;
   }
-  return (
-    <input
-      {...shared}
-      onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-    />
-  );
+  return <input {...shared} />;
 }
 
 
@@ -235,6 +251,8 @@ export function UrlCell({
   const [editing, setEditing] = useState(false);
   const [v, setV] = useState(value ?? '');
   useEffect(() => { setV(value ?? ''); }, [value]);
+  // Set when Escape reverts, so the blur it triggers doesn't commit the change.
+  const skipCommit = useRef(false);
 
   if (editing) {
     return (
@@ -245,8 +263,15 @@ export function UrlCell({
         value={v}
         placeholder="https://…"
         onChange={e => setV(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-        onBlur={() => { if ((v ?? '') !== (value ?? '')) onCommit(v.trim()); setEditing(false); }}
+        onKeyDown={e => {
+          if (e.key === 'Escape') { skipCommit.current = true; setV(value ?? ''); e.currentTarget.blur(); }
+          else if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); }
+        }}
+        onBlur={() => {
+          if (skipCommit.current) skipCommit.current = false;
+          else if ((v ?? '') !== (value ?? '')) onCommit(v.trim());
+          setEditing(false);
+        }}
       />
     );
   }
