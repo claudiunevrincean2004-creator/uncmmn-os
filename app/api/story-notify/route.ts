@@ -15,7 +15,7 @@ function opener(status: string, name: string): string | null {
     case 'Approved':
       return `🟢 Green light for ${n}, Claudiu!`;
     case 'Revision Requested':
-      return `🔧 Not quite there yet! Nathan wants tweaks on ${n}, Claudiu. Take a peek.`;
+      return `🔧 Not quite there yet! Nathan wants tweaks on ${n}, Claudiu.`;
     default:
       // Unknown status → no message (the client only ever sends the three above,
       // but guard so a stray call can't post a malformed notification).
@@ -43,10 +43,13 @@ export async function POST(request: Request) {
   const head = opener(status, name);
   if (!head) return NextResponse.json({ skipped: true });
 
+  // "Revision Requested" frames the link as "Take a peek:"; the other statuses
+  // keep the "Find the final products here:" wording.
+  const linkLabel = status === 'Revision Requested' ? 'Take a peek' : 'Find the final products here';
   const lines = [
     head,
     '',
-    finalUrl ? `Find the final products here: ${finalUrl}` : '⚠️ No final product link added tho!',
+    finalUrl ? `${linkLabel}: ${finalUrl}` : '⚠️ No final product link added tho!',
   ];
 
   try {
