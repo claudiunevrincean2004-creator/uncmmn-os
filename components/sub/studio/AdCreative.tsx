@@ -3,6 +3,8 @@ import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
+import { usePagedRows } from '@/lib/use-paged-rows';
+import LoadMore from './LoadMore';
 import { AD_FORMATS, AD_STATUSES, AD_STATUS_COLORS, todayISO, logActivity, mergeOptions, inDateRange, getFieldOptions, colorMap, buildAddOptionRows } from '@/lib/studio';
 import { EditPillSelect, EditSelect, MiniSelect, InlineText, InlineDate, UrlCell } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
@@ -208,6 +210,12 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
 
   const rows = useMemo(() => applyCustomFilters(filtered, cprops, custFilters), [filtered, cprops, custFilters]);
 
+  // "Load more" pagination — resets to the first page on filter/sort change only.
+  const { visible, hasMore, remaining, loadMore } = usePagedRows(
+    rows,
+    [fStatus, fFormat, fAngle, sortKey, sortDir, dateFrom, dateTo, JSON.stringify(custFilters)].join('|'),
+  );
+
   const fields: FieldDef[] = useMemo(() => [
     { key: 'creative_id', label: 'Creative ID', type: 'text', placeholder: 'Name / identifier' },
     { key: 'date_added', label: 'Date Added', type: 'date' },
@@ -250,6 +258,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
         {rows.length === 0 ? (
           <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>No ad creatives yet. Add one, or set a video&apos;s status to &quot;Ad Variation Needed&quot;.</div>
         ) : (
+          <>
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
               <thead>
@@ -267,7 +276,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                 </tr>
               </thead>
               <tbody>
-                {rows.map(a => (
+                {visible.map(a => (
                   <Fragment key={a.id}>
                     <tr style={selectedId === a.id ? { background: 'var(--surface-2)' } : undefined}>
                       <td style={{ minWidth: 160 }}>
@@ -290,6 +299,8 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
               </tbody>
             </table>
           </div>
+          {hasMore && <LoadMore remaining={remaining} onClick={loadMore} />}
+          </>
         )}
       </div>
 

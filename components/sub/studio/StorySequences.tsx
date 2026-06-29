@@ -3,6 +3,8 @@ import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StudioSequence, StudioComment, StudioActivity, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
+import { usePagedRows } from '@/lib/use-paged-rows';
+import LoadMore from './LoadMore';
 import {
   SEQUENCE_STATUSES, SEQUENCE_STATUS_COLORS,
   isOverdue, logActivity, inDateRange, getFieldOptions, colorMap, buildAddOptionRows,
@@ -172,6 +174,12 @@ export default function StorySequences({ sequences, comments, activity, dropdown
 
   const rows = useMemo(() => applyCustomFilters(filtered, cprops, custFilters), [filtered, cprops, custFilters]);
 
+  // "Load more" pagination — resets to the first page on filter/sort change only.
+  const { visible, hasMore, remaining, loadMore } = usePagedRows(
+    rows,
+    [fStatus, sortDir, dateFrom, dateTo, JSON.stringify(custFilters)].join('|'),
+  );
+
   const fields: FieldDef[] = useMemo(() => [
     { key: 'title', label: 'Title / Desc', type: 'textarea', placeholder: 'Title / description' },
     { key: 'status', label: 'Status', type: 'pill', field: 'sequence_status', options: statusValues, colors: statusColors, allowAdd: isAdmin },
@@ -203,6 +211,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
         {rows.length === 0 ? (
           <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>No sequences match. Add a sequence or adjust filters.</div>
         ) : (
+          <>
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
               <thead>
@@ -216,7 +225,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
                 </tr>
               </thead>
               <tbody>
-                {rows.map(s => {
+                {visible.map(s => {
                   const overdue = isOverdue(s.scheduled_date, s.status, DONE);
                   return (
                     <Fragment key={s.id}>
@@ -241,6 +250,8 @@ export default function StorySequences({ sequences, comments, activity, dropdown
               </tbody>
             </table>
           </div>
+          {hasMore && <LoadMore remaining={remaining} onClick={loadMore} />}
+          </>
         )}
       </div>
 

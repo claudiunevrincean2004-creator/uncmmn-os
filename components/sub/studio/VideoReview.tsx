@@ -3,6 +3,8 @@ import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StudioVideo, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
+import { usePagedRows } from '@/lib/use-paged-rows';
+import LoadMore from './LoadMore';
 import {
   VIDEO_FORMATS, VIDEO_STATUSES, VIDEO_STATUS_COLORS,
   PRIORITIES, PRIORITY_COLORS,
@@ -179,6 +181,13 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
     });
   }, [videos, fStatus, fAssigned, fFormat, fPriority, sortDir, dateFrom, dateTo, profiles]);
 
+  // "Load more" pagination — resets to the first page when filters/sort change,
+  // not on data refresh (so editing a cell doesn't collapse the list).
+  const { visible, hasMore, remaining, loadMore } = usePagedRows(
+    filtered,
+    [fStatus, fAssigned, fFormat, fPriority, sortDir, dateFrom, dateTo].join('|'),
+  );
+
   const fields: FieldDef[] = useMemo(() => [
     { key: 'title', label: 'Title / Desc', type: 'textarea', placeholder: 'Title / description' },
     { key: 'format', label: 'Format', type: 'pill', field: 'video_format', options: formatValues, colors: formatColors, allowAdd: isAdmin, allowEmpty: true },
@@ -219,6 +228,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
         {filtered.length === 0 ? (
           <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>No videos match. Add a video or adjust filters.</div>
         ) : (
+          <>
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
               <thead>
@@ -237,7 +247,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(v => {
+                {visible.map(v => {
                   const overdue = isOverdue(v.deadline, v.status, DONE);
                   return (
                     <Fragment key={v.id}>
@@ -271,6 +281,8 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
               </tbody>
             </table>
           </div>
+          {hasMore && <LoadMore remaining={remaining} onClick={loadMore} />}
+          </>
         )}
       </div>
 

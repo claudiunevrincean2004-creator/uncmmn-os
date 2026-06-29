@@ -3,6 +3,8 @@ import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StudioSession, StudioComment, StudioActivity, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
+import { usePagedRows } from '@/lib/use-paged-rows';
+import LoadMore from './LoadMore';
 import { SESSION_STATUSES, SESSION_STATUS_COLORS, SESSION_TYPES, SESSION_TYPE_COLORS, todayISO, logActivity, inDateRange, getFieldOptions, colorMap, buildAddOptionRows } from '@/lib/studio';
 import { EditPillSelect, MiniSelect, UrlCell, InlineDate, InlineNumber } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
@@ -188,6 +190,12 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
 
   const rows = useMemo(() => applyCustomFilters(filtered, cprops, custFilters), [filtered, cprops, custFilters]);
 
+  // "Load more" pagination — resets to the first page on filter/sort change only.
+  const { visible, hasMore, remaining, loadMore } = usePagedRows(
+    rows,
+    [fStatus, fType, sortDir, dateFrom, dateTo, JSON.stringify(custFilters)].join('|'),
+  );
+
   const fields: FieldDef[] = useMemo(() => [
     { key: 'name', label: 'Session / Desc', type: 'textarea', placeholder: 'Session name / description' },
     { key: 'type', label: 'Type', type: 'pill', field: 'session_type', options: typeValues, colors: typeColors, allowAdd: isAdmin },
@@ -224,6 +232,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
         {rows.length === 0 ? (
           <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>No sessions match. Add a session or adjust filters.</div>
         ) : (
+          <>
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
               <thead>
@@ -242,7 +251,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                 </tr>
               </thead>
               <tbody>
-                {rows.map(s => {
+                {visible.map(s => {
                   const planned = s.videos_planned || 0;
                   const filmed = s.videos_filmed || 0;
                   const pct = planned > 0 ? Math.min(100, Math.round((filmed / planned) * 100)) : 0;
@@ -277,6 +286,8 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
               </tbody>
             </table>
           </div>
+          {hasMore && <LoadMore remaining={remaining} onClick={loadMore} />}
+          </>
         )}
       </div>
 

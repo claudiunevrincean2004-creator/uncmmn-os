@@ -1,12 +1,17 @@
 'use client';
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Profile } from '@/lib/types';
-import { useDismiss } from '@/lib/use-dismiss';
 import { profileName } from '@/lib/profile-name';
 
 // Re-export so existing `./UserPicker` importers (AssigneeSettings, ItemPanel)
 // keep working off the shared helper.
 export { profileName };
+
+const DROPDOWN_W = 240;
+// Approximate full height (search box + ~220 list + padding) used to decide
+// whether to flip the dropdown above the trigger.
+const DROPDOWN_MAX_H = 290;
 
 // Resolve a stored assigned_to (a profile id, or legacy plain text) to a display name.
 // Returns null when it can't be mapped to a real user (→ shown as Unassigned).
@@ -33,8 +38,11 @@ export function UserPicker({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const ref = useRef<HTMLDivElement>(null);
-  useDismiss(ref, () => setOpen(false), { active: open });
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  // Fixed-viewport coords for the portaled dropdown; uses `top` (open down) or
+  // `bottom` (flipped up) so it's never clipped by the table's overflow box.
+  const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number } | null>(null);
 
   const display = resolveAssignee(value, profiles);
   const assignable = profiles.filter(p => p.assignable !== false);
@@ -43,6 +51,44 @@ export function UserPicker({
     ? assignable.filter(p => profileName(p).toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q))
     : assignable;
 
+  function reposition() {
+    const el = btnRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - DROPDOWN_W - 8));
+    const spaceBelow = window.innerHeight - r.bottom;
+    // Flip up only when there isn't room below AND there's more room above.
+    if (spaceBelow < DROPDOWN_MAX_H && r.top > spaceBelow) {
+      setPos({ left, bottom: window.innerHeight - r.top + 4 });
+    } else {
+      setPos({ left, top: r.bottom + 4 });
+    }
+  }
+
+  useLayoutEffect(() => { if (open) reposition(); }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (btnRef.current?.contains(t) || popRef.current?.contains(t)) return;
+      setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    // Keep the dropdown glued to its trigger while the page/table scrolls.
+    const onScrollResize = () => reposition();
+    document.addEventListener('mousedown', onDocDown);
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('scroll', onScrollResize, true);
+    window.addEventListener('resize', onScrollResize);
+    return () => {
+      document.removeEventListener('mousedown', onDocDown);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', onScrollResize, true);
+      window.removeEventListener('resize', onScrollResize);
+    };
+  }, [open]);
+
   function pick(id: string) {
     onChange(id);
     setOpen(false);
@@ -50,8 +96,9 @@ export function UserPicker({
   }
 
   return (
-    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+    <>
       <button
+        ref={btnRef}
         onClick={() => setOpen(o => !o)}
         className="btn-ghost"
         style={{ fontSize: 11, padding: '4px 9px', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: display ? 'var(--text)' : 'var(--text-faint)' }}
@@ -60,11 +107,12 @@ export function UserPicker({
         {display || 'Unassigned'}
       </button>
 
-      {open && (
+      {open && pos && typeof document !== 'undefined' && createPortal(
         <div
+          ref={popRef}
           style={{
-            position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 50,
-            width: 240, background: 'var(--surface)', border: '1px solid var(--border)',
+            position: 'fixed', left: pos.left, top: pos.top, bottom: pos.bottom, zIndex: 3000,
+            width: DROPDOWN_W, background: 'var(--surface)', border: '1px solid var(--border)',
             borderRadius: 12, boxShadow: 'var(--shadow)', padding: 8,
           }}
         >
@@ -99,8 +147,9 @@ export function UserPicker({
             ))}
             {filtered.length === 0 && <div style={{ fontSize: 11, color: 'var(--text-faint)', padding: '6px 10px' }}>No users found.</div>}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 }
