@@ -13,6 +13,7 @@ import { EditPillSelect, MiniSelect, UrlCell, InlineDate } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal } from './CustomColumns';
 import FieldOptionsManager from './FieldOptionsManager';
+import FilterField from './FilterField';
 
 const DONE = ['Posted'];
 const TABLE_KEY = 'sequence';
@@ -192,19 +193,22 @@ export default function StorySequences({ sequences, comments, activity, dropdown
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-          <MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} />
-          <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))} title="Sort by scheduled date">
-            Scheduled {sortDir === 'asc' ? '↑ oldest' : '↓ newest'}
-          </button>
-          <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>From</span>
-          <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-          <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>To</span>
-          <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
-          {(dateFrom || dateTo) && <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>clear</button>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+          <FilterField label="Status"><MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} /></FilterField>
+          <FilterField label="Sort">
+            <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))} title="Sort by scheduled date">
+              Scheduled {sortDir === 'asc' ? '↑ Oldest' : '↓ Newest'}
+            </button>
+          </FilterField>
+          <FilterField label="From">
+            <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+          </FilterField>
+          <FilterField label="To">
+            <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
+          </FilterField>
+          {(dateFrom || dateTo) && <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>Clear dates</button>}
           <CustomFilterControls props={cprops} optionsByProp={optsByProp} filters={custFilters} setFilters={setCustFilters} />
           {isAdmin && <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setMgrOpen(true)}>+ Add property</button>}
-          <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{rows.length} {rows.length === 1 ? 'sequence' : 'sequences'}</span>
           <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={() => { setDraft(EMPTY_DRAFT); setAddOpen(true); }}>+ Add Sequence</button>
         </div>
 

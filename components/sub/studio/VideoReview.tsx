@@ -5,6 +5,7 @@ import { StudioVideo, StudioComment, StudioActivity, StudioQuickLink, StudioDrop
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { usePagedRows } from '@/lib/use-paged-rows';
 import LoadMore from './LoadMore';
+import FilterField from './FilterField';
 import {
   VIDEO_FORMATS, VIDEO_STATUSES, VIDEO_STATUS_COLORS,
   PRIORITIES, PRIORITY_COLORS,
@@ -208,20 +209,23 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
       <div style={{ flex: 1, minWidth: 0 }}>
         <QuickLinks context="video-review" links={quickLinks} onReload={onReload} />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-          <MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} />
-          <MiniSelect value={fAssigned} options={assignedPresent} onChange={setFAssigned} />
-          <MiniSelect value={fFormat} options={formatPresent} onChange={setFFormat} />
-          <MiniSelect value={fPriority} options={priorityPresent} onChange={setFPriority} />
-          <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))} title="Sort by deadline">
-            Deadline {sortDir === 'asc' ? '↑ oldest' : '↓ newest'}
-          </button>
-          <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>From</span>
-          <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-          <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>To</span>
-          <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
-          {(dateFrom || dateTo) && <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>clear</button>}
-          <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{filtered.length} {filtered.length === 1 ? 'video' : 'videos'}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+          <FilterField label="Status"><MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} /></FilterField>
+          <FilterField label="Assigned to"><MiniSelect value={fAssigned} options={assignedPresent} onChange={setFAssigned} /></FilterField>
+          <FilterField label="Format"><MiniSelect value={fFormat} options={formatPresent} onChange={setFFormat} /></FilterField>
+          <FilterField label="Priority"><MiniSelect value={fPriority} options={priorityPresent} onChange={setFPriority} /></FilterField>
+          <FilterField label="Sort">
+            <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))} title="Sort by deadline">
+              Deadline {sortDir === 'asc' ? '↑ Oldest' : '↓ Newest'}
+            </button>
+          </FilterField>
+          <FilterField label="From">
+            <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+          </FilterField>
+          <FilterField label="To">
+            <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
+          </FilterField>
+          {(dateFrom || dateTo) && <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>Clear dates</button>}
           <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={() => { setDraft(EMPTY_DRAFT); setAddOpen(true); }}>+ Add Video</button>
         </div>
 

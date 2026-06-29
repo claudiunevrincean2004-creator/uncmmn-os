@@ -11,6 +11,7 @@ import ItemPanel, { FieldDef } from './ItemPanel';
 import QuickLinks from './QuickLinks';
 import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal } from './CustomColumns';
 import FieldOptionsManager from './FieldOptionsManager';
+import FilterField from './FilterField';
 
 type SortKey = 'date_added' | 'angle';
 const TABLE_KEY = 'ad';
@@ -49,9 +50,6 @@ const EMPTY_DRAFT: AdDraft = {
   status: 'Paused',
 };
 
-// Inline filter group + label styling, so each control reads "Label [control]".
-const FILTER_GROUP: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 5 };
-const FILTER_LABEL: React.CSSProperties = { fontSize: 10, color: 'var(--text-faint)' };
 
 interface Props {
   adCreatives: StudioAdCreative[];
@@ -294,22 +292,12 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
           />
 
           {/* Labeled filters */}
-          <label style={FILTER_GROUP}>
-            <span style={FILTER_LABEL}>Format</span>
-            <MiniSelect value={fFormat} options={formatPresent} onChange={setFFormat} />
-          </label>
-          <label style={FILTER_GROUP}>
-            <span style={FILTER_LABEL}>Angle</span>
-            <MiniSelect value={fAngle} options={anglePresent} onChange={setFAngle} />
-          </label>
-          <label style={FILTER_GROUP}>
-            <span style={FILTER_LABEL}>Status</span>
-            <MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} />
-          </label>
+          <FilterField label="Format"><MiniSelect value={fFormat} options={formatPresent} onChange={setFFormat} /></FilterField>
+          <FilterField label="Angle"><MiniSelect value={fAngle} options={anglePresent} onChange={setFAngle} /></FilterField>
+          <FilterField label="Status"><MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} /></FilterField>
 
           {/* Sort by + direction */}
-          <label style={FILTER_GROUP}>
-            <span style={FILTER_LABEL}>Sort</span>
+          <FilterField label="Sort">
             <select className="form-input" style={{ width: 'auto', padding: '4px 7px', fontSize: 11 }} value={sortKey} onChange={e => setSortKey(e.target.value as SortKey)}>
               <option value="date_added">Date Added</option>
               <option value="angle">Angle</option>
@@ -317,17 +305,11 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
             <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))} title="Toggle sort direction">
               {sortDir === 'asc' ? '↑ Ascending' : '↓ Descending'}
             </button>
-          </label>
+          </FilterField>
 
           {/* Date range (kept) */}
-          <label style={FILTER_GROUP}>
-            <span style={FILTER_LABEL}>From</span>
-            <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-          </label>
-          <label style={FILTER_GROUP}>
-            <span style={FILTER_LABEL}>To</span>
-            <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
-          </label>
+          <FilterField label="From"><input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} /></FilterField>
+          <FilterField label="To"><input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateTo} onChange={e => setDateTo(e.target.value)} /></FilterField>
           {(dateFrom || dateTo) && <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>clear</button>}
 
           <CustomFilterControls props={cprops} optionsByProp={optsByProp} filters={custFilters} setFilters={setCustFilters} />
