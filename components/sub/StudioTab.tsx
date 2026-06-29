@@ -93,9 +93,25 @@ export default function StudioTab({ videos, sequences, sessions, adCreatives, co
     { label: 'This month', value: String(sequenceStats.thisMonth), color: 'var(--text)' },
   ];
 
+  // Ad Creative-specific cards, counted from real status values. Unknown status
+  // names simply don't match, leaving the relevant card at 0.
+  const adStats = useMemo(() => {
+    const live = adCreatives.filter(a => a.status === 'Live').length;
+    const winners = adCreatives.filter(a => a.status === 'Winner').length;
+    const revisionRequested = adCreatives.filter(a => a.status === 'Revision Requested').length;
+    return { live, winners, revisionRequested };
+  }, [adCreatives]);
+
+  const adOverviewItems: { label: string; value: string; color?: string }[] = [
+    { label: 'Live', value: String(adStats.live), color: '#8b5cf6' },
+    { label: 'Winners', value: String(adStats.winners), color: 'var(--text)' },
+    { label: 'Revision Requested', value: String(adStats.revisionRequested), color: adStats.revisionRequested > 0 ? '#ef4444' : 'var(--text)' },
+  ];
+
   const activeOverview =
     sub === 'sessions' ? sessionOverviewItems
     : sub === 'sequences' ? sequenceOverviewItems
+    : sub === 'ads' ? adOverviewItems
     : overviewItems;
 
   return (
