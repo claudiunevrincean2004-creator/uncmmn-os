@@ -113,8 +113,17 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
     const text = newComment.trim();
     if (!text || saving) return;
     setSaving(true);
-    await supabase.from('studio_comments').insert([{ item_type: itemType, item_id: itemId, text, author_id: currentUserId }]);
+    const { error } = await supabase
+      .from('studio_comments')
+      .insert([{ item_type: itemType, item_id: itemId, text, author_id: currentUserId }]);
     setSaving(false);
+    if (error) {
+      // Surface the failure instead of dropping the comment silently — e.g. a
+      // missing author_id column (run studio_comments_author.sql) or an RLS denial.
+      console.error('[ItemPanel] failed to add comment', error);
+      alert(`Couldn't add comment: ${error.message}`);
+      return;
+    }
     setNewComment('');
     onReload();
   }
@@ -132,13 +141,23 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
   async function saveEdit(id: string) {
     const text = editText.trim();
     if (!text) return;
-    await supabase.from('studio_comments').update({ text }).eq('id', id);
+    const { error } = await supabase.from('studio_comments').update({ text }).eq('id', id);
+    if (error) {
+      console.error('[ItemPanel] failed to edit comment', error);
+      alert(`Couldn't save comment: ${error.message}`);
+      return;
+    }
     cancelEdit();
     onReload();
   }
 
   async function deleteComment(id: string) {
-    await supabase.from('studio_comments').delete().eq('id', id);
+    const { error } = await supabase.from('studio_comments').delete().eq('id', id);
+    if (error) {
+      console.error('[ItemPanel] failed to delete comment', error);
+      alert(`Couldn't delete comment: ${error.message}`);
+      return;
+    }
     onReload();
   }
 
@@ -195,10 +214,10 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
             className="form-input"
             value={newComment}
             onChange={e => setNewComment(e.target.value)}
-            placeholder="Leave a comment…"
+            placeholder="Leave a comment… (Enter to send, Shift+Enter for a new line)"
             rows={2}
             style={{ resize: 'vertical', fontSize: 12, lineHeight: 1.4 }}
-            onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) addComment(); }}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addComment(); } }}
           />
           <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', alignSelf: 'flex-end' }} onClick={addComment} disabled={saving || !newComment.trim()}>
             {saving ? '…' : 'Add'}

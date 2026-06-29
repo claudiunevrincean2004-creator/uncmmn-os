@@ -41,47 +41,6 @@ export function InlineText({
   );
 }
 
-// Expandable note editor used in the note row on each Studio tab. Saves and
-// closes on Enter or the "Leave note" button; Shift+Enter inserts a newline.
-// Persists via onCommit (same path as the inline textarea) and only writes when
-// the text actually changed. onBlur still persists so clicking away never loses
-// the note; closing is reserved for the explicit save actions.
-export function NoteEditor({
-  value,
-  onCommit,
-  onClose,
-  placeholder,
-}: {
-  value?: string;
-  onCommit: (v: string) => void;
-  onClose: () => void;
-  placeholder?: string;
-}) {
-  const [v, setV] = useState(value ?? '');
-  useEffect(() => { setV(value ?? ''); }, [value]);
-
-  const persist = () => { if ((v ?? '') !== (value ?? '')) onCommit(v.trim()); };
-  const save = () => { persist(); onClose(); };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
-      <textarea
-        autoFocus
-        className="form-input"
-        value={v}
-        placeholder={placeholder}
-        rows={3}
-        onChange={e => setV(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save(); } }}
-        onBlur={persist}
-        style={{ width: '100%', padding: '4px 7px', fontSize: 12, lineHeight: 1.4, resize: 'vertical' }}
-      />
-      {/* preventDefault on mousedown so the click doesn't blur the textarea first
-          (which would double-fire the commit and race the close). */}
-      <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px' }} onMouseDown={e => e.preventDefault()} onClick={save}>Leave note</button>
-    </div>
-  );
-}
 
 // A select styled as a colored pill — click opens the dropdown to change.
 export function PillSelect({
