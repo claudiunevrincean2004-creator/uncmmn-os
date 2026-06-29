@@ -151,6 +151,7 @@ export interface StudioActivity {
 export interface StudioSession {
   id: string;
   name: string;
+  type?: string;
   script_url?: string;
   footage_link?: string;
   date?: string;

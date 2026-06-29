@@ -3,7 +3,7 @@ import { Fragment, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StudioSession, StudioComment, StudioActivity, StudioDropdownOption, CustomProperty, CustomPropertyOption } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
-import { SESSION_STATUSES, SESSION_STATUS_COLORS, todayISO, logActivity, inDateRange, getFieldOptions, colorMap } from '@/lib/studio';
+import { SESSION_STATUSES, SESSION_STATUS_COLORS, SESSION_TYPES, SESSION_TYPE_COLORS, sessionType, todayISO, logActivity, inDateRange, getFieldOptions, colorMap } from '@/lib/studio';
 import { InlineText, EditPillSelect, MiniSelect, UrlCell, InlineDate, InlineNumber } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal } from './CustomColumns';
@@ -24,6 +24,7 @@ interface Props {
 
 export default function FilmingSessions({ sessions, comments, activity, dropdownOptions, properties, customOptions, isAdmin, onReload }: Props) {
   const [fStatus, setFStatus] = usePersistedState<string>('studio_f_status', 'All');
+  const [fType, setFType] = usePersistedState<string>('studio_f_type', 'All');
   const [sortDir, setSortDir] = usePersistedState<'asc' | 'desc'>('studio_f_sortdir', 'asc');
   const [dateFrom, setDateFrom] = usePersistedState<string>('studio_f_from', '');
   const [dateTo, setDateTo] = usePersistedState<string>('studio_f_to', '');
@@ -59,7 +60,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
   }
 
   async function addSession() {
-    await supabase.from('studio_sessions').insert([{ name: 'Untitled Session', status: 'Planned', videos_planned: 0, videos_filmed: 0 }]);
+    await supabase.from('studio_sessions').insert([{ name: 'Untitled Session', type: 'Scripted', status: 'Planned', videos_planned: 0, videos_filmed: 0 }]);
     onReload();
   }
 
@@ -77,6 +78,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
   const filtered = useMemo(() => {
     let r = sessions;
     if (fStatus !== 'All') r = r.filter(s => s.status === fStatus);
+    if (fType !== 'All') r = r.filter(s => sessionType(s.type) === fType);
     if (dateFrom || dateTo) r = r.filter(s => inDateRange(s.date, dateFrom, dateTo));
     return [...r].sort((a, b) => {
       const ad = a.date ? a.date.slice(0, 10) : '';
@@ -86,12 +88,13 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
       if (!bd) return -1;
       return sortDir === 'asc' ? ad.localeCompare(bd) : bd.localeCompare(ad);
     });
-  }, [sessions, fStatus, sortDir, dateFrom, dateTo]);
+  }, [sessions, fStatus, fType, sortDir, dateFrom, dateTo]);
 
   const rows = useMemo(() => applyCustomFilters(filtered, cprops, custFilters), [filtered, cprops, custFilters]);
 
   const fields: FieldDef[] = useMemo(() => [
     { key: 'name', label: 'Session / Desc', type: 'textarea', placeholder: 'Session name / description' },
+    { key: 'type', label: 'Type', type: 'pill', field: 'session_type', options: SESSION_TYPES, colors: SESSION_TYPE_COLORS, allowAdd: false },
     { key: 'script_url', label: 'Link to Script', type: 'url' },
     { key: 'footage_link', label: 'Footage', type: 'url' },
     { key: 'date', label: 'Date', type: 'date' },
@@ -108,6 +111,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
           <MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} />
+          <MiniSelect value={fType} options={['All', ...SESSION_TYPES]} onChange={setFType} />
           <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))} title="Sort by date">
             Date {sortDir === 'asc' ? '↑ oldest' : '↓ newest'}
           </button>
@@ -130,6 +134,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
               <thead>
                 <tr>
                   <th style={{ minWidth: 180 }}>Session / Description</th>
+                  <th>Type</th>
                   <th>Script</th>
                   <th>Footage</th>
                   <th>Date</th>
@@ -154,6 +159,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                         <td style={{ minWidth: 180 }}>
                           <button onClick={() => setSelectedId(s.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{s.name}</button>
                         </td>
+                        <td><EditPillSelect field="session_type" value={sessionType(s.type)} options={SESSION_TYPES} colors={SESSION_TYPE_COLORS} onChange={t => patch(s.id, { type: t })} allowAdd={false} /></td>
                         <td><UrlCell value={s.script_url} onCommit={u => patch(s.id, { script_url: u })} /></td>
                         <td><UrlCell value={s.footage_link} onCommit={u => patch(s.id, { footage_link: u })} /></td>
                         <td><InlineDate value={s.date} onCommit={d => patch(s.id, { date: d || undefined })} /></td>
@@ -178,7 +184,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                       </tr>
                       {expanded === s.id && (
                         <tr>
-                          <td colSpan={10 + cprops.length} style={{ background: 'var(--surface-2)' }}>
+                          <td colSpan={11 + cprops.length} style={{ background: 'var(--surface-2)' }}>
                             <div style={{ padding: '4px 2px' }}>
                               <div className="form-label" style={{ marginBottom: 4 }}>Notes</div>
                               <InlineText value={s.notes} onCommit={n => patch(s.id, { notes: n })} placeholder="Add notes…" multiline style={{ width: '100%' }} />
@@ -201,7 +207,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
           itemId={selected.id}
           title={selected.name}
           fields={fields}
-          values={selected}
+          values={{ ...selected, type: sessionType(selected.type) }}
           onChangeField={(key, value) => { if (key === 'status') changeStatus(selected, value); else patch(selected.id, { [key]: value }); }}
           onAddOption={addOption}
           comments={comments}
