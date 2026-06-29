@@ -93,6 +93,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
   const fields: FieldDef[] = useMemo(() => [
     { key: 'name', label: 'Session / Desc', type: 'textarea', placeholder: 'Session name / description' },
     { key: 'script_url', label: 'Link to Script', type: 'url' },
+    { key: 'footage_link', label: 'Footage', type: 'url' },
     { key: 'date', label: 'Date', type: 'date' },
     { key: 'status', label: 'Status', type: 'pill', field: 'session_status', options: statusValues, colors: statusColors, allowAdd: false },
     { key: 'videos_planned', label: 'Videos to Film', type: 'number' },
@@ -130,6 +131,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                 <tr>
                   <th style={{ minWidth: 180 }}>Session / Description</th>
                   <th>Script</th>
+                  <th>Footage</th>
                   <th>Date</th>
                   <th onClick={isAdmin ? () => setOptsField({ field: 'session_status', title: 'Status' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Status{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <th>To Film</th>
@@ -153,6 +155,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                           <button onClick={() => setSelectedId(s.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{s.name}</button>
                         </td>
                         <td><UrlCell value={s.script_url} onCommit={u => patch(s.id, { script_url: u })} /></td>
+                        <td><UrlCell value={s.footage_link} onCommit={u => patch(s.id, { footage_link: u })} /></td>
                         <td><InlineDate value={s.date} onCommit={d => patch(s.id, { date: d || undefined })} /></td>
                         <td><EditPillSelect field="session_status" value={s.status} options={statusValues} colors={statusColors} onChange={st => changeStatus(s, st)} allowAdd={false} /></td>
                         <td style={{ textAlign: 'center' }}><InlineNumber value={planned} onCommit={n => patch(s.id, { videos_planned: n })} /></td>
@@ -175,7 +178,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                       </tr>
                       {expanded === s.id && (
                         <tr>
-                          <td colSpan={9 + cprops.length} style={{ background: 'var(--surface-2)' }}>
+                          <td colSpan={10 + cprops.length} style={{ background: 'var(--surface-2)' }}>
                             <div style={{ padding: '4px 2px' }}>
                               <div className="form-label" style={{ marginBottom: 4 }}>Notes</div>
                               <InlineText value={s.notes} onCommit={n => patch(s.id, { notes: n })} placeholder="Add notes…" multiline style={{ width: '100%' }} />

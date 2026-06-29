@@ -114,6 +114,7 @@ create table if not exists studio_sessions (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   script_url text,
+  footage_link text,
   date date,
   location text,
   status text default 'Planned',
@@ -122,6 +123,8 @@ create table if not exists studio_sessions (
   notes text,
   created_at timestamptz default now()
 );
+-- Migrate older installs of studio_sessions to the new columns
+alter table studio_sessions add column if not exists footage_link text;
 
 -- Studio — Ad Creative pipeline
 create table if not exists studio_ad_creatives (

@@ -202,6 +202,7 @@ create policy "anon_all_studio_sequences" on studio_sequences for all to anon us
   id uuid primary key default gen_random_uuid(),
   name text not null,
   script_url text,
+  footage_link text,
   date date,
   location text,
   status text default 'Planned',
