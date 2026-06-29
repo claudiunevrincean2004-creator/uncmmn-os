@@ -29,6 +29,8 @@ export async function POST(request: Request) {
   let footageLink = '';
   try {
     const body = await request.json();
+    // The client also sends id and name/description; the locked message format
+    // only uses type + footage link, but we accept the full payload.
     type = typeof body?.type === 'string' ? body.type.trim() : '';
     footageLink = typeof body?.footageLink === 'string' ? body.footageLink.trim() : '';
   } catch {

@@ -74,19 +74,28 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
     if (status === s.status) return;
     // Only the (not-Filmed) → "Filmed" transition pings Slack — never other
     // status changes, and never a repeated save while already Filmed (the guard
-    // above already returns early when the status is unchanged).
+    // above already returns early when the status is unchanged). Capture the
+    // payload now, from the pre-update row, before any awaits.
     const justFilmed = status === 'Filmed' && s.status !== 'Filmed';
+    const notifyPayload = {
+      id: s.id,
+      name: s.name,
+      type: s.type ?? '',
+      footageLink: s.footage_link ?? '',
+    };
     await logActivity('session', s.id, 'Status changed', s.status, status);
     await patch(s.id, { status });
-    if (justFilmed) {
-      // Fire-and-forget; the server route holds the webhook URL and skips
-      // silently if it's unset. Never block the UI or throw on failure.
-      fetch('/api/filming-notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: s.type, footageLink: s.footage_link }),
-      }).catch(() => {});
-    }
+    if (justFilmed) notifyFilmed(notifyPayload);
+  }
+
+  // Fire-and-forget POST to the server route, which holds the Slack webhook URL
+  // and skips silently if it's unset. Never blocks the UI or throws.
+  function notifyFilmed(payload: { id: string; name: string; type: string; footageLink: string }) {
+    fetch('/api/filming-notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).catch(err => console.warn('[FilmingSessions] /api/filming-notify call failed', err));
   }
 
   async function addSession() {
