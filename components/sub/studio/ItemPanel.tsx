@@ -163,28 +163,43 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
   }
 
   return (
-    <div
-      ref={panelRef}
-      style={{
-        // Desktop: roughly half the viewport, capped for ultrawide. Narrow/mobile
-        // stays near-full via minWidth (50vw of a phone is tiny → clamps to 340).
-        width: 'min(50vw, 720px)',
-        minWidth: 340,
-        maxWidth: 720,
-        flexShrink: 0,
-        alignSelf: 'flex-start',
-        position: 'sticky',
-        top: 0,
-        maxHeight: 'calc(100vh - 130px)',
-        overflowY: 'auto',
-        borderLeft: '0.5px solid var(--border)',
-        background: 'var(--surface)',
-        borderRadius: 10,
-        marginLeft: 16,
-        padding: '22px 26px',
-        animation: 'slideInRight 0.2s ease',
-      }}
-    >
+    <>
+      {/* Subtle scrim so the panel reads as floating above the page (Notion-style):
+          content behind stays visible but clearly underneath. Clicking it dismisses
+          via the click-outside handler below. */}
+      <div
+        aria-hidden
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.28)',
+          zIndex: 1400,
+          animation: 'fadeIn 0.18s ease',
+        }}
+      />
+      <div
+        ref={panelRef}
+        style={{
+          // Floating slide-over: fixed to the right edge, above the page content,
+          // so the page keeps its full width and layout (nothing behind reflows).
+          // Desktop ≈ half the viewport, capped for ultrawide; narrow/mobile stays
+          // near-full via minWidth (50vw of a phone is tiny → clamps to 340).
+          position: 'fixed',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: 'min(50vw, 720px)',
+          minWidth: 340,
+          maxWidth: 720,
+          zIndex: 1401,
+          overflowY: 'auto',
+          borderLeft: '0.5px solid var(--border)',
+          background: 'var(--surface)',
+          boxShadow: '-16px 0 48px rgba(0, 0, 0, 0.4)',
+          padding: '22px 26px',
+          animation: 'slideInRight 0.2s ease',
+        }}
+      >
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 18 }}>
         <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.3, wordBreak: 'break-word' }}>{title || 'Untitled'}</div>
@@ -311,6 +326,7 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </>
   );
 }

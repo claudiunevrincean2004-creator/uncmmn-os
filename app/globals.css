@@ -392,6 +392,16 @@ html, body {
   }
 }
 
+/* Backdrop scrim behind the Studio detail slide-over */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* Dashboard greeting emoji — subtle, tasteful time-of-day motions */
 .emoji-hop,
 .emoji-steam,
