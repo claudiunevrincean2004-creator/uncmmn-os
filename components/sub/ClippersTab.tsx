@@ -9,6 +9,8 @@ import PlatformIcon from '@/components/PlatformIcon';
 import ViewsOverTime from '@/components/ViewsOverTime';
 
 const PLATFORMS = ['tiktok', 'instagram', 'youtube'];
+const PLATFORM_LABELS: Record<string, string> = { tiktok: 'TikTok', instagram: 'Instagram', youtube: 'YouTube' };
+const capPlatform = (p?: string | null) => (p ? PLATFORM_LABELS[p.toLowerCase()] || (p.charAt(0).toUpperCase() + p.slice(1)) : '—');
 type PlatformChoice = 'All' | 'TikTok' | 'YouTube' | 'Instagram';
 const PLATFORM_CHOICES: PlatformChoice[] = ['All', 'TikTok', 'YouTube', 'Instagram'];
 
@@ -485,7 +487,6 @@ function ContentEditor({ clipperId, accounts, row, onClose, onSaved }: {
   onSaved: () => void;
 }) {
   const [title, setTitle] = useState(row?.title ?? '');
-  const [platform, setPlatform] = useState(row?.platform ?? 'tiktok');
   const [accountId, setAccountId] = useState(row?.account_id ?? '');
   const [contentUrl, setContentUrl] = useState(row?.content_url ?? '');
   const [views, setViews] = useState(String(row?.views ?? 0));
@@ -493,13 +494,17 @@ function ContentEditor({ clipperId, accounts, row, onClose, onSaved }: {
   const [postedAt, setPostedAt] = useState((row?.posted_at || '').slice(0, 10));
   const [saving, setSaving] = useState(false);
 
+  // A post must belong to one of the clipper's accounts; platform is derived from it.
+  const selectedAccount = accounts.find(a => a.id === accountId) || null;
+
   async function save() {
     if (saving) return;
+    if (!selectedAccount) { alert('Pick an account for this post.'); return; }
     setSaving(true);
     const payload = {
       clipper_id: clipperId,
-      account_id: accountId || null,
-      platform,
+      account_id: selectedAccount.id,
+      platform: selectedAccount.platform || null, // derived from the chosen account
       title: title.trim() || 'Untitled',
       content_url: contentUrl.trim() || null,
       views: Number(views) || 0,
@@ -526,16 +531,15 @@ function ContentEditor({ clipperId, accounts, row, onClose, onSaved }: {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={field}><div style={lbl}>Title</div><input className="form-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="Title" style={{ fontSize: 12 }} /></div>
-          <div style={field}><div style={lbl}>Platform</div>
-            <select className="form-input" value={platform} onChange={e => setPlatform(e.target.value)} style={{ fontSize: 12 }}>
-              {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-          </div>
           <div style={field}><div style={lbl}>Account</div>
-            <select className="form-input" value={accountId} onChange={e => setAccountId(e.target.value)} style={{ fontSize: 12 }}>
-              <option value="">—</option>
-              {accounts.map(a => <option key={a.id} value={a.id}>{(a.platform || '?')} · {a.handle || a.account_url || a.id.slice(0, 6)}</option>)}
-            </select>
+            {accounts.length === 0 ? (
+              <div style={{ fontSize: 12, color: '#f59e0b' }}>⚠️ Add an account first — a post must belong to one of this clipper&apos;s accounts.</div>
+            ) : (
+              <select className="form-input" value={accountId} onChange={e => setAccountId(e.target.value)} style={{ fontSize: 12 }}>
+                <option value="">Select an account…</option>
+                {accounts.map(a => <option key={a.id} value={a.id}>{capPlatform(a.platform)} · {a.handle || a.account_url || a.id.slice(0, 6)}</option>)}
+              </select>
+            )}
           </div>
           <div style={field}><div style={lbl}>Link</div><input className="form-input" value={contentUrl} onChange={e => setContentUrl(e.target.value)} placeholder="https://…" style={{ fontSize: 12 }} /></div>
           <div style={field}><div style={lbl}>Views</div><input className="form-input" type="number" value={views} onChange={e => setViews(e.target.value)} style={{ fontSize: 12 }} /></div>
@@ -544,7 +548,7 @@ function ContentEditor({ clipperId, accounts, row, onClose, onSaved }: {
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
           <button className="btn-ghost" style={{ fontSize: 12, padding: '8px 14px' }} onClick={onClose}>Cancel</button>
-          <button className="btn-primary" style={{ fontSize: 12, padding: '8px 14px' }} onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+          <button className="btn-primary" style={{ fontSize: 12, padding: '8px 14px' }} onClick={save} disabled={saving || !selectedAccount}>{saving ? 'Saving…' : 'Save'}</button>
         </div>
       </div>
     </div>
