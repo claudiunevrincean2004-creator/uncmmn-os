@@ -351,6 +351,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                   <th onClick={isAdmin ? () => setOptsField({ field: 'ad_format', title: 'Format' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Format{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <th onClick={isAdmin ? () => setOptsField({ field: 'ad_angle', title: 'Angle' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Angle{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <th>Assigned To</th>
+                  <th>Source Video</th>
                   <th>Final</th>
                   <th>Iterate</th>
                   <th onClick={isAdmin ? () => setOptsField({ field: 'ad_status', title: 'Status' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Status{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
@@ -369,6 +370,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                       <td><EditPillSelect field="ad_format" value={a.ad_format || ''} options={formatValues} colors={formatColors} onChange={f => patch(a.id, { ad_format: f })} onAddOption={addOption} allowAdd={isAdmin} allowEmpty /></td>
                       <td><EditPillSelect field="ad_angle" value={a.angle || ''} options={angleOpts} colors={angleColors} onChange={x => patch(a.id, { angle: x })} onAddOption={addOption} allowAdd={isAdmin} allowEmpty /></td>
                       <td><UserPicker value={a.assigned_to} profiles={profiles} onChange={uid => patch(a.id, { assigned_to: uid })} /></td>
+                      <td><UrlCell value={a.source_video_url} onCommit={u => patch(a.id, { source_video_url: u })} /></td>
                       <td><UrlCell value={a.final_link} onCommit={u => patch(a.id, { final_link: u })} /></td>
                       <td>
                         <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px', color: 'var(--accent)' }} onClick={() => handleIterate(a)} title="Trigger iteration">↻ Iterate</button>
