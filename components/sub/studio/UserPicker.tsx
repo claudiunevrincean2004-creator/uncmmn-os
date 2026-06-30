@@ -37,18 +37,6 @@ function mentionFor(name: string, id: string | null | undefined): string {
   return sid ? `<@${sid}>` : `@${n} (Slack ID not set)`;
 }
 
-// Combined @-mentions for every profile holding one of the given pipeline roles
-// (used for the fixed-target review/test pings). Resolves the CURRENT display_name
-// live and builds <@ID> when slack_user_id is set, else the "(Slack ID not set)"
-// fallback. Returns '' when no profile holds any of the roles → caller posts a
-// "no reviewer/tester set" warning instead of silently dropping the mention.
-export function slackMentionsByPipelineRole(profiles: Profile[], roles: string[]): string {
-  return profiles
-    .filter(p => p.pipeline_role && roles.includes(p.pipeline_role))
-    .map(p => mentionFor(profileName(p), p.slack_user_id))
-    .join(' ');
-}
-
 // Mention for a row's assigned_to (a profile id or legacy text). Resolves to a
 // profile by Display Name the same way the UI does, then reads its slack_user_id.
 // Returns '' when assigned_to is empty / unmatched → caller treats as unassigned.
@@ -59,16 +47,13 @@ export function slackMentionByAssignee(assignedTo: string | undefined | null, pr
   return mentionFor(name, p?.slack_user_id);
 }
 
-// Bundle of the @-mentions a pipeline ping needs: the assigned editor plus the
-// role-based fixed targets (reviewers / testers). Resolved entirely client-side
-// from the already-loaded profiles (slack_user_id + pipeline_role live there).
+// The assigned-editor @-mention for a pipeline ping, resolved client-side from
+// the row's assigned_to_user_id → profile → slack_user_id. Fixed-seat people
+// (Claudiu/Colin/Nathan) are no longer resolved here — the notify routes mention
+// them directly from TEAM_SLACK_IDS.
 export function buildPipelineMentions(assignedTo: string | undefined | null, profiles: Profile[]) {
   return {
     editorMention: slackMentionByAssignee(assignedTo, profiles),
-    reviewerMention: slackMentionsByPipelineRole(profiles, ['reviewer']),
-    testerMention: slackMentionsByPipelineRole(profiles, ['tester']),
-    // Combined review gate: everyone who reviews or tests.
-    reviewTeamMention: slackMentionsByPipelineRole(profiles, ['reviewer', 'tester']),
   };
 }
 

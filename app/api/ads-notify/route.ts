@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { TEAM_SLACK_IDS, mention } from '@/lib/team-slack';
 
 // Server-side only: posts to the #ad-creative-pipeline Slack webhook when an Ad
 // Creative transitions into (or is created at) one of the pipeline statuses. The
@@ -26,8 +27,6 @@ export async function POST(request: Request) {
   let sourceLink = '';
   let finalLink = '';
   let editorMention = '';
-  let reviewTeamMention = '';
-  let testerMention = '';
   try {
     const b = await request.json();
     status = str(b?.status);
@@ -35,8 +34,6 @@ export async function POST(request: Request) {
     sourceLink = str(b?.sourceLink);
     finalLink = str(b?.finalLink);
     editorMention = str(b?.editorMention);
-    reviewTeamMention = str(b?.reviewTeamMention);
-    testerMention = str(b?.testerMention);
   } catch {
     // ignore malformed body; the guard below handles the empty status
   }
@@ -68,7 +65,7 @@ export async function POST(request: Request) {
       // Single combined review gate — ping both reviewers in one message. The
       // link is the Ad Creative's OWN Final cut; omit the line when it's empty.
       blocks = [
-        `🟡 New ad creative ready for review, ${reviewTeamMention || '⚠️ no reviewer/tester set — assign a pipeline role in Manage all users'}!`,
+        `🟡 New ad creative ready for review, ${mention(TEAM_SLACK_IDS.claudiu)} ${mention(TEAM_SLACK_IDS.colin)}!`,
         openLine,
         block([finalLink ? `Take a peek: ${finalLink}` : null]),
       ];
@@ -85,7 +82,7 @@ export async function POST(request: Request) {
       break;
     case 'Ready to Test':
       blocks = [
-        `🟢 Ad creative approved, ready to test — ${testerMention || '⚠️ no tester set — assign a pipeline role in Manage all users'}!`,
+        `🟢 Ad creative approved, ready to test — ${mention(TEAM_SLACK_IDS.colin)}!`,
         openLine,
         block([finalLink ? `Find the final product here: ${finalLink}` : null]),
       ];

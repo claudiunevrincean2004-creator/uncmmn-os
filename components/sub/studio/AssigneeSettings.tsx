@@ -21,7 +21,6 @@ export default function AssigneeSettings({
   const [editName, setEditName] = useState('');
   const [editTitle, setEditTitle] = useState('');
   const [editSlack, setEditSlack] = useState('');
-  const [editRole, setEditRole] = useState('');
   useDismiss(null, onClose, { outside: false });
 
   const sorted = [...profiles].sort((a, b) => profileName(a).localeCompare(profileName(b)));
@@ -30,7 +29,6 @@ export default function AssigneeSettings({
     setEditName(p.display_name ?? '');
     setEditTitle(p.job_title ?? '');
     setEditSlack(p.slack_user_id ?? '');
-    setEditRole(p.pipeline_role ?? '');
     setEditingId(p.id);
   }
 
@@ -44,7 +42,7 @@ export default function AssigneeSettings({
     // Admins may update any profile (profiles_admin_update policy).
     const { error } = await supabase
       .from('profiles')
-      .update({ display_name: editName.trim() || null, job_title: editTitle.trim() || null, slack_user_id: editSlack.trim() || null, pipeline_role: editRole || null })
+      .update({ display_name: editName.trim() || null, job_title: editTitle.trim() || null, slack_user_id: editSlack.trim() || null })
       .eq('id', p.id);
     setBusy(null);
     if (error) {
@@ -126,20 +124,6 @@ export default function AssigneeSettings({
                           onKeyDown={e => { if (e.key === 'Enter') saveEdit(p); else if (e.key === 'Escape') cancelEdit(); }}
                         />
                       </div>
-                      <div>
-                        <div style={labelStyle}>Pipeline role</div>
-                        <select
-                          className="form-input"
-                          value={editRole}
-                          onChange={e => setEditRole(e.target.value)}
-                          style={{ width: '100%', fontSize: 12, marginTop: 3 }}
-                        >
-                          <option value="">None</option>
-                          <option value="reviewer">Reviewer</option>
-                          <option value="tester">Tester</option>
-                        </select>
-                        <div style={{ fontSize: 10, color: 'var(--text-faint)', marginTop: 3 }}>Routes the In Review / Ready for Review / Ready to Test Slack pings.</div>
-                      </div>
                       {p.email && <div style={{ fontSize: 11, color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.email}</div>}
                     </>
                   ) : (
@@ -148,7 +132,6 @@ export default function AssigneeSettings({
                       {p.job_title && <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{p.job_title}</div>}
                       {p.email && <div style={{ fontSize: 11, color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.email}</div>}
                       <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>Slack ID: {p.slack_user_id?.trim() || <span style={{ color: 'var(--text-faint)' }}>not set</span>}</div>
-                      {p.pipeline_role && <div style={{ fontSize: 10, color: '#8b5cf6', textTransform: 'capitalize', fontWeight: 600 }}>{p.pipeline_role}</div>}
                       {p.role && <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{p.role}</div>}
                     </>
                   )}

@@ -158,7 +158,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   // the Slack webhook URL. @-mentions are resolved here from user profiles
   // (slack_user_id) and passed in pre-built. Skips silently if the webhook is
   // unset. Never blocks the UI or throws.
-  function notifyAdPipeline(payload: { status: string; creativeId: string; itemUrl: string; sourceLink: string; finalLink: string; editorMention: string; reviewerMention: string; testerMention: string; reviewTeamMention: string }) {
+  function notifyAdPipeline(payload: { status: string; creativeId: string; itemUrl: string; sourceLink: string; finalLink: string; editorMention: string }) {
     fetch('/api/ads-notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { TEAM_SLACK_IDS, mention } from '@/lib/team-slack';
 
 // Server-side only: posts to the #main-ig-updates Slack webhook when a Video
 // Review row transitions into one of the notify statuses. The webhook URL is read
@@ -26,7 +27,6 @@ export async function POST(request: Request) {
   let rawFilesLink = '';
   let finalLink = '';
   let editorMention = '';
-  let reviewerMention = '';
   try {
     const b = await request.json();
     status = str(b?.status);
@@ -35,7 +35,6 @@ export async function POST(request: Request) {
     rawFilesLink = str(b?.rawFilesLink);
     finalLink = str(b?.finalLink);
     editorMention = str(b?.editorMention);
-    reviewerMention = str(b?.reviewerMention);
   } catch {
     // ignore malformed body; the guard below handles the empty status
   }
@@ -68,7 +67,7 @@ export async function POST(request: Request) {
       break;
     case 'In Review':
       blocks = [
-        `🟣 New video ready for review, ${reviewerMention || '⚠️ no reviewer set — assign a pipeline role in Manage all users'}!`,
+        `🟣 New video ready for review, ${mention(TEAM_SLACK_IDS.claudiu)}!`,
         openLine,
         block([finalLink ? `Take a peek: ${finalLink}` : null]),
       ];

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { TEAM_SLACK_IDS, mention } from '@/lib/team-slack';
 
 // Server-side only: posts to a Slack incoming webhook when a Story Sequence
 // transitions into one of the notify statuses. The webhook URL is read from
@@ -6,16 +7,17 @@ import { NextResponse } from 'next/server';
 // browser bundle.
 
 // Opener line per status. "Approved" / "Revision Requested" weave in the
-// sequence name; "Ready for Review" is a fixed line. Plain names, no @-mentions.
+// sequence name; "Ready for Review" is a fixed line. Fixed-seat people are real
+// <@ID> mentions from TEAM_SLACK_IDS.
 function opener(status: string, name: string): string | null {
   const n = name || 'this sequence';
   switch (status) {
     case 'Ready for Review':
-      return '🎬 Nathan, a new story sequence is begging for your attention!';
+      return `🎬 ${mention(TEAM_SLACK_IDS.nathan)}, a new story sequence is begging for your attention!`;
     case 'Approved':
-      return `🟢 Green light for ${n}, Claudiu!`;
+      return `🟢 Green light for ${n}, ${mention(TEAM_SLACK_IDS.claudiu)}!`;
     case 'Revision Requested':
-      return `🔧 Not quite there yet! Nathan wants tweaks on ${n}, Claudiu.`;
+      return `🔧 Not quite there yet! Nathan wants tweaks on ${n}, ${mention(TEAM_SLACK_IDS.claudiu)}.`;
     default:
       // Unknown status → no message (the client only ever sends the three above,
       // but guard so a stray call can't post a malformed notification).

@@ -1,14 +1,16 @@
 import { NextResponse } from 'next/server';
+import { TEAM_SLACK_IDS, mention } from '@/lib/team-slack';
 
 // Server-side only: posts to a Slack incoming webhook when a Filming Session is
 // marked "Filmed". The webhook URL is read from SLACK_FILMING_WEBHOOK_URL (no
 // NEXT_PUBLIC_ prefix) so it never reaches the browser bundle.
 
-// Random opener — one of these is picked at random on each notification.
+// Random opener — one of these is picked at random on each notification. Claudiu
+// is a real <@ID> ping from TEAM_SLACK_IDS; "Nathan" stays as descriptive wording.
 const OPENERS = [
-  "Nathan's been cooking, Claudiu! 🔥",
-  'Nathan cooked again, Claudiu! 👨‍🍳',
-  "Nathan's at it again, Claudiu! 🎬",
+  `Nathan's been cooking, ${mention(TEAM_SLACK_IDS.claudiu)}! 🔥`,
+  `Nathan cooked again, ${mention(TEAM_SLACK_IDS.claudiu)}! 👨‍🍳`,
+  `Nathan's at it again, ${mention(TEAM_SLACK_IDS.claudiu)}! 🎬`,
 ];
 
 function randomOpener(): string {
