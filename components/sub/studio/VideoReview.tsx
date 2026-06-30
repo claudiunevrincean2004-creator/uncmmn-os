@@ -113,7 +113,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
 
   // Fire-and-forget POST to the Ad Creative pipeline notify (server holds the
   // Slack webhook URL, skips silently if unset). Never blocks the UI or throws.
-  function notifyAdPipeline(payload: { status: string; creativeId: string; sourceLink: string; buyerFeedback: string; editorMention: string; claudiuMention: string; colinMention: string }) {
+  function notifyAdPipeline(payload: { status: string; creativeId: string; sourceLink: string; finalLink: string; editorMention: string; claudiuMention: string; colinMention: string }) {
     fetch('/api/ads-notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -147,7 +147,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
       alert(`Couldn't create ad creative: ${error.message}`);
       return;
     }
-    notifyAdPipeline({ status: 'Ad Creative Needed', creativeId, sourceLink, buyerFeedback: '', ...mentions });
+    notifyAdPipeline({ status: 'Ad Creative Needed', creativeId, sourceLink, finalLink: '', ...mentions });
     showToast(`Ad creative created for ${creativeId} → assigned to ${editorName || 'unassigned'}`);
     onReload();
   }

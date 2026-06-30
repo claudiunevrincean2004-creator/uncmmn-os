@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   let status = '';
   let creativeId = '';
   let sourceLink = '';
-  let buyerFeedback = '';
+  let finalLink = '';
   let editorMention = '';
   let claudiuMention = '';
   let colinMention = '';
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     status = str(b?.status);
     creativeId = str(b?.creativeId);
     sourceLink = str(b?.sourceLink);
-    buyerFeedback = str(b?.buyerFeedback);
+    finalLink = str(b?.finalLink);
     editorMention = str(b?.editorMention);
     claudiuMention = str(b?.claudiuMention);
     colinMention = str(b?.colinMention);
@@ -45,26 +45,43 @@ export async function POST(request: Request) {
   if (!NOTIFY.has(status)) return NextResponse.json({ skipped: true });
 
   const id = creativeId || 'this creative';
-  let text = '';
+  // Each message is a list of blocks separated by a blank line; null blocks
+  // (e.g. an absent Final link) drop out before joining.
+  let blocks: (string | null)[] = [];
   switch (status) {
     case 'Ad Creative Needed':
-      text = editorMention
-        ? `🎬 New ad creative needed — *${id}*, assigned to ${editorMention}.${sourceLink ? ` ${sourceLink}` : ''}`
-        : `🎬 New ad creative needed — *${id}*, ⚠️ unassigned — set an editor.${sourceLink ? ` ${sourceLink}` : ''}`;
+      blocks = [
+        `🎬 New ad creative needed — *${id}*.`,
+        editorMention ? `Assigned to ${editorMention}.` : '⚠️ Unassigned — set an editor.',
+        `Source link: ${sourceLink}`,
+      ];
       break;
     case 'Ready for Review':
-      // Single combined review gate — ping both reviewers in one message.
-      text = `${`${claudiuMention} ${colinMention}`.trim()} 👀 *${id}* is ready for review — take a look.`.trim();
+      // Single combined review gate — ping both reviewers in one message. The
+      // link is the Ad Creative's OWN Final cut; omit the line when it's empty.
+      blocks = [
+        `👀 ${`${claudiuMention} ${colinMention}`.trim()} *${id}* is ready for review!`,
+        finalLink ? `Take a peek: ${finalLink}` : null,
+      ];
       break;
     case 'Revisions Needed':
-      text = `🔁 Revisions needed on *${id}* — back to ${editorMention || '⚠️ an editor (unassigned)'}.${buyerFeedback ? ` ${buyerFeedback}` : ''}`;
+      blocks = [
+        `🔁 Revisions needed on *${id}*, ${editorMention || '⚠️ an editor (unassigned)'}.`,
+        'Check comments for the revisions.',
+        finalLink ? `Find the final product here: ${finalLink}` : null,
+      ];
       break;
     case 'Ready to Test':
-      text = `${colinMention} 🚀 *${id}* approved — ready to test, over to you.`.trim();
+      blocks = [
+        `🚀 *${id}* approved! Ready to test, over to you, ${colinMention}.`,
+        finalLink ? `Find the final product here: ${finalLink}` : null,
+      ];
       break;
     default:
       return NextResponse.json({ skipped: true });
   }
+
+  const text = blocks.filter((b): b is string => b !== null).join('\n\n');
 
   try {
     await fetch(webhookUrl, {

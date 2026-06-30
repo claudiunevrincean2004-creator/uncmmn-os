@@ -130,7 +130,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
         status: becoming,
         creativeId: prev?.creative_id ?? '',
         sourceLink: (p.source_video_url ?? prev?.source_video_url) ?? '',
-        buyerFeedback: (p.buyer_feedback ?? prev?.buyer_feedback) ?? '',
+        finalLink: (p.final_link ?? prev?.final_link) ?? '',
         ...buildPipelineMentions((p.assigned_to ?? prev?.assigned_to) ?? null, profiles),
       });
     }
@@ -147,7 +147,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   // the Slack webhook URL. @-mentions are resolved here from user profiles
   // (slack_user_id) and passed in pre-built. Skips silently if the webhook is
   // unset. Never blocks the UI or throws.
-  function notifyAdPipeline(payload: { status: string; creativeId: string; sourceLink: string; buyerFeedback: string; editorMention: string; claudiuMention: string; colinMention: string }) {
+  function notifyAdPipeline(payload: { status: string; creativeId: string; sourceLink: string; finalLink: string; editorMention: string; claudiuMention: string; colinMention: string }) {
     fetch('/api/ads-notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -182,7 +182,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
         status,
         creativeId: row.creative_id,
         sourceLink: '',
-        buyerFeedback: '',
+        finalLink: row.final_link ?? '',
         ...buildPipelineMentions(row.assigned_to, profiles),
       });
     }
