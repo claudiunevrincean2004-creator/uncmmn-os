@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Role, canAccess } from '@/lib/auth-config';
 import { checkSchema, getMigrationSQL } from '@/lib/setup-db';
-import { Client, Post, DriveFolder, SubscriberSnapshot, ResearchItem, StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile, MainPage } from '@/lib/types';
+import { Client, Post, DriveFolder, SubscriberSnapshot, ResearchItem, StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile, ClipperAccount, ClipperContent, MainPage } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 
 import Sidebar from '@/components/Sidebar';
@@ -16,6 +16,7 @@ import StudioTab from '@/components/sub/StudioTab';
 import DisplayNamePrompt from '@/components/DisplayNamePrompt';
 import AccountPanel from '@/components/AccountPanel';
 import AssigneeSettings from '@/components/sub/studio/AssigneeSettings';
+import ClippersTab from '@/components/sub/ClippersTab';
 import { profileName } from '@/lib/profile-name';
 
 async function safeSelect(table: string, orderCol: string, ascending = true) {
@@ -34,6 +35,7 @@ const PAGE_LABELS: Record<MainPage, string> = {
   research: 'Research',
   drive: 'Assets',
   studio: 'Studio',
+  clippers: 'Clippers',
 };
 
 const PAGE_SUBTITLES: Record<MainPage, string> = {
@@ -42,6 +44,7 @@ const PAGE_SUBTITLES: Record<MainPage, string> = {
   research: 'Ideas & references',
   drive: 'Files & folders',
   studio: 'Review & production',
+  clippers: 'Distribution team',
 };
 
 export default function Home() {
@@ -61,6 +64,8 @@ export default function Home() {
   const [customProperties, setCustomProperties] = useState<CustomProperty[]>([]);
   const [customPropOptions, setCustomPropOptions] = useState<CustomPropertyOption[]>([]);
   const [studioProfiles, setStudioProfiles] = useState<Profile[]>([]);
+  const [clipperAccounts, setClipperAccounts] = useState<ClipperAccount[]>([]);
+  const [clipperContent, setClipperContent] = useState<ClipperContent[]>([]);
   const [loading, setLoading] = useState(true);
   const [schemaMissing, setSchemaMissing] = useState<{ missing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[]; adColumnsMissing: string[]; sessionColumnsMissing: string[]; dropdownColsMissing: boolean } | null>(null);
   const [showMigrationSQL, setShowMigrationSQL] = useState(false);
@@ -124,7 +129,9 @@ export default function Home() {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
       if (cancelled) return;
       setCurrentUserId(user.id);
-      setRole(profile?.role === 'admin' ? 'admin' : 'editor');
+      // Recognize the new 'clipper' tier; anything else stays exactly as before
+      // (admin → admin, all others → editor). Admin/editor behavior unchanged.
+      setRole(profile?.role === 'admin' ? 'admin' : profile?.role === 'clipper' ? 'clipper' : 'editor');
     })();
     return () => { cancelled = true; };
   }, [router]);
@@ -154,7 +161,7 @@ export default function Home() {
 
   // Migrate stale persisted page values from prior builds
   useEffect(() => {
-    if (!(['dashboard', 'content', 'research', 'drive', 'studio'] as const).includes(mainPage)) {
+    if (!(['dashboard', 'content', 'research', 'drive', 'studio', 'clippers'] as const).includes(mainPage)) {
       setMainPage('dashboard');
     }
   }, [mainPage, setMainPage]);
@@ -177,6 +184,11 @@ export default function Home() {
       safeSelect('custom_properties', 'position'),
       safeSelect('custom_property_options', 'position'),
       safeSelect('profiles', 'created_at'),
+    ]);
+
+    const [ca, cc] = await Promise.all([
+      safeSelect('clipper_accounts', 'created_at'),
+      safeSelect('clipper_content', 'created_at', false),
     ]);
 
     let active = (c as Client[])[0] || null;
@@ -206,6 +218,8 @@ export default function Home() {
     setCustomProperties(cp as CustomProperty[]);
     setCustomPropOptions(co as CustomPropertyOption[]);
     setStudioProfiles(pr as Profile[]);
+    setClipperAccounts(ca as ClipperAccount[]);
+    setClipperContent(cc as ClipperContent[]);
     setLoading(false);
   }, []);
 
@@ -233,6 +247,23 @@ export default function Home() {
   // prompt). Null until both the auth id and profiles have loaded.
   const currentProfile = currentUserId ? studioProfiles.find(p => p.id === currentUserId) ?? null : null;
   const currentName = currentProfile ? profileName(currentProfile) : (userEmail ?? 'Account');
+
+  // Clipper tier (Phase 1): the clipper-facing portal ships in Phase 2. For now a
+  // clipper sees NO admin surface at all — no sidebar, no tabs — just a minimal
+  // placeholder with sign-out. This guarantees clippers can't reach Studio, the
+  // content pipeline, Manage all users, or the Clippers management tab.
+  if (role === 'clipper') {
+    return (
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+        <div style={{ textAlign: 'center', maxWidth: 360, padding: 24 }}>
+          <div className="font-head" style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px', marginBottom: 8 }}>UNCMMN OS</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>Your clipper portal is coming soon ✂</div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 20 }}>You&apos;re all set up{currentProfile ? `, ${currentName}` : ''}. Hang tight — your dashboard is on the way.</div>
+          <button className="btn-ghost" style={{ fontSize: 12, padding: '8px 16px' }} onClick={signOut}>Sign out</button>
+        </div>
+      </div>
+    );
+  }
   // First-login: prompt until the user has actually set a display name.
   const needsDisplayName = !!currentProfile && !(currentProfile.display_name && currentProfile.display_name.trim());
 
@@ -389,6 +420,16 @@ export default function Home() {
               />
             </div>
           )}
+          {client && mainPage === 'clippers' && role === 'admin' && (
+            <div style={{ padding: '16px 24px' }}>
+              <ClippersTab
+                profiles={studioProfiles}
+                accounts={clipperAccounts}
+                content={clipperContent}
+                onReload={loadData}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -410,7 +451,7 @@ export default function Home() {
       {/* Admin: manage every user's display name + assignable (relocated here
           from the old Video Review "Users" button) */}
       {adminUsersOpen && role === 'admin' && (
-        <AssigneeSettings profiles={studioProfiles} currentUserId={currentUserId} onClose={() => setAdminUsersOpen(false)} onReload={loadData} />
+        <AssigneeSettings profiles={studioProfiles} clipperAccounts={clipperAccounts} currentUserId={currentUserId} onClose={() => setAdminUsersOpen(false)} onReload={loadData} />
       )}
     </div>
   );

@@ -16,6 +16,7 @@ const NAV: NavItem[] = [
   { key: 'research', label: 'Research', icon: '✦' },
   { key: 'studio', label: 'Studio', icon: '◈' },
   { key: 'drive', label: 'Assets', icon: '▤' },
+  { key: 'clippers', label: 'Clippers', icon: '✂' },
 ];
 
 interface Props {

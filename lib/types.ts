@@ -51,7 +51,7 @@ export interface RevenueEntry {
   created_at?: string;
 }
 
-export type MainPage = 'dashboard' | 'content' | 'research' | 'drive' | 'studio';
+export type MainPage = 'dashboard' | 'content' | 'research' | 'drive' | 'studio' | 'clippers';
 
 export interface StudioVideo {
   id: string;
@@ -142,6 +142,36 @@ export interface Profile {
   display_name?: string | null;
   job_title?: string | null;
   slack_user_id?: string | null;
+  // Clipper tier (role='clipper'). Unused/ignored for admin & editor.
+  clipper_status?: string | null; // 'active' | 'inactive'
+  joined_at?: string | null;
+  created_at?: string;
+}
+
+// A social account a clipper runs (Clippers tab, admin-managed).
+export interface ClipperAccount {
+  id: string;
+  clipper_id: string;
+  platform?: string; // 'tiktok' | 'instagram' | 'youtube'
+  handle?: string;
+  account_url?: string;
+  status?: string; // 'active' | 'inactive'
+  created_at?: string;
+}
+
+// A single piece of content a clipper posted. The views/likes/posted_at/
+// platform_post_id fields are automation-ready (filled by platform APIs later).
+export interface ClipperContent {
+  id: string;
+  clipper_id: string;
+  account_id?: string | null;
+  platform?: string;
+  content_url?: string;
+  title?: string;
+  views?: number;
+  likes?: number;
+  posted_at?: string | null;
+  platform_post_id?: string | null;
   created_at?: string;
 }
 

@@ -35,7 +35,7 @@ export default function LoginPage() {
       .select('role')
       .eq('id', data.user.id)
       .single();
-    const role: Role = profile?.role === 'admin' ? 'admin' : 'editor';
+    const role: Role = profile?.role === 'admin' ? 'admin' : profile?.role === 'clipper' ? 'clipper' : 'editor';
     try {
       localStorage.setItem('main_page', JSON.stringify(LANDING_PAGE[role]));
     } catch {}
