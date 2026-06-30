@@ -76,23 +76,13 @@ export default function ClippersTab({ profiles, accounts, content, onReload }: P
   // ── Stat cards (grid view — unchanged) ───────────────────────────────────
   const stats = (() => {
     const activeClippers = clippers.filter(c => isActive(c.clipper_status)).length;
-    const activeAccounts = accounts.filter(a => isActive(a.status));
-    const perPlatform = (p: string) => activeAccounts.filter(a => (a.platform || '').toLowerCase() === p).length;
-    return {
-      activeClippers,
-      activeAccounts: activeAccounts.length,
-      tiktok: perPlatform('tiktok'),
-      instagram: perPlatform('instagram'),
-      youtube: perPlatform('youtube'),
-    };
+    const activeAccounts = accounts.filter(a => isActive(a.status)).length;
+    return { activeClippers, activeAccounts };
   })();
 
   const cards: { label: string; value: number; color?: string }[] = [
     { label: 'Active Clippers', value: stats.activeClippers, color: '#8b5cf6' },
     { label: 'Total Active Accounts', value: stats.activeAccounts, color: 'var(--text)' },
-    { label: 'TikTok Accounts', value: stats.tiktok, color: 'var(--text)' },
-    { label: 'Instagram Accounts', value: stats.instagram, color: 'var(--text)' },
-    { label: 'YouTube Accounts', value: stats.youtube, color: 'var(--text)' },
   ];
 
   const filtered = (() => {
@@ -141,8 +131,6 @@ export default function ClippersTab({ profiles, accounts, content, onReload }: P
             const posts = contentByClipper[c.id] || [];
             const contentCount = posts.length;
             const totalViews = posts.reduce((s, p) => s + (p.views || 0), 0);
-            const totalLikes = posts.reduce((s, p) => s + (p.likes || 0), 0);
-            const avgEr = totalViews ? (totalLikes / totalViews) * 100 : 0;
             const active = isActive(c.clipper_status);
             return (
               <button
@@ -161,11 +149,10 @@ export default function ClippersTab({ profiles, accounts, content, onReload }: P
                     {active ? 'Active' : 'Inactive'}
                   </span>
                 </div>
-                {/* Quick performance triage — replaces the platform-logos row. */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, borderTop: '0.5px solid var(--border)', paddingTop: 10 }}>
+                {/* Quick all-time triage — replaces the platform-logos row. */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, borderTop: '0.5px solid var(--border)', paddingTop: 10 }}>
                   {[
                     { l: 'Views', v: fn(totalViews) },
-                    { l: 'Eng', v: `${avgEr.toFixed(1)}%` },
                     { l: 'Accts', v: String(accs.length) },
                     { l: 'Posts', v: String(contentCount) },
                   ].map(s => (
@@ -206,14 +193,18 @@ function ClipperDashboard({ clipper, accounts, content, onBack, onReload }: {
   const matchesPlatform = (c: ClipperContent, choice: PlatformChoice) =>
     choice === 'All' ? true : (c.platform || '').toLowerCase() === choice.toLowerCase();
   const contentDateKey = (c: ClipperContent) => (c.posted_at ? c.posted_at.slice(0, 10) : '');
+  // Undated posts (manually logged without a posted date) can't be date-excluded,
+  // so they always count — matching the grid card's all-content total. Dated posts
+  // are filtered to the selected range.
   const inRange = (c: ClipperContent) => {
     const k = contentDateKey(c);
-    if (!k) return false;
+    if (!k) return true;
     const d = new Date(k + 'T00:00:00');
     return d >= start && d <= today;
   };
 
-  // Scoped to platform + date range for the stats/chart/outliers.
+  // Scoped to platform + date range for the stats/chart/outliers. Platform 'All'
+  // includes posts with a null/missing platform.
   const scoped = useMemo(
     () => content.filter(c => matchesPlatform(c, platform) && inRange(c)),
     [content, platform, period]
@@ -288,7 +279,6 @@ function ClipperDashboard({ clipper, accounts, content, onBack, onReload }: {
       {/* Top bar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         <button className="btn-ghost" style={{ fontSize: 12, padding: '6px 12px' }} onClick={onBack}>← Clippers</button>
-        <div className="font-head" style={{ fontSize: 18, fontWeight: 700 }}>{profileName(clipper)}</div>
         <div style={{ display: 'flex', gap: 4 }}>
           {PLATFORM_CHOICES.map(p => (
             <button key={p} className={`subtab${platform === p ? ' active' : ''}`} onClick={() => setPlatform(p)} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
