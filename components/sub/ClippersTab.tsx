@@ -189,6 +189,7 @@ function ClipperDashboard({ clipper, accounts, content, onBack, onReload }: {
   const [sortKey, setSortKey] = useState<'date' | 'views'>('date');
   const [tablePlatform, setTablePlatform] = useState<PlatformChoice>('All');
   const [editing, setEditing] = useState<ClipperContent | null | undefined>(undefined); // undefined=closed, null=new
+  const [editingAccount, setEditingAccount] = useState<ClipperAccount | null | undefined>(undefined); // undefined=closed, null=new
 
   const days = PERIOD_DAYS[period];
   const today = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
@@ -254,16 +255,6 @@ function ClipperDashboard({ clipper, accounts, content, onBack, onReload }: {
   const active = isActive(clipper.clipper_status);
 
   // ── CRUD ──
-  async function addAccount() {
-    const { error } = await supabase.from('clipper_accounts').insert([{ clipper_id: clipper.id, platform: 'tiktok', status: 'active' }]);
-    if (error) { alert(`Couldn't add account: ${error.message}`); return; }
-    onReload();
-  }
-  async function patchAccount(id: string, p: Partial<ClipperAccount>) {
-    const { error } = await supabase.from('clipper_accounts').update(p).eq('id', id);
-    if (error) { alert(`Couldn't save account: ${error.message}`); return; }
-    onReload();
-  }
   async function removeAccount(id: string) {
     if (!confirm('Remove this account?')) return;
     const { error } = await supabase.from('clipper_accounts').delete().eq('id', id);
@@ -385,7 +376,7 @@ function ClipperDashboard({ clipper, accounts, content, onBack, onReload }: {
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                           <PlatformIcon platform={c.platform || ''} size={14} />
-                          <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{c.platform || '—'}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{c.platform ? capPlatform(c.platform) : '—'}</span>
                         </div>
                       </td>
                       <td style={{ color: 'var(--text-faint)', fontSize: 11 }}>{c.posted_at ? c.posted_at.slice(0, 10) : '—'}</td>
@@ -433,32 +424,29 @@ function ClipperDashboard({ clipper, accounts, content, onBack, onReload }: {
           <div style={{ borderTop: '0.5px solid var(--border)', paddingTop: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
               <div style={{ fontSize: 11, color: 'var(--text-faint)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Accounts {accounts.length > 0 && <span>· {accounts.length}</span>}</div>
-              <button className="btn-ghost" style={{ fontSize: 11, padding: '3px 8px', color: 'var(--accent)' }} onClick={addAccount}>+ Add</button>
+              <button className="btn-ghost" style={{ fontSize: 11, padding: '3px 8px', color: 'var(--accent)' }} onClick={() => setEditingAccount(null)}>+ Add</button>
             </div>
             {accounts.length === 0 ? (
               <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>No accounts yet.</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {accounts.map(a => (
-                  <div key={a.id} style={{ border: '0.5px solid var(--border)', borderRadius: 10, background: 'var(--surface-2)', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <PlatformIcon platform={a.platform || ''} size={18} />
-                      <select className="form-input" defaultValue={a.platform || 'tiktok'} onChange={e => patchAccount(a.id, { platform: e.target.value })} style={{ width: 110, fontSize: 11, padding: '3px 6px' }}>
-                        {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
-                      </select>
-                      <select className="form-input" defaultValue={isActive(a.status) ? 'active' : 'inactive'} onChange={e => patchAccount(a.id, { status: e.target.value })} style={{ width: 88, fontSize: 11, padding: '3px 6px', marginLeft: 'auto' }}>
-                        <option value="active">active</option>
-                        <option value="inactive">inactive</option>
-                      </select>
-                      <button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => removeAccount(a.id)}>✕</button>
+                {accounts.map(a => {
+                  const aActive = isActive(a.status);
+                  return (
+                    <div key={a.id} style={{ border: '0.5px solid var(--border)', borderRadius: 10, background: 'var(--surface-2)', padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <PlatformIcon platform={a.platform || ''} size={20} />
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {capPlatform(a.platform)} {a.handle && <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>· {a.handle}</span>}
+                        </div>
+                        {a.account_url && <a href={a.account_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, color: 'var(--accent)', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{a.account_url} ↗</a>}
+                      </div>
+                      <span className="badge" style={{ fontSize: 9, flexShrink: 0, ...(aActive ? { background: 'rgba(16,185,129,0.15)', color: '#10b981' } : { background: 'rgba(107,114,128,0.18)', color: 'var(--text-faint)' }) }}>{aActive ? 'Active' : 'Inactive'}</span>
+                      <button className="btn-ghost" style={{ fontSize: 10, padding: '2px 8px', flexShrink: 0 }} onClick={() => setEditingAccount(a)}>Edit</button>
+                      <button className="btn-danger" style={{ padding: '2px 6px', flexShrink: 0 }} onClick={() => removeAccount(a.id)}>✕</button>
                     </div>
-                    <input className="form-input" defaultValue={a.handle || ''} placeholder="@handle" onBlur={e => { const v = e.target.value.trim(); if (v !== (a.handle || '')) patchAccount(a.id, { handle: v || undefined }); }} style={{ width: '100%', fontSize: 11, padding: '3px 6px' }} />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <input className="form-input" defaultValue={a.account_url || ''} placeholder="https://…" onBlur={e => { const v = e.target.value.trim(); if (v !== (a.account_url || '')) patchAccount(a.id, { account_url: v || undefined }); }} style={{ flex: 1, fontSize: 11, padding: '3px 6px' }} />
-                      {a.account_url && <a href={a.account_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontSize: 13 }} title="Open">↗</a>}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -474,6 +462,79 @@ function ClipperDashboard({ clipper, accounts, content, onBack, onReload }: {
           onSaved={() => { setEditing(undefined); onReload(); }}
         />
       )}
+      {editingAccount !== undefined && (
+        <AccountEditor
+          clipperId={clipper.id}
+          row={editingAccount}
+          onClose={() => setEditingAccount(undefined)}
+          onSaved={() => { setEditingAccount(undefined); onReload(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Add / edit a single clipper_account row (submit-then-edit, modal) ─────────
+function AccountEditor({ clipperId, row, onClose, onSaved }: {
+  clipperId: string;
+  row: ClipperAccount | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [platform, setPlatform] = useState(row?.platform ?? 'tiktok');
+  const [handle, setHandle] = useState(row?.handle ?? '');
+  const [accountUrl, setAccountUrl] = useState(row?.account_url ?? '');
+  const [status, setStatus] = useState(isActive(row?.status) ? 'active' : 'inactive');
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    if (saving) return;
+    setSaving(true);
+    const payload = {
+      clipper_id: clipperId,
+      platform,
+      handle: handle.trim() || null,
+      account_url: accountUrl.trim() || null,
+      status,
+    };
+    const res = row
+      ? await supabase.from('clipper_accounts').update(payload).eq('id', row.id)
+      : await supabase.from('clipper_accounts').insert([payload]);
+    setSaving(false);
+    if (res.error) { alert(`Couldn't save account: ${res.error.message}`); return; }
+    onSaved();
+  }
+
+  const field: React.CSSProperties = { display: 'grid', gridTemplateColumns: '110px 1fr', gap: 10, alignItems: 'center' };
+  const lbl: React.CSSProperties = { fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" style={{ width: 420 }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div className="font-head" style={{ fontSize: 17, fontWeight: 700 }}>{row ? 'Edit Account' : 'New Account'}</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>✕</button>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={field}><div style={lbl}>Platform</div>
+            <select className="form-input" value={platform} onChange={e => setPlatform(e.target.value)} style={{ fontSize: 12 }}>
+              {PLATFORMS.map(p => <option key={p} value={p}>{capPlatform(p)}</option>)}
+            </select>
+          </div>
+          <div style={field}><div style={lbl}>Handle</div><input className="form-input" value={handle} onChange={e => setHandle(e.target.value)} placeholder="@username" style={{ fontSize: 12 }} /></div>
+          <div style={field}><div style={lbl}>Account URL</div><input className="form-input" value={accountUrl} onChange={e => setAccountUrl(e.target.value)} placeholder="https://…" style={{ fontSize: 12 }} /></div>
+          <div style={field}><div style={lbl}>Status</div>
+            <select className="form-input" value={status} onChange={e => setStatus(e.target.value)} style={{ fontSize: 12 }}>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+          <button className="btn-ghost" style={{ fontSize: 12, padding: '8px 14px' }} onClick={onClose}>Cancel</button>
+          <button className="btn-primary" style={{ fontSize: 12, padding: '8px 14px' }} onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Submit'}</button>
+        </div>
+      </div>
     </div>
   );
 }
