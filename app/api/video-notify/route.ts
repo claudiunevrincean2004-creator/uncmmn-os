@@ -21,7 +21,6 @@ export async function POST(request: Request) {
 
   const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
   let status = '';
-  let title = '';
   let itemUrl = '';
   let briefLink = '';
   let rawFilesLink = '';
@@ -31,7 +30,6 @@ export async function POST(request: Request) {
   try {
     const b = await request.json();
     status = str(b?.status);
-    title = str(b?.title);
     itemUrl = str(b?.itemUrl);
     briefLink = str(b?.briefLink);
     rawFilesLink = str(b?.rawFilesLink);
@@ -45,42 +43,44 @@ export async function POST(request: Request) {
   // Unknown/non-notify status → no message (guard against stray calls).
   if (!NOTIFY.has(status)) return NextResponse.json({ skipped: true });
 
-  const name = title || 'Untitled';
   const editor = editorMention || '⚠️ an editor (unassigned)';
-  // Title on its own line: a Slack hyperlink to the row's page when we have a URL,
-  // else plain bold text.
-  const titleLine = `Title: ${itemUrl ? `<${itemUrl}|${name}>` : `*${name}*`}`;
-  // Each message is a list of blocks separated by a blank line; null blocks drop
-  // out before joining. Lines within a block are joined by a single newline.
+  // Item identified only by a clickable deep link to its page; omit the line when
+  // there's no URL (rather than showing plain text).
+  const openLine = itemUrl ? `<${itemUrl}|🔗 Open in OS>` : null;
+  // Helper: collapse a list of lines (dropping empties) into one block joined by
+  // single newlines, or null if nothing remains.
+  const block = (lines: (string | null)[]): string | null => {
+    const kept = lines.filter((l): l is string => !!l);
+    return kept.length ? kept.join('\n') : null;
+  };
+  // Logical blocks separated by a blank line (double newline); null blocks drop.
   let blocks: (string | null)[] = [];
   switch (status) {
     case 'Ready to Edit':
       blocks = [
         `🔵 New video ready to edit, ${editor}!`,
-        [
-          titleLine,
-          briefLink ? `Find the clip brief here: ${briefLink}` : null,
+        openLine,
+        block([
+          briefLink ? `Clip brief: ${briefLink}` : null,
           rawFilesLink ? `Raw files: ${rawFilesLink}` : null,
-        ].filter((l): l is string => l !== null).join('\n'),
+        ]),
       ];
       break;
     case 'In Review':
       blocks = [
         `🟣 New video ready for review, ${claudiuMention}!`,
-        [
-          titleLine,
-          finalLink ? `Take a peek: ${finalLink}` : null,
-        ].filter((l): l is string => l !== null).join('\n'),
+        openLine,
+        block([finalLink ? `Take a peek: ${finalLink}` : null]),
       ];
       break;
     case 'Revisions Needed':
       blocks = [
         `🔴 Revisions needed, ${editor}.`,
-        [
-          titleLine,
+        openLine,
+        block([
           'Check the comments for what to fix.',
           finalLink ? `Find the final product here: ${finalLink}` : null,
-        ].filter((l): l is string => l !== null).join('\n'),
+        ]),
       ];
       break;
     default:

@@ -22,7 +22,6 @@ export async function POST(request: Request) {
 
   const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
   let status = '';
-  let creativeId = '';
   let itemUrl = '';
   let sourceLink = '';
   let finalLink = '';
@@ -32,7 +31,6 @@ export async function POST(request: Request) {
   try {
     const b = await request.json();
     status = str(b?.status);
-    creativeId = str(b?.creativeId);
     itemUrl = str(b?.itemUrl);
     sourceLink = str(b?.sourceLink);
     finalLink = str(b?.finalLink);
@@ -46,19 +44,24 @@ export async function POST(request: Request) {
   // Unknown/non-notify status → no message (guard against stray calls).
   if (!NOTIFY.has(status)) return NextResponse.json({ skipped: true });
 
-  const name = creativeId || 'Untitled';
   const editor = editorMention || '⚠️ an editor (unassigned)';
-  // Creative ID on its own line: a Slack hyperlink to the row's page when we have
-  // a URL, else plain bold text.
-  const idLine = `Creative ID: ${itemUrl ? `<${itemUrl}|${name}>` : `*${name}*`}`;
-  // Each message is a list of blocks separated by a blank line; null blocks
-  // (e.g. an absent Final link) drop out before joining.
+  // Item identified only by a clickable deep link to its page; omit the line when
+  // there's no URL (rather than showing plain text).
+  const openLine = itemUrl ? `<${itemUrl}|🔗 Open in OS>` : null;
+  // Helper: collapse a list of lines (dropping empties) into one block joined by
+  // single newlines, or null if nothing remains.
+  const block = (lines: (string | null)[]): string | null => {
+    const kept = lines.filter((l): l is string => !!l);
+    return kept.length ? kept.join('\n') : null;
+  };
+  // Logical blocks separated by a blank line (double newline); null blocks drop.
   let blocks: (string | null)[] = [];
   switch (status) {
     case 'Ad Creative Needed':
       blocks = [
         `🟠 New ad creative needed, ${editor}!`,
-        [idLine, `Source link: ${sourceLink}`].join('\n'),
+        openLine,
+        block([`Source link: ${sourceLink}`]),
       ];
       break;
     case 'Ready for Review':
@@ -66,23 +69,25 @@ export async function POST(request: Request) {
       // link is the Ad Creative's OWN Final cut; omit the line when it's empty.
       blocks = [
         `🟡 New ad creative ready for review, ${`${claudiuMention} ${colinMention}`.trim()}!`,
-        [idLine, finalLink ? `Take a peek: ${finalLink}` : null].filter((l): l is string => l !== null).join('\n'),
+        openLine,
+        block([finalLink ? `Take a peek: ${finalLink}` : null]),
       ];
       break;
     case 'Revisions Needed':
       blocks = [
         `🔴 Revisions needed, ${editor}.`,
-        [
-          idLine,
+        openLine,
+        block([
           'Check comments for the revisions.',
           finalLink ? `Find the final product here: ${finalLink}` : null,
-        ].filter((l): l is string => l !== null).join('\n'),
+        ]),
       ];
       break;
     case 'Ready to Test':
       blocks = [
         `🟢 Ad creative approved, ready to test — ${colinMention}!`,
-        [idLine, finalLink ? `Find the final product here: ${finalLink}` : null].filter((l): l is string => l !== null).join('\n'),
+        openLine,
+        block([finalLink ? `Find the final product here: ${finalLink}` : null]),
       ];
       break;
     default:
