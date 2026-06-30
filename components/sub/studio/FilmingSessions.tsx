@@ -1,5 +1,5 @@
 'use client';
-import { Fragment, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StudioSession, StudioComment, StudioActivity, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
@@ -53,10 +53,11 @@ interface Props {
   customOptions: CustomPropertyOption[];
   profiles: Profile[];
   isAdmin: boolean;
+  openItemId?: string;
   onReload: () => void;
 }
 
-export default function FilmingSessions({ sessions, comments, activity, dropdownOptions, properties, customOptions, profiles, isAdmin, onReload }: Props) {
+export default function FilmingSessions({ sessions, comments, activity, dropdownOptions, properties, customOptions, profiles, isAdmin, openItemId, onReload }: Props) {
   const [fStatus, setFStatus] = usePersistedState<string>('studio_f_status', 'All');
   const [fType, setFType] = usePersistedState<string>('studio_f_type', 'All');
   const [sortDir, setSortDir] = usePersistedState<'asc' | 'desc'>('studio_f_sortdir', 'asc');
@@ -69,6 +70,9 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState<SessionDraft>(EMPTY_DRAFT);
   const [creating, setCreating] = useState(false);
+
+  // Open a row's panel when arriving via a deep link (Slack "Open in OS").
+  useEffect(() => { if (openItemId) setSelectedId(openItemId); }, [openItemId]);
 
   const cprops = useMemo(() => sortProps(properties, TABLE_KEY), [properties]);
   const optsByProp = useMemo(() => groupOptions(customOptions), [customOptions]);
@@ -110,6 +114,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
       notifyFilmed({
         id,
         name: prev?.name ?? '',
+        itemUrl: typeof window !== 'undefined' ? `${window.location.origin}/studio/filming/${id}` : '',
         // Prefer a value included in this same patch, else the current row value.
         type: (p.type ?? prev?.type) ?? '',
         footageLink: (p.footage_link ?? prev?.footage_link) ?? '',
@@ -126,7 +131,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
 
   // Fire-and-forget POST to the server route, which holds the Slack webhook URL
   // and skips silently if it's unset. Never blocks the UI or throws.
-  function notifyFilmed(payload: { id: string; name: string; type: string; footageLink: string }) {
+  function notifyFilmed(payload: { id: string; name: string; itemUrl: string; type: string; footageLink: string }) {
     fetch('/api/filming-notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

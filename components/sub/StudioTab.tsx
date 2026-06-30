@@ -30,7 +30,7 @@ interface Props {
   customOptions: CustomPropertyOption[];
   profiles: Profile[];
   isAdmin: boolean;
-  deepLink?: { type: 'video' | 'ad'; id: string } | null;
+  deepLink?: { type: 'video' | 'ad' | 'story' | 'filming'; id: string } | null;
   onReload: () => void;
 }
 
@@ -50,7 +50,9 @@ export default function StudioTab({ videos, sequences, sessions, adCreatives, co
   // A deep link (from a Slack ping) selects the matching sub-tab; the child then
   // opens the row's side panel via openItemId.
   useEffect(() => {
-    if (deepLink) setSub(deepLink.type === 'video' ? 'videos' : 'ads');
+    if (!deepLink) return;
+    const map: Record<string, SubTab> = { video: 'videos', ad: 'ads', story: 'sequences', filming: 'sessions' };
+    setSub(map[deepLink.type]);
   }, [deepLink, setSub]);
 
   const stats = useMemo(() => {
@@ -145,8 +147,8 @@ export default function StudioTab({ videos, sequences, sessions, adCreatives, co
       </div>
 
       {sub === 'videos' && <VideoReview videos={videos} comments={comments} activity={activity} quickLinks={quickLinks} dropdownOptions={dropdownOptions} profiles={profiles} isAdmin={isAdmin} openItemId={deepLink?.type === 'video' ? deepLink.id : undefined} onReload={onReload} showToast={showToast} />}
-      {sub === 'sequences' && <StorySequences sequences={sequences} comments={comments} activity={activity} dropdownOptions={dropdownOptions} properties={properties} customOptions={customOptions} profiles={profiles} isAdmin={isAdmin} onReload={onReload} />}
-      {sub === 'sessions' && <FilmingSessions sessions={sessions} comments={comments} activity={activity} dropdownOptions={dropdownOptions} properties={properties} customOptions={customOptions} profiles={profiles} isAdmin={isAdmin} onReload={onReload} />}
+      {sub === 'sequences' && <StorySequences sequences={sequences} comments={comments} activity={activity} dropdownOptions={dropdownOptions} properties={properties} customOptions={customOptions} profiles={profiles} isAdmin={isAdmin} openItemId={deepLink?.type === 'story' ? deepLink.id : undefined} onReload={onReload} />}
+      {sub === 'sessions' && <FilmingSessions sessions={sessions} comments={comments} activity={activity} dropdownOptions={dropdownOptions} properties={properties} customOptions={customOptions} profiles={profiles} isAdmin={isAdmin} openItemId={deepLink?.type === 'filming' ? deepLink.id : undefined} onReload={onReload} />}
       {sub === 'ads' && <AdCreative adCreatives={adCreatives} comments={comments} activity={activity} quickLinks={quickLinks} dropdownOptions={dropdownOptions} properties={properties} customOptions={customOptions} profiles={profiles} isAdmin={isAdmin} openItemId={deepLink?.type === 'ad' ? deepLink.id : undefined} onReload={onReload} showToast={showToast} />}
 
       {/* Toast */}

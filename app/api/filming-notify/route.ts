@@ -23,29 +23,37 @@ export async function POST(request: Request) {
   if (!webhookUrl) return NextResponse.json({ skipped: true });
 
   let type = '';
+  let itemUrl = '';
   let footageLink = '';
   try {
     const body = await request.json();
     // The client also sends id and name/description; the locked message format
-    // only uses type + footage link, but we accept the full payload.
+    // only uses type + footage link (+ the Open in OS link), but we accept the
+    // full payload.
     type = typeof body?.type === 'string' ? body.type.trim() : '';
+    itemUrl = typeof body?.itemUrl === 'string' ? body.itemUrl.trim() : '';
     footageLink = typeof body?.footageLink === 'string' ? body.footageLink.trim() : '';
   } catch {
     // ignore malformed body; fall back to defaults below
   }
 
-  const lines = [
-    randomOpener(),
-    '',
+  // Keep the "Fresh … session" line and the footage line together (single
+  // newline); the opener and the "Open in OS" deep link are their own blocks.
+  const infoBlock = [
     `Fresh ${type || 'video'} session, ready just for you.`,
     footageLink ? `Find the RAW files here: ${footageLink}` : '⚠️ No footage link added tho!',
-  ];
+  ].join('\n');
+  const blocks = [
+    randomOpener(),
+    itemUrl ? `<${itemUrl}|🔗 Open in OS>` : null,
+    infoBlock,
+  ].filter((b): b is string => b !== null);
 
   try {
     await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: lines.join('\n') }),
+      body: JSON.stringify({ text: blocks.join('\n\n') }),
     });
   } catch {
     // Never let a Slack delivery failure surface to the user / crash the request.

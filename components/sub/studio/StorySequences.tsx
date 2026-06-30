@@ -1,5 +1,5 @@
 'use client';
-import { Fragment, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StudioSequence, StudioComment, StudioActivity, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
@@ -51,10 +51,11 @@ interface Props {
   customOptions: CustomPropertyOption[];
   profiles: Profile[];
   isAdmin: boolean;
+  openItemId?: string;
   onReload: () => void;
 }
 
-export default function StorySequences({ sequences, comments, activity, dropdownOptions, properties, customOptions, profiles, isAdmin, onReload }: Props) {
+export default function StorySequences({ sequences, comments, activity, dropdownOptions, properties, customOptions, profiles, isAdmin, openItemId, onReload }: Props) {
   const [fStatus, setFStatus] = usePersistedState<string>('studio_s_status', 'All');
   const [sortDir, setSortDir] = usePersistedState<'asc' | 'desc'>('studio_s_sortdir', 'asc');
   const [dateFrom, setDateFrom] = usePersistedState<string>('studio_s_from', '');
@@ -66,6 +67,9 @@ export default function StorySequences({ sequences, comments, activity, dropdown
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState<SequenceDraft>(EMPTY_DRAFT);
   const [creating, setCreating] = useState(false);
+
+  // Open a row's panel when arriving via a deep link (Slack "Open in OS").
+  useEffect(() => { if (openItemId) setSelectedId(openItemId); }, [openItemId]);
 
   const cprops = useMemo(() => sortProps(properties, TABLE_KEY), [properties]);
   const optsByProp = useMemo(() => groupOptions(customOptions), [customOptions]);
@@ -101,6 +105,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
       notifyStatus({
         status: becoming,
         name: prev?.title ?? '',
+        itemUrl: typeof window !== 'undefined' ? `${window.location.origin}/studio/story/${id}` : '',
         // Prefer a value included in this same patch, else the current row value.
         finalUrl: (p.final_url ?? prev?.final_url) ?? '',
       });
@@ -116,7 +121,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
 
   // Fire-and-forget POST to the server route, which holds the Slack webhook URL
   // and skips silently if it's unset. Never blocks the UI or throws.
-  function notifyStatus(payload: { status: string; name: string; finalUrl: string }) {
+  function notifyStatus(payload: { status: string; name: string; itemUrl: string; finalUrl: string }) {
     fetch('/api/story-notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

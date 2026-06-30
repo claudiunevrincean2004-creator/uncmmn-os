@@ -32,11 +32,13 @@ export async function POST(request: Request) {
 
   let status = '';
   let name = '';
+  let itemUrl = '';
   let finalUrl = '';
   try {
     const body = await request.json();
     status = typeof body?.status === 'string' ? body.status.trim() : '';
     name = typeof body?.name === 'string' ? body.name.trim() : '';
+    itemUrl = typeof body?.itemUrl === 'string' ? body.itemUrl.trim() : '';
     finalUrl = typeof body?.finalUrl === 'string' ? body.finalUrl.trim() : '';
   } catch {
     // ignore malformed body; fall back to defaults below
@@ -48,17 +50,19 @@ export async function POST(request: Request) {
   // "Revision Requested" frames the link as "Take a peek:"; the other statuses
   // keep the "Find the final products here:" wording.
   const linkLabel = status === 'Revision Requested' ? 'Take a peek' : 'Find the final products here';
-  const lines = [
+  // Blocks separated by a blank line; the "Open in OS" deep link drops out when
+  // no per-item URL is available.
+  const blocks = [
     head,
-    '',
+    itemUrl ? `<${itemUrl}|🔗 Open in OS>` : null,
     finalUrl ? `${linkLabel}: ${finalUrl}` : '⚠️ No final product link added tho!',
-  ];
+  ].filter((b): b is string => b !== null);
 
   try {
     await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: lines.join('\n') }),
+      body: JSON.stringify({ text: blocks.join('\n\n') }),
     });
   } catch {
     // Never let a Slack delivery failure surface to the user / crash the request.
