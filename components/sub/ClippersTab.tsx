@@ -138,9 +138,11 @@ export default function ClippersTab({ profiles, accounts, content, onReload }: P
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
           {filtered.map(c => {
             const accs = accountsByClipper[c.id] || [];
-            const activeAccs = accs.filter(a => isActive(a.status));
-            const platforms = Array.from(new Set(activeAccs.map(a => (a.platform || '').toLowerCase()).filter(Boolean)));
-            const contentCount = (contentByClipper[c.id] || []).length;
+            const posts = contentByClipper[c.id] || [];
+            const contentCount = posts.length;
+            const totalViews = posts.reduce((s, p) => s + (p.views || 0), 0);
+            const totalLikes = posts.reduce((s, p) => s + (p.likes || 0), 0);
+            const avgEr = totalViews ? (totalLikes / totalViews) * 100 : 0;
             const active = isActive(c.clipper_status);
             return (
               <button
@@ -159,13 +161,19 @@ export default function ClippersTab({ profiles, accounts, content, onReload }: P
                     {active ? 'Active' : 'Inactive'}
                   </span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    {platforms.length ? platforms.map(p => <PlatformIcon key={p} platform={p} size={18} />) : <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>No accounts</span>}
-                  </div>
-                  <div style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-dim)' }}>
-                    {accs.length} acct{accs.length === 1 ? '' : 's'} · {contentCount} post{contentCount === 1 ? '' : 's'}
-                  </div>
+                {/* Quick performance triage — replaces the platform-logos row. */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, borderTop: '0.5px solid var(--border)', paddingTop: 10 }}>
+                  {[
+                    { l: 'Views', v: fn(totalViews) },
+                    { l: 'Eng', v: `${avgEr.toFixed(1)}%` },
+                    { l: 'Accts', v: String(accs.length) },
+                    { l: 'Posts', v: String(contentCount) },
+                  ].map(s => (
+                    <div key={s.l}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', lineHeight: 1.2 }}>{s.v}</div>
+                      <div style={{ fontSize: 9, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.l}</div>
+                    </div>
+                  ))}
                 </div>
               </button>
             );
