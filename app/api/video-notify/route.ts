@@ -55,20 +55,20 @@ export async function POST(request: Request) {
         rawFilesLink ? `Raw files: ${rawFilesLink}` : null,
       ].filter((l): l is string => l !== null);
       blocks = [
-        `🎬 New video ready to edit — *${id}*, over to you ${editor}!`,
+        `🔵 New video ready to edit — *${id}*, over to you ${editor}!`,
         links.length ? links.join('\n') : null,
       ];
       break;
     }
     case 'In Review':
       blocks = [
-        `👀 ${claudiuMention} *${id}* is ready for review!`,
+        `🟣 *${id}* is ready for review, ${claudiuMention}!`,
         finalLink ? `Take a peek: ${finalLink}` : null,
       ];
       break;
     case 'Revisions Needed':
       blocks = [
-        `🔁 Revisions needed on *${id}*, back to you ${editor}.`,
+        `🔴 Revisions needed on *${id}*, back to you ${editor}.`,
         [
           'Check the comments for what to fix.',
           finalLink ? `Find the final product here: ${finalLink}` : null,

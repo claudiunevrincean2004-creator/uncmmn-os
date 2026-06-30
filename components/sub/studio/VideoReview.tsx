@@ -199,6 +199,19 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
       alert(`Couldn't create video: ${error.message}`);
       return;
     }
+    // A video created directly at a pinging status fires that ping once on
+    // creation (changeStatus only fires on edits to existing rows). This is the
+    // only insert-time fire, so it can't double-fire with changeStatus/patch.
+    if (VIDEO_NOTIFY_STATUSES.includes(row.status)) {
+      notifyVideo({
+        status: row.status,
+        title: row.title,
+        briefLink: row.brief_url ?? '',
+        rawFilesLink: row.raw_files_url ?? '',
+        finalLink: row.final_url ?? '',
+        ...buildPipelineMentions(row.assigned_to, profiles),
+      });
+    }
     closeAdd();
     onReload();
   }
