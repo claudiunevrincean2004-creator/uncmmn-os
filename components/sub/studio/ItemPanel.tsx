@@ -166,9 +166,11 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
     <div
       ref={panelRef}
       style={{
-        width: '40%',
+        // Desktop: roughly half the viewport, capped for ultrawide. Narrow/mobile
+        // stays near-full via minWidth (50vw of a phone is tiny → clamps to 340).
+        width: 'min(50vw, 720px)',
         minWidth: 340,
-        maxWidth: 560,
+        maxWidth: 720,
         flexShrink: 0,
         alignSelf: 'flex-start',
         position: 'sticky',
@@ -179,7 +181,7 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
         background: 'var(--surface)',
         borderRadius: 10,
         marginLeft: 16,
-        padding: '16px 18px',
+        padding: '22px 26px',
         animation: 'slideInRight 0.2s ease',
       }}
     >
@@ -196,17 +198,17 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
       </div>
 
       {/* Properties */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 22 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginBottom: 28 }}>
         {fields.filter(f => !f.visibleIf || f.visibleIf(values)).map(f => (
-          <div key={f.key} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 10, alignItems: 'start' }}>
-            <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, paddingTop: 6 }}>{f.label}</div>
+          <div key={f.key} style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: 16, alignItems: 'start' }}>
+            <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, paddingTop: 7 }}>{f.label}</div>
             <div><FieldControl field={f} values={values} onChangeField={onChangeField} onAddOption={onAddOption} profiles={profiles} /></div>
           </div>
         ))}
       </div>
 
       {/* Comments */}
-      <div style={{ borderTop: '0.5px solid var(--border)', paddingTop: 16, marginBottom: 22 }}>
+      <div style={{ borderTop: '0.5px solid var(--border)', paddingTop: 20, marginBottom: 28 }}>
         <div style={{ fontSize: 11, color: 'var(--text-faint)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
           Comments {itemComments.length > 0 && <span style={{ color: 'var(--text-faint)' }}>· {itemComments.length}</span>}
         </div>
@@ -288,7 +290,7 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
       </div>
 
       {/* Activity log */}
-      <div style={{ borderTop: '0.5px solid var(--border)', paddingTop: 16 }}>
+      <div style={{ borderTop: '0.5px solid var(--border)', paddingTop: 20 }}>
         <div style={{ fontSize: 11, color: 'var(--text-faint)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Activity</div>
         {itemActivity.length === 0 ? (
           <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>No activity yet.</div>
