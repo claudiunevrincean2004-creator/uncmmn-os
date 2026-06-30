@@ -18,7 +18,11 @@ import QuickLinks from './QuickLinks';
 import { UserPicker, resolveAssignee, buildPipelineMentions } from './UserPicker';
 import FieldOptionsManager from './FieldOptionsManager';
 
-const DONE = ['Approved', 'Posted'];
+const DONE = ['Posted'];
+
+// Video status transitions that ping #main-ig-updates (see /api/video-notify).
+// Briefing / Editing / Ready to Post / Posted are intentionally silent.
+const VIDEO_NOTIFY_STATUSES = ['Ready to Edit', 'In Review', 'Revisions Needed'];
 
 // In-code fallback options per built-in select field, so adding an option can
 // backfill them as rows instead of dropping them (see buildAddOptionRows).
@@ -45,7 +49,7 @@ const EMPTY_DRAFT: VideoDraft = {
   title: '',
   format: '',
   assigned_to: '',
-  status: 'Scripting',
+  status: 'Briefing',
   priority: 'Normal',
   brief_url: '',
   raw_files_url: '',
@@ -104,11 +108,33 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   async function changeStatus(v: StudioVideo, status: string) {
     if (status === v.status) return;
     const p: Partial<StudioVideo> = { status };
-    if (status === 'Revision Requested' && v.status !== 'Revision Requested') {
+    if (status === 'Revisions Needed' && v.status !== 'Revisions Needed') {
       p.revision_count = (v.revision_count || 0) + 1;
     }
     await logActivity('video', v.id, 'Status changed', v.status, status);
+    // Fire the #main-ig-updates ping for notify transitions. Only here (the single
+    // status-change path) — generic patch() never pings — so no double-fire.
+    if (VIDEO_NOTIFY_STATUSES.includes(status)) {
+      notifyVideo({
+        status,
+        title: v.title || '',
+        briefLink: v.brief_url || '',
+        rawFilesLink: v.raw_files_url || '',
+        finalLink: v.final_url || '',
+        ...buildPipelineMentions(v.assigned_to, profiles),
+      });
+    }
     await patch(v.id, p);
+  }
+
+  // Fire-and-forget POST to the #main-ig-updates notify route (server holds the
+  // Slack webhook URL, skips silently if unset). Never blocks the UI or throws.
+  function notifyVideo(payload: { status: string; title: string; briefLink: string; rawFilesLink: string; finalLink: string; editorMention: string; claudiuMention: string; colinMention: string }) {
+    fetch('/api/video-notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).catch(err => console.warn('[VideoReview] /api/video-notify call failed', err));
   }
 
   // Fire-and-forget POST to the Ad Creative pipeline notify (server holds the
@@ -159,7 +185,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
       title: draft.title.trim() || 'Untitled Video',
       format: draft.format || null,
       assigned_to: draft.assigned_to || null,
-      status: draft.status || 'Scripting',
+      status: draft.status || 'Briefing',
       priority: draft.priority || 'Normal',
       brief_url: draft.brief_url.trim() || null,
       raw_files_url: draft.raw_files_url.trim() || null,

@@ -49,7 +49,7 @@ export default function StudioTab({ videos, sequences, sessions, adCreatives, co
   const stats = useMemo(() => {
     const today = todayISO();
     const inReview = videos.filter(v => v.status === 'In Review').length;
-    const awaitingRevision = videos.filter(v => v.status === 'Revision Requested').length;
+    const awaitingRevision = videos.filter(v => v.status === 'Revisions Needed').length;
     const overdue = videos.filter(v =>
       v.deadline && v.deadline.slice(0, 10) < today && v.status !== 'Posted'
     ).length;

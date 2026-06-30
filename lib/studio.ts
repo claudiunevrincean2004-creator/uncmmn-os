@@ -11,23 +11,23 @@ export const TEAM = ['Unassigned', 'Nathan', 'Editor', 'Videographer', 'Scriptwr
 // entirely on Ad Creative; videos move through to "Posted" and spawn ad work via
 // the per-row "Ad Creative Needed" button instead of an in-flow status.
 export const VIDEO_STATUSES = [
-  'Scripting',
-  'Recording',
-  'Raw Footage Ready',
+  'Briefing',
+  'Ready to Edit',
   'Editing',
   'In Review',
-  'Revision Requested',
+  'Revisions Needed',
+  'Ready to Post',
   'Posted',
 ];
 
 export const VIDEO_STATUS_COLORS: Record<string, string> = {
-  'Scripting': '#6b7280',           // gray
-  'Recording': '#3b82f6',           // blue
-  'Raw Footage Ready': '#eab308',   // yellow
-  'Editing': '#f59e0b',             // orange
-  'In Review': '#8b5cf6',           // purple
-  'Revision Requested': '#ef4444',  // red
-  'Posted': '#14b8a6',              // teal
+  'Briefing': '#6b7280',          // gray
+  'Ready to Edit': '#3b82f6',     // blue
+  'Editing': '#f59e0b',           // orange
+  'In Review': '#8b5cf6',         // purple
+  'Revisions Needed': '#ef4444',  // red
+  'Ready to Post': '#eab308',     // yellow
+  'Posted': '#10b981',            // green
 };
 
 // Ad Creative pipeline — full ad lifecycle (replaces the old Live/Paused/Winner/

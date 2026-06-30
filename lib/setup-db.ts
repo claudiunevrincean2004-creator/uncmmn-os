@@ -180,7 +180,7 @@ alter table revenue_entries disable row level security;`);
   title text not null,
   format text,
   assigned_to text,
-  status text default 'Scripting',
+  status text default 'Briefing',
   priority text default 'Normal',
   brief_url text,
   raw_files_url text,
@@ -381,7 +381,7 @@ alter table studio_dropdown_options add column if not exists color text;
 alter table studio_dropdown_options add column if not exists position int not null default 0;
 create unique index if not exists studio_dropdown_options_field_value_key on studio_dropdown_options (field, value);
 insert into studio_dropdown_options (field, value, color, position) values
-  ('video_status','Scripting','#6b7280',0),('video_status','Recording','#3b82f6',1),('video_status','Raw Footage Ready','#eab308',2),('video_status','Editing','#f59e0b',3),('video_status','In Review','#8b5cf6',4),('video_status','Revision Requested','#ef4444',5),('video_status','Ad Variation Needed','#ec4899',6),('video_status','Approved','#10b981',7),('video_status','Posted','#14b8a6',8),
+  ('video_status','Briefing','#6b7280',0),('video_status','Ready to Edit','#3b82f6',1),('video_status','Editing','#f59e0b',2),('video_status','In Review','#8b5cf6',3),('video_status','Revisions Needed','#ef4444',4),('video_status','Ready to Post','#eab308',5),('video_status','Posted','#10b981',6),
   ('video_format','Short',null,0),('video_format','Long Form',null,1),('video_format','Reel',null,2),('video_format','Story',null,3),('video_format','Other',null,4),
   ('sequence_status','Draft','#6b7280',0),('sequence_status','Ready for Review','#8b5cf6',1),('sequence_status','Revision Requested','#ef4444',2),('sequence_status','Approved','#10b981',3),('sequence_status','Posted','#14b8a6',4),
   ('session_status','Planned','#6b7280',0),('session_status','Confirmed','#3b82f6',1),('session_status','Filming','#f59e0b',2),('session_status','Filmed','#10b981',3),('session_status','Cancelled','#ef4444',4),
