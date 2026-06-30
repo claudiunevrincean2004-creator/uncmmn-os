@@ -26,8 +26,8 @@ export async function POST(request: Request) {
   let sourceLink = '';
   let finalLink = '';
   let editorMention = '';
-  let claudiuMention = '';
-  let colinMention = '';
+  let reviewTeamMention = '';
+  let testerMention = '';
   try {
     const b = await request.json();
     status = str(b?.status);
@@ -35,8 +35,8 @@ export async function POST(request: Request) {
     sourceLink = str(b?.sourceLink);
     finalLink = str(b?.finalLink);
     editorMention = str(b?.editorMention);
-    claudiuMention = str(b?.claudiuMention);
-    colinMention = str(b?.colinMention);
+    reviewTeamMention = str(b?.reviewTeamMention);
+    testerMention = str(b?.testerMention);
   } catch {
     // ignore malformed body; the guard below handles the empty status
   }
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
       // Single combined review gate — ping both reviewers in one message. The
       // link is the Ad Creative's OWN Final cut; omit the line when it's empty.
       blocks = [
-        `🟡 New ad creative ready for review, ${`${claudiuMention} ${colinMention}`.trim()}!`,
+        `🟡 New ad creative ready for review, ${reviewTeamMention || '⚠️ no reviewer/tester set — assign a pipeline role in Manage all users'}!`,
         openLine,
         block([finalLink ? `Take a peek: ${finalLink}` : null]),
       ];
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
       break;
     case 'Ready to Test':
       blocks = [
-        `🟢 Ad creative approved, ready to test — ${colinMention}!`,
+        `🟢 Ad creative approved, ready to test — ${testerMention || '⚠️ no tester set — assign a pipeline role in Manage all users'}!`,
         openLine,
         block([finalLink ? `Find the final product here: ${finalLink}` : null]),
       ];

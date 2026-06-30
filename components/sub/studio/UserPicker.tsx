@@ -37,13 +37,16 @@ function mentionFor(name: string, id: string | null | undefined): string {
   return sid ? `<@${sid}>` : `@${n} (Slack ID not set)`;
 }
 
-// Mention for a person looked up by Display Name among profiles (used for the
-// fixed reviewers, e.g. Claudiu / Colin). No match → "(Slack ID not set)".
-export function slackMentionByName(name: string, profiles: Profile[]): string {
-  const n = (name || '').trim();
-  if (!n) return '';
-  const p = profiles.find(x => profileName(x).toLowerCase() === n.toLowerCase());
-  return mentionFor(n, p?.slack_user_id);
+// Combined @-mentions for every profile holding one of the given pipeline roles
+// (used for the fixed-target review/test pings). Resolves the CURRENT display_name
+// live and builds <@ID> when slack_user_id is set, else the "(Slack ID not set)"
+// fallback. Returns '' when no profile holds any of the roles → caller posts a
+// "no reviewer/tester set" warning instead of silently dropping the mention.
+export function slackMentionsByPipelineRole(profiles: Profile[], roles: string[]): string {
+  return profiles
+    .filter(p => p.pipeline_role && roles.includes(p.pipeline_role))
+    .map(p => mentionFor(profileName(p), p.slack_user_id))
+    .join(' ');
 }
 
 // Mention for a row's assigned_to (a profile id or legacy text). Resolves to a
@@ -56,14 +59,16 @@ export function slackMentionByAssignee(assignedTo: string | undefined | null, pr
   return mentionFor(name, p?.slack_user_id);
 }
 
-// Bundle of the @-mentions an Ad Creative pipeline ping needs: the assigned
-// editor plus the two fixed reviewers. Resolved entirely client-side from the
-// already-loaded profiles (slack_user_id lives on the profile now).
+// Bundle of the @-mentions a pipeline ping needs: the assigned editor plus the
+// role-based fixed targets (reviewers / testers). Resolved entirely client-side
+// from the already-loaded profiles (slack_user_id + pipeline_role live there).
 export function buildPipelineMentions(assignedTo: string | undefined | null, profiles: Profile[]) {
   return {
     editorMention: slackMentionByAssignee(assignedTo, profiles),
-    claudiuMention: slackMentionByName('Claudiu', profiles),
-    colinMention: slackMentionByName('Colin', profiles),
+    reviewerMention: slackMentionsByPipelineRole(profiles, ['reviewer']),
+    testerMention: slackMentionsByPipelineRole(profiles, ['tester']),
+    // Combined review gate: everyone who reviews or tests.
+    reviewTeamMention: slackMentionsByPipelineRole(profiles, ['reviewer', 'tester']),
   };
 }
 

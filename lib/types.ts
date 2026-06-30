@@ -142,6 +142,9 @@ export interface Profile {
   display_name?: string | null;
   job_title?: string | null;
   slack_user_id?: string | null;
+  // Slack-ping routing role, separate from the admin/editor access role.
+  // 'reviewer' | 'tester' | null. Resolved live for fixed-target pings.
+  pipeline_role?: string | null;
   created_at?: string;
 }
 

@@ -140,7 +140,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
 
   // Fire-and-forget POST to the #main-ig-updates notify route (server holds the
   // Slack webhook URL, skips silently if unset). Never blocks the UI or throws.
-  function notifyVideo(payload: { status: string; title: string; itemUrl: string; briefLink: string; rawFilesLink: string; finalLink: string; editorMention: string; claudiuMention: string; colinMention: string }) {
+  function notifyVideo(payload: { status: string; title: string; itemUrl: string; briefLink: string; rawFilesLink: string; finalLink: string; editorMention: string; reviewerMention: string; testerMention: string; reviewTeamMention: string }) {
     fetch('/api/video-notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -150,7 +150,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
 
   // Fire-and-forget POST to the Ad Creative pipeline notify (server holds the
   // Slack webhook URL, skips silently if unset). Never blocks the UI or throws.
-  function notifyAdPipeline(payload: { status: string; creativeId: string; itemUrl: string; sourceLink: string; finalLink: string; editorMention: string; claudiuMention: string; colinMention: string }) {
+  function notifyAdPipeline(payload: { status: string; creativeId: string; itemUrl: string; sourceLink: string; finalLink: string; editorMention: string; reviewerMention: string; testerMention: string; reviewTeamMention: string }) {
     fetch('/api/ads-notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
