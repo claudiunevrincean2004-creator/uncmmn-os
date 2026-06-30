@@ -7,7 +7,7 @@ export const VIDEO_FORMATS = ['Short', 'Long Form', 'Reel', 'Story', 'Other'];
 export const TEAM = ['Unassigned', 'Nathan', 'Editor', 'Videographer', 'Scriptwriter', 'Thumbnail Designer'];
 
 // Video Review is purely organic content production — no ad-lifecycle statuses
-// live here. The ad lifecycle (Variation Needed → … → Winner/Killed) lives
+// live here. The ad lifecycle (Ad Creative Needed → … → Winner/Killed) lives
 // entirely on Ad Creative; videos move through to "Posted" and spawn ad work via
 // the per-row "Ad Creative Needed" button instead of an in-flow status.
 export const VIDEO_STATUSES = [
@@ -35,7 +35,7 @@ export const VIDEO_STATUS_COLORS: Record<string, string> = {
 // no separate "Approved"). Status transitions ping #ad-creative-pipeline.
 export const AD_FORMATS = ['Video', 'Static'];
 export const AD_STATUSES = [
-  'Variation Needed',
+  'Ad Creative Needed',
   'Editing',
   'Ready for Review',
   'Revisions Needed',
@@ -46,7 +46,7 @@ export const AD_STATUSES = [
 ];
 
 export const AD_STATUS_COLORS: Record<string, string> = {
-  'Variation Needed': '#f59e0b',   // orange
+  'Ad Creative Needed': '#f59e0b', // orange
   'Editing': '#3b82f6',            // blue
   'Ready for Review': '#eab308',   // yellow
   'Revisions Needed': '#ef4444',   // red

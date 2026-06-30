@@ -124,7 +124,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   // "Ad Creative Needed": spawn a new Ad Creative row from this video to kick off
   // the ad lifecycle. Pre-fills the creative id (video title + " — Ad"), the
   // source link (the video's Final Product link), and the assigned editor; starts
-  // it at "Variation Needed", which pings the editor in #ad-creative-pipeline.
+  // it at "Ad Creative Needed", which pings the editor in #ad-creative-pipeline.
   async function createAdCreative(v: StudioVideo) {
     if (adBusy) return;
     setAdBusy(v.id);
@@ -137,7 +137,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
       assigned_to: v.assigned_to || null,
       date_added: todayISO(),
       ad_format: 'Video',
-      status: 'Variation Needed',
+      status: 'Ad Creative Needed',
     };
     const { error } = await supabase.from('studio_ad_creatives').insert([row]);
     setAdBusy(null);
@@ -146,7 +146,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
       alert(`Couldn't create ad creative: ${error.message}`);
       return;
     }
-    notifyAdPipeline({ status: 'Variation Needed', creativeId, editor: editorName, sourceLink, buyerFeedback: '' });
+    notifyAdPipeline({ status: 'Ad Creative Needed', creativeId, editor: editorName, sourceLink, buyerFeedback: '' });
     showToast(`Ad creative created for ${creativeId} → assigned to ${editorName || 'unassigned'}`);
     onReload();
   }

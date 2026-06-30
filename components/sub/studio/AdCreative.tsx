@@ -20,7 +20,7 @@ const TABLE_KEY = 'ad';
 
 // Status transitions whose entry fires a Slack ping to #ad-creative-pipeline (see
 // /api/ads-notify). Editing / Testing / Winner / Killed are intentionally silent.
-const PIPELINE_NOTIFY_STATUSES = ['Variation Needed', 'Ready for Review', 'Revisions Needed', 'Ready to Test'];
+const PIPELINE_NOTIFY_STATUSES = ['Ad Creative Needed', 'Ready for Review', 'Revisions Needed', 'Ready to Test'];
 
 // In-code fallback options per built-in select field, so adding an option can
 // backfill them as rows instead of dropping them (see buildAddOptionRows).
@@ -50,7 +50,7 @@ const EMPTY_DRAFT: AdDraft = {
   angle: '',
   final_link: '',
   assigned_to: '',
-  status: 'Variation Needed',
+  status: 'Ad Creative Needed',
 };
 
 
@@ -160,7 +160,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   async function createAd() {
     if (creating) return;
     setCreating(true);
-    const status = draft.status || 'Variation Needed';
+    const status = draft.status || 'Ad Creative Needed';
     const row = {
       creative_id: draft.creative_id.trim() || 'New Creative',
       date_added: draft.date_added || null,
@@ -178,7 +178,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
       return;
     }
     // A row created directly at a notify status pings the pipeline too (mirrors
-    // the "Ad Creative Needed" button creating one at "Variation Needed").
+    // the "Ad Creative Needed" button creating one at "Ad Creative Needed").
     if (PIPELINE_NOTIFY_STATUSES.includes(status)) {
       notifyAdPipeline({
         status,

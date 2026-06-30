@@ -10,7 +10,7 @@ import { createServerClient } from '@/lib/supabase-server';
 
 // Statuses that fire a ping. Editing / Testing / Winner / Killed are intentionally
 // silent (the client never sends them, but we guard here too).
-const NOTIFY = new Set(['Variation Needed', 'Ready for Review', 'Revisions Needed', 'Ready to Test']);
+const NOTIFY = new Set(['Ad Creative Needed', 'Ready for Review', 'Revisions Needed', 'Ready to Test']);
 
 export async function POST(request: Request) {
   const webhookUrl = process.env.SLACK_AD_PIPELINE_WEBHOOK_URL || process.env.SLACK_WEBHOOK_URL;
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
   const id = creativeId || 'this creative';
   let text = '';
   switch (status) {
-    case 'Variation Needed':
+    case 'Ad Creative Needed':
       text = editor
         ? `🎬 New ad creative needed — *${id}*, assigned to ${mention(editor)}.${sourceLink ? ` ${sourceLink}` : ''}`
         : `🎬 New ad creative needed — *${id}*, ⚠️ unassigned — set an editor.${sourceLink ? ` ${sourceLink}` : ''}`;
