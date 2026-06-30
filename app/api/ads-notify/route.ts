@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 
 // Server-side only: posts to the #ad-creative-pipeline Slack webhook when an Ad
 // Creative transitions into (or is created at) one of the pipeline statuses. The
-// webhook URL is read from SLACK_AD_PIPELINE_WEBHOOK_URL, falling back to
-// SLACK_WEBHOOK_URL — neither has a NEXT_PUBLIC_ prefix so the URL never reaches
-// the browser bundle.
+// webhook URL is read from SLACK_ADS_WEBHOOK_URL — the same already-configured
+// webhook the other ad automations use (no NEXT_PUBLIC_ prefix, so the URL never
+// reaches the browser bundle).
 //
 // @-mentions are resolved on the client from user profiles (slack_user_id lives
 // on the profile) and passed in pre-built, so this route does no DB access. A
@@ -16,7 +16,7 @@ import { NextResponse } from 'next/server';
 const NOTIFY = new Set(['Ad Creative Needed', 'Ready for Review', 'Revisions Needed', 'Ready to Test']);
 
 export async function POST(request: Request) {
-  const webhookUrl = process.env.SLACK_AD_PIPELINE_WEBHOOK_URL || process.env.SLACK_WEBHOOK_URL;
+  const webhookUrl = process.env.SLACK_ADS_WEBHOOK_URL;
   // Missing/empty webhook → skip silently, don't crash.
   if (!webhookUrl) return NextResponse.json({ skipped: true });
 
