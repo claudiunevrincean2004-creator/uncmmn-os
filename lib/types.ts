@@ -122,8 +122,9 @@ export interface StudioDropdownOption {
   created_at?: string;
 }
 
-// Maps a person's name to their Slack user ID, so Ad Creative status pings can
-// @-mention the right person. Edited via the "Team Slack IDs" mini-editor.
+// DEPRECATED: Slack IDs now live on the user profile (profiles.slack_user_id).
+// The slack_user_map table is kept in the DB but no longer read; this type is
+// retained only to document that legacy table.
 export interface SlackUserMap {
   id: string;
   person_name: string;
@@ -138,6 +139,7 @@ export interface Profile {
   email?: string | null;
   display_name?: string | null;
   job_title?: string | null;
+  slack_user_id?: string | null;
   created_at?: string;
 }
 

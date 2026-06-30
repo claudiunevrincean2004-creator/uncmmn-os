@@ -20,6 +20,7 @@ export default function AssigneeSettings({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editTitle, setEditTitle] = useState('');
+  const [editSlack, setEditSlack] = useState('');
   useDismiss(null, onClose, { outside: false });
 
   const sorted = [...profiles].sort((a, b) => profileName(a).localeCompare(profileName(b)));
@@ -27,6 +28,7 @@ export default function AssigneeSettings({
   function startEdit(p: Profile) {
     setEditName(p.display_name ?? '');
     setEditTitle(p.job_title ?? '');
+    setEditSlack(p.slack_user_id ?? '');
     setEditingId(p.id);
   }
 
@@ -40,7 +42,7 @@ export default function AssigneeSettings({
     // Admins may update any profile (profiles_admin_update policy).
     const { error } = await supabase
       .from('profiles')
-      .update({ display_name: editName.trim() || null, job_title: editTitle.trim() || null })
+      .update({ display_name: editName.trim() || null, job_title: editTitle.trim() || null, slack_user_id: editSlack.trim() || null })
       .eq('id', p.id);
     setBusy(null);
     if (error) {
@@ -111,6 +113,17 @@ export default function AssigneeSettings({
                           onKeyDown={e => { if (e.key === 'Enter') saveEdit(p); else if (e.key === 'Escape') cancelEdit(); }}
                         />
                       </div>
+                      <div>
+                        <div style={labelStyle}>Slack member ID</div>
+                        <input
+                          className="form-input"
+                          value={editSlack}
+                          onChange={e => setEditSlack(e.target.value)}
+                          placeholder="e.g. U01ABCDE23"
+                          style={{ width: '100%', fontSize: 12, marginTop: 3 }}
+                          onKeyDown={e => { if (e.key === 'Enter') saveEdit(p); else if (e.key === 'Escape') cancelEdit(); }}
+                        />
+                      </div>
                       {p.email && <div style={{ fontSize: 11, color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.email}</div>}
                     </>
                   ) : (
@@ -118,6 +131,7 @@ export default function AssigneeSettings({
                       <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profileName(p)}</div>
                       {p.job_title && <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{p.job_title}</div>}
                       {p.email && <div style={{ fontSize: 11, color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.email}</div>}
+                      <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>Slack ID: {p.slack_user_id?.trim() || <span style={{ color: 'var(--text-faint)' }}>not set</span>}</div>
                       {p.role && <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{p.role}</div>}
                     </>
                   )}

@@ -1,7 +1,7 @@
 'use client';
 import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
-import { StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile, SlackUserMap } from '@/lib/types';
+import { StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { usePagedRows } from '@/lib/use-paged-rows';
 import LoadMore from './LoadMore';
@@ -9,10 +9,9 @@ import { AD_FORMATS, AD_STATUSES, AD_STATUS_COLORS, todayISO, logActivity, merge
 import { EditPillSelect, MiniSelect, InlineDate, UrlCell } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import QuickLinks from './QuickLinks';
-import { UserPicker, resolveAssignee } from './UserPicker';
+import { UserPicker, buildPipelineMentions } from './UserPicker';
 import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal, AddPropertyButton } from './CustomColumns';
 import FieldOptionsManager from './FieldOptionsManager';
-import SlackUserMapEditor from './SlackUserMapEditor';
 import FilterField from './FilterField';
 
 type SortKey = 'date_added' | 'angle';
@@ -63,13 +62,12 @@ interface Props {
   properties: CustomProperty[];
   customOptions: CustomPropertyOption[];
   profiles: Profile[];
-  slackUsers: SlackUserMap[];
   isAdmin: boolean;
   onReload: () => void;
   showToast: (msg: string) => void;
 }
 
-export default function AdCreative({ adCreatives, comments, activity, quickLinks, dropdownOptions, properties, customOptions, profiles, slackUsers, isAdmin, onReload, showToast }: Props) {
+export default function AdCreative({ adCreatives, comments, activity, quickLinks, dropdownOptions, properties, customOptions, profiles, isAdmin, onReload, showToast }: Props) {
   const [fStatus, setFStatus] = usePersistedState<string>('studio_ad_status', 'All');
   const [fFormat, setFFormat] = usePersistedState<string>('studio_ad_format', 'All');
   const [fAngle, setFAngle] = usePersistedState<string>('studio_ad_angle', 'All');
@@ -85,7 +83,6 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState<AdDraft>(EMPTY_DRAFT);
   const [creating, setCreating] = useState(false);
-  const [slackOpen, setSlackOpen] = useState(false);
 
   const cprops = useMemo(() => sortProps(properties, TABLE_KEY), [properties]);
   const optsByProp = useMemo(() => groupOptions(customOptions), [customOptions]);
@@ -132,9 +129,9 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
       notifyAdPipeline({
         status: becoming,
         creativeId: prev?.creative_id ?? '',
-        editor: resolveAssignee((p.assigned_to ?? prev?.assigned_to) ?? null, profiles) ?? '',
         sourceLink: (p.source_video_url ?? prev?.source_video_url) ?? '',
         buyerFeedback: (p.buyer_feedback ?? prev?.buyer_feedback) ?? '',
+        ...buildPipelineMentions((p.assigned_to ?? prev?.assigned_to) ?? null, profiles),
       });
     }
   }
@@ -147,9 +144,10 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   }
 
   // Fire-and-forget POST to the #ad-creative-pipeline notify route, which holds
-  // the Slack webhook URL and resolves @-mentions via slack_user_map. Skips
-  // silently if the webhook is unset. Never blocks the UI or throws.
-  function notifyAdPipeline(payload: { status: string; creativeId: string; editor: string; sourceLink: string; buyerFeedback: string }) {
+  // the Slack webhook URL. @-mentions are resolved here from user profiles
+  // (slack_user_id) and passed in pre-built. Skips silently if the webhook is
+  // unset. Never blocks the UI or throws.
+  function notifyAdPipeline(payload: { status: string; creativeId: string; sourceLink: string; buyerFeedback: string; editorMention: string; claudiuMention: string; colinMention: string }) {
     fetch('/api/ads-notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -183,9 +181,9 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
       notifyAdPipeline({
         status,
         creativeId: row.creative_id,
-        editor: resolveAssignee(row.assigned_to, profiles) ?? '',
         sourceLink: '',
         buyerFeedback: '',
+        ...buildPipelineMentions(row.assigned_to, profiles),
       });
     }
     closeAdd();
@@ -311,13 +309,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
             placeholder="Search Creative ID…"
             style={{ width: 240, padding: '5px 9px', fontSize: 11 }}
           />
-          <button
-            className="btn-ghost"
-            style={{ fontSize: 11, padding: '5px 9px', marginLeft: 'auto' }}
-            onClick={() => setSlackOpen(true)}
-            title="Edit team Slack IDs (for #ad-creative-pipeline pings)"
-          >⚙ Team Slack IDs</button>
-          <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px' }} onClick={() => { setDraft({ ...EMPTY_DRAFT, date_added: todayISO() }); setAddOpen(true); }}>+ Add Ad Creative</button>
+          <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={() => { setDraft({ ...EMPTY_DRAFT, date_added: todayISO() }); setAddOpen(true); }}>+ Add Ad Creative</button>
         </div>
 
         {/* Filter / sort row */}
@@ -458,9 +450,6 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
       )}
       {optsField && (
         <FieldOptionsManager field={optsField.field} title={optsField.title} options={dropdownOptions} onClose={() => setOptsField(null)} onReload={onReload} />
-      )}
-      {slackOpen && (
-        <SlackUserMapEditor rows={slackUsers} onClose={() => setSlackOpen(false)} onReload={onReload} />
       )}
     </div>
   );

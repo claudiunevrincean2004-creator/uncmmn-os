@@ -15,7 +15,7 @@ import {
 import { EditPillSelect, MiniSelect, UrlCell, InlineDate } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import QuickLinks from './QuickLinks';
-import { UserPicker, resolveAssignee } from './UserPicker';
+import { UserPicker, resolveAssignee, buildPipelineMentions } from './UserPicker';
 import FieldOptionsManager from './FieldOptionsManager';
 
 const DONE = ['Approved', 'Posted'];
@@ -113,7 +113,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
 
   // Fire-and-forget POST to the Ad Creative pipeline notify (server holds the
   // Slack webhook URL, skips silently if unset). Never blocks the UI or throws.
-  function notifyAdPipeline(payload: { status: string; creativeId: string; editor: string; sourceLink: string; buyerFeedback: string }) {
+  function notifyAdPipeline(payload: { status: string; creativeId: string; sourceLink: string; buyerFeedback: string; editorMention: string; claudiuMention: string; colinMention: string }) {
     fetch('/api/ads-notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -130,6 +130,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
     setAdBusy(v.id);
     const creativeId = `${(v.title || 'Untitled').trim()} — Ad`;
     const editorName = resolveAssignee(v.assigned_to, profiles) || '';
+    const mentions = buildPipelineMentions(v.assigned_to, profiles);
     const sourceLink = v.final_url || '';
     const row = {
       creative_id: creativeId,
@@ -146,7 +147,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
       alert(`Couldn't create ad creative: ${error.message}`);
       return;
     }
-    notifyAdPipeline({ status: 'Ad Creative Needed', creativeId, editor: editorName, sourceLink, buyerFeedback: '' });
+    notifyAdPipeline({ status: 'Ad Creative Needed', creativeId, sourceLink, buyerFeedback: '', ...mentions });
     showToast(`Ad creative created for ${creativeId} → assigned to ${editorName || 'unassigned'}`);
     onReload();
   }

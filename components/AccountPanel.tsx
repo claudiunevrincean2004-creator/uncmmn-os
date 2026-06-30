@@ -25,24 +25,28 @@ export default function AccountPanel({
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(profile.display_name ?? '');
   const [jobTitle, setJobTitle] = useState(profile.job_title ?? '');
+  const [slackId, setSlackId] = useState(profile.slack_user_id ?? '');
   const [saving, setSaving] = useState(false);
   useDismiss(null, onClose, { outside: false });
 
   const nameChanged = name.trim() !== (profile.display_name ?? '').trim();
   const titleChanged = jobTitle.trim() !== (profile.job_title ?? '').trim();
-  const changed = nameChanged || titleChanged;
+  const slackChanged = slackId.trim() !== (profile.slack_user_id ?? '').trim();
+  const changed = nameChanged || titleChanged || slackChanged;
   const roleLabel = profile.role === 'admin' ? 'Admin' : 'Editor';
   const loginEmail = profile.email || email || '';
 
   function startEdit() {
     setName(profile.display_name ?? '');
     setJobTitle(profile.job_title ?? '');
+    setSlackId(profile.slack_user_id ?? '');
     setEditing(true);
   }
 
   function cancel() {
     setName(profile.display_name ?? '');
     setJobTitle(profile.job_title ?? '');
+    setSlackId(profile.slack_user_id ?? '');
     setEditing(false);
   }
 
@@ -53,6 +57,7 @@ export default function AccountPanel({
     let error: { message?: string } | null = null;
     if (nameChanged) ({ error } = await supabase.rpc('set_my_display_name', { new_name: name.trim() }));
     if (!error && titleChanged) ({ error } = await supabase.rpc('set_my_job_title', { new_title: jobTitle.trim() }));
+    if (!error && slackChanged) ({ error } = await supabase.rpc('set_my_slack_user_id', { new_slack_id: slackId.trim() }));
     setSaving(false);
     if (error) {
       // PostgrestError is a plain object with `.message` — read it so the user
@@ -138,6 +143,16 @@ export default function AccountPanel({
               style={{ width: '100%', fontSize: 13, marginBottom: 14 }}
               onKeyDown={e => { if (e.key === 'Enter') save(); else if (e.key === 'Escape') cancel(); }}
             />
+            <div style={labelStyle}>Slack member ID</div>
+            <input
+              className="form-input"
+              value={slackId}
+              onChange={e => setSlackId(e.target.value)}
+              placeholder="e.g. U01ABCDE23"
+              style={{ width: '100%', fontSize: 13, marginBottom: 4 }}
+              onKeyDown={e => { if (e.key === 'Enter') save(); else if (e.key === 'Escape') cancel(); }}
+            />
+            <div style={{ fontSize: 10, color: 'var(--text-faint)', marginBottom: 14 }}>Used to @-mention you in Ad Creative pipeline pings.</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn-primary" style={{ fontSize: 12, padding: '8px 14px' }} onClick={save} disabled={saving}>
                 {saving ? 'Saving…' : 'Save'}
@@ -151,6 +166,8 @@ export default function AccountPanel({
             <div style={valueStyle}>{profile.display_name?.trim() || <span style={{ color: 'var(--text-faint)' }}>—</span>}</div>
             <div style={labelStyle}>Job title</div>
             <div style={valueStyle}>{profile.job_title?.trim() || <span style={{ color: 'var(--text-faint)' }}>—</span>}</div>
+            <div style={labelStyle}>Slack member ID</div>
+            <div style={valueStyle}>{profile.slack_user_id?.trim() || <span style={{ color: 'var(--text-faint)' }}>—</span>}</div>
           </>
         )}
 

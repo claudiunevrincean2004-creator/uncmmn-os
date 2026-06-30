@@ -27,6 +27,46 @@ export function resolveAssignee(assignedTo: string | undefined | null, profiles:
   return byText ? profileName(byText) : null;
 }
 
+// Build a Slack mention from a profile's slack_user_id. Returns `<@ID>` when the
+// id is present, else plain text `@name (Slack ID not set)` so the message still
+// posts and flags the gap. Empty name → '' (caller treats as unassigned).
+function mentionFor(name: string, id: string | null | undefined): string {
+  const n = (name || '').trim();
+  if (!n) return '';
+  const sid = (id || '').trim();
+  return sid ? `<@${sid}>` : `@${n} (Slack ID not set)`;
+}
+
+// Mention for a person looked up by Display Name among profiles (used for the
+// fixed reviewers, e.g. Claudiu / Colin). No match → "(Slack ID not set)".
+export function slackMentionByName(name: string, profiles: Profile[]): string {
+  const n = (name || '').trim();
+  if (!n) return '';
+  const p = profiles.find(x => profileName(x).toLowerCase() === n.toLowerCase());
+  return mentionFor(n, p?.slack_user_id);
+}
+
+// Mention for a row's assigned_to (a profile id or legacy text). Resolves to a
+// profile by Display Name the same way the UI does, then reads its slack_user_id.
+// Returns '' when assigned_to is empty / unmatched → caller treats as unassigned.
+export function slackMentionByAssignee(assignedTo: string | undefined | null, profiles: Profile[]): string {
+  const name = resolveAssignee(assignedTo, profiles);
+  if (!name) return '';
+  const p = profiles.find(x => profileName(x) === name);
+  return mentionFor(name, p?.slack_user_id);
+}
+
+// Bundle of the @-mentions an Ad Creative pipeline ping needs: the assigned
+// editor plus the two fixed reviewers. Resolved entirely client-side from the
+// already-loaded profiles (slack_user_id lives on the profile now).
+export function buildPipelineMentions(assignedTo: string | undefined | null, profiles: Profile[]) {
+  return {
+    editorMention: slackMentionByAssignee(assignedTo, profiles),
+    claudiuMention: slackMentionByName('Claudiu', profiles),
+    colinMention: slackMentionByName('Colin', profiles),
+  };
+}
+
 // Searchable picker backed by all real platform users. Everyone is assignable;
 // the legacy `assignable` flag is ignored (kept in the DB, no longer used).
 export function UserPicker({
