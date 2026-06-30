@@ -301,7 +301,6 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
     { key: 'assigned_to_user_id', label: 'Assigned To', type: 'user' },
     { key: 'source_video_url', label: 'Source Video', type: 'url' },
     { key: 'final_link', label: 'Final', type: 'url' },
-    { key: 'buyer_feedback', label: 'Buyer Feedback', type: 'textarea', placeholder: 'Notes the editor should action' },
     { key: 'status', label: 'Status', type: 'pill', field: 'ad_status', options: statusValues, colors: statusColors, allowAdd: isAdmin },
   ], [formatValues, formatColors, angleOpts, angleColors, statusValues, statusColors, isAdmin]);
 
