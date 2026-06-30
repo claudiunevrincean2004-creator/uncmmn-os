@@ -37,7 +37,7 @@ const FIELD_FALLBACKS: Record<string, { values: string[]; colors?: Record<string
 interface VideoDraft {
   title: string;
   format: string;
-  assigned_to: string;
+  assigned_to_user_id: string;
   status: string;
   priority: string;
   brief_url: string;
@@ -48,7 +48,7 @@ interface VideoDraft {
 const EMPTY_DRAFT: VideoDraft = {
   title: '',
   format: '',
-  assigned_to: '',
+  assigned_to_user_id: '',
   status: 'Briefing',
   priority: 'Normal',
   brief_url: '',
@@ -126,7 +126,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
         briefLink: v.brief_url || '',
         rawFilesLink: v.raw_files_url || '',
         finalLink: v.final_url || '',
-        ...buildPipelineMentions(v.assigned_to, profiles),
+        ...buildPipelineMentions(v.assigned_to_user_id, profiles),
       });
     }
     await patch(v.id, p);
@@ -166,13 +166,14 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
     if (adBusy) return;
     setAdBusy(v.id);
     const creativeId = `${(v.title || 'Untitled').trim()} — Ad`;
-    const editorName = resolveAssignee(v.assigned_to, profiles) || '';
-    const mentions = buildPipelineMentions(v.assigned_to, profiles);
+    const editorName = resolveAssignee(v.assigned_to_user_id, profiles) || '';
+    const mentions = buildPipelineMentions(v.assigned_to_user_id, profiles);
     const sourceLink = v.final_url || '';
     const row = {
       creative_id: creativeId,
       source_video_url: sourceLink || null,
-      assigned_to: v.assigned_to || null,
+      // Carry the user REFERENCE (not the legacy text) onto the new ad creative.
+      assigned_to_user_id: v.assigned_to_user_id || null,
       date_added: todayISO(),
       ad_format: 'Video',
       status: 'Ad Creative Needed',
@@ -196,7 +197,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
     const row = {
       title: draft.title.trim() || 'Untitled Video',
       format: draft.format || null,
-      assigned_to: draft.assigned_to || null,
+      assigned_to_user_id: draft.assigned_to_user_id || null,
       status: draft.status || 'Briefing',
       priority: draft.priority || 'Normal',
       brief_url: draft.brief_url.trim() || null,
@@ -222,7 +223,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
         briefLink: row.brief_url ?? '',
         rawFilesLink: row.raw_files_url ?? '',
         finalLink: row.final_url ?? '',
-        ...buildPipelineMentions(row.assigned_to, profiles),
+        ...buildPipelineMentions(row.assigned_to_user_id, profiles),
       });
     }
     closeAdd();
@@ -244,14 +245,14 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   // Filter dropdowns only offer values actually present in the data
   const present = (vals: (string | undefined)[]) => ['All', ...Array.from(new Set(vals.filter(Boolean) as string[]))];
   const statusPresent = present(videos.map(v => v.status));
-  const assignedPresent = present(videos.map(v => resolveAssignee(v.assigned_to, profiles) || undefined));
+  const assignedPresent = present(videos.map(v => resolveAssignee(v.assigned_to_user_id, profiles) || undefined));
   const formatPresent = present(videos.map(v => v.format));
   const priorityPresent = present(videos.map(v => v.priority || 'Normal'));
 
   const filtered = useMemo(() => {
     let r = videos;
     if (fStatus !== 'All') r = r.filter(v => v.status === fStatus);
-    if (fAssigned !== 'All') r = r.filter(v => (resolveAssignee(v.assigned_to, profiles) || '') === fAssigned);
+    if (fAssigned !== 'All') r = r.filter(v => (resolveAssignee(v.assigned_to_user_id, profiles) || '') === fAssigned);
     if (fFormat !== 'All') r = r.filter(v => (v.format || '') === fFormat);
     if (fPriority !== 'All') r = r.filter(v => (v.priority || 'Normal') === fPriority);
     if (dateFrom || dateTo) r = r.filter(v => inDateRange(v.deadline, dateFrom, dateTo));
@@ -275,7 +276,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   const fields: FieldDef[] = useMemo(() => [
     { key: 'title', label: 'Title / Desc', type: 'textarea', placeholder: 'Title / description' },
     { key: 'format', label: 'Format', type: 'pill', field: 'video_format', options: formatValues, colors: formatColors, allowAdd: isAdmin, allowEmpty: true },
-    { key: 'assigned_to', label: 'Assigned To', type: 'user' },
+    { key: 'assigned_to_user_id', label: 'Assigned To', type: 'user' },
     { key: 'status', label: 'Status', type: 'pill', field: 'video_status', options: statusValues, colors: statusColors, allowAdd: isAdmin },
     { key: 'priority', label: 'Priority', type: 'pill', field: 'video_priority', options: priorityOpts, colors: PRIORITY_COLORS, allowAdd: isAdmin },
     { key: 'brief_url', label: 'Brief', type: 'url' },
@@ -346,7 +347,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                           <button onClick={() => setSelectedId(v.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{v.title}</button>
                         </td>
                         <td><EditPillSelect field="video_format" value={v.format || ''} options={formatValues} colors={formatColors} onChange={f => patch(v.id, { format: f })} onAddOption={addOption} allowAdd={isAdmin} allowEmpty /></td>
-                        <td><UserPicker value={v.assigned_to} profiles={profiles} onChange={uid => patch(v.id, { assigned_to: uid })} /></td>
+                        <td><UserPicker value={v.assigned_to_user_id ?? undefined} profiles={profiles} onChange={uid => patch(v.id, { assigned_to_user_id: uid || null })} /></td>
                         <td><EditPillSelect field="video_status" value={v.status} options={statusValues} colors={statusColors} onChange={s => changeStatus(v, s)} onAddOption={addOption} allowAdd={isAdmin} /></td>
                         <td><UrlCell value={v.brief_url} onCommit={u => patch(v.id, { brief_url: u })} /></td>
                         <td><UrlCell value={v.raw_files_url} onCommit={u => patch(v.id, { raw_files_url: u })} /></td>
@@ -394,7 +395,11 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
           title={selected.title}
           fields={fields}
           values={selected}
-          onChangeField={(key, value) => { if (key === 'status') changeStatus(selected, value); else patch(selected.id, { [key]: value }); }}
+          onChangeField={(key, value) => {
+            if (key === 'status') changeStatus(selected, value);
+            else if (key === 'assigned_to_user_id') patch(selected.id, { assigned_to_user_id: value || null });
+            else patch(selected.id, { [key]: value });
+          }}
           onAddOption={addOption}
           comments={comments}
           activity={activity}
@@ -421,7 +426,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                 <EditPillSelect field="video_format" value={draft.format} options={formatValues} colors={formatColors} onChange={f => setDraft(d => ({ ...d, format: f }))} onAddOption={addOption} allowAdd={isAdmin} allowEmpty />
               </DraftField>
               <DraftField label="Assigned To">
-                <UserPicker value={draft.assigned_to} profiles={profiles} onChange={uid => setDraft(d => ({ ...d, assigned_to: uid }))} />
+                <UserPicker value={draft.assigned_to_user_id} profiles={profiles} onChange={uid => setDraft(d => ({ ...d, assigned_to_user_id: uid }))} />
               </DraftField>
               <DraftField label="Status">
                 <EditPillSelect field="video_status" value={draft.status} options={statusValues} colors={statusColors} onChange={s => setDraft(d => ({ ...d, status: s }))} onAddOption={addOption} allowAdd={isAdmin} />

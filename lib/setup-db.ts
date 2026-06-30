@@ -180,6 +180,7 @@ alter table revenue_entries disable row level security;`);
   title text not null,
   format text,
   assigned_to text,
+  assigned_to_user_id uuid,
   status text default 'Briefing',
   priority text default 'Normal',
   brief_url text,
@@ -250,6 +251,7 @@ create policy "anon_all_studio_sessions" on studio_sessions for all to anon usin
   deadline date,
   notes text,
   assigned_to text,
+  assigned_to_user_id uuid,
   created_at timestamptz default now()
 );
 alter table studio_ad_creatives enable row level security;

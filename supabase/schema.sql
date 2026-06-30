@@ -86,6 +86,7 @@ create table if not exists studio_videos (
   title text not null,
   format text,
   assigned_to text,
+  assigned_to_user_id uuid,
   status text default 'Scripting',
   priority text default 'Normal',
   brief_url text,
@@ -147,6 +148,7 @@ create table if not exists studio_ad_creatives (
   deadline date,
   notes text,
   assigned_to text,
+  assigned_to_user_id uuid,
   created_at timestamptz default now()
 );
 -- Migrate older installs of studio_ad_creatives to the new columns

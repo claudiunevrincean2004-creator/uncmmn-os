@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   // Unknown/non-notify status → no message (guard against stray calls).
   if (!NOTIFY.has(status)) return NextResponse.json({ skipped: true });
 
-  const editor = editorMention || '⚠️ an editor (unassigned)';
+  const editor = editorMention || '⚠️ Unassigned — set an editor';
   // Item identified only by a clickable deep link to its page; omit the line when
   // there's no URL (rather than showing plain text).
   const openLine = itemUrl ? `<${itemUrl}|🔗 Open in OS>` : null;

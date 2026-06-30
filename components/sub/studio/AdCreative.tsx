@@ -39,7 +39,7 @@ interface AdDraft {
   ad_format: string;
   angle: string;
   final_link: string;
-  assigned_to: string;
+  assigned_to_user_id: string;
   status: string;
 }
 const EMPTY_DRAFT: AdDraft = {
@@ -48,7 +48,7 @@ const EMPTY_DRAFT: AdDraft = {
   ad_format: '',
   angle: '',
   final_link: '',
-  assigned_to: '',
+  assigned_to_user_id: '',
   status: 'Ad Creative Needed',
 };
 
@@ -136,7 +136,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
         itemUrl: adUrl(id),
         sourceLink: (p.source_video_url ?? prev?.source_video_url) ?? '',
         finalLink: (p.final_link ?? prev?.final_link) ?? '',
-        ...buildPipelineMentions((p.assigned_to ?? prev?.assigned_to) ?? null, profiles),
+        ...buildPipelineMentions((p.assigned_to_user_id ?? prev?.assigned_to_user_id) ?? null, profiles),
       });
     }
   }
@@ -176,7 +176,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
       ad_format: draft.ad_format || null,
       angle: draft.angle.trim() || null,
       final_link: draft.final_link.trim() || null,
-      assigned_to: draft.assigned_to || null,
+      assigned_to_user_id: draft.assigned_to_user_id || null,
       status,
     };
     const { data: created, error } = await supabase.from('studio_ad_creatives').insert([row]).select().single();
@@ -195,7 +195,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
         itemUrl: created?.id ? adUrl(created.id) : '',
         sourceLink: '',
         finalLink: row.final_link ?? '',
-        ...buildPipelineMentions(row.assigned_to, profiles),
+        ...buildPipelineMentions(row.assigned_to_user_id, profiles),
       });
     }
     closeAdd();
@@ -298,7 +298,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
     { key: 'date_added', label: 'Date Added', type: 'date' },
     { key: 'ad_format', label: 'Format', type: 'pill', field: 'ad_format', options: formatValues, colors: formatColors, allowAdd: isAdmin, allowEmpty: true },
     { key: 'angle', label: 'Angle', type: 'pill', field: 'ad_angle', options: angleOpts, colors: angleColors, allowAdd: isAdmin, allowEmpty: true },
-    { key: 'assigned_to', label: 'Assigned To', type: 'user' },
+    { key: 'assigned_to_user_id', label: 'Assigned To', type: 'user' },
     { key: 'source_video_url', label: 'Source Video', type: 'url' },
     { key: 'final_link', label: 'Final', type: 'url' },
     { key: 'buyer_feedback', label: 'Buyer Feedback', type: 'textarea', placeholder: 'Notes the editor should action' },
@@ -381,7 +381,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                       <td><InlineDate value={a.date_added} onCommit={d => patch(a.id, { date_added: d || undefined })} /></td>
                       <td><EditPillSelect field="ad_format" value={a.ad_format || ''} options={formatValues} colors={formatColors} onChange={f => patch(a.id, { ad_format: f })} onAddOption={addOption} allowAdd={isAdmin} allowEmpty /></td>
                       <td><EditPillSelect field="ad_angle" value={a.angle || ''} options={angleOpts} colors={angleColors} onChange={x => patch(a.id, { angle: x })} onAddOption={addOption} allowAdd={isAdmin} allowEmpty /></td>
-                      <td><UserPicker value={a.assigned_to} profiles={profiles} onChange={uid => patch(a.id, { assigned_to: uid })} /></td>
+                      <td><UserPicker value={a.assigned_to_user_id ?? undefined} profiles={profiles} onChange={uid => patch(a.id, { assigned_to_user_id: uid || null })} /></td>
                       <td><UrlCell value={a.source_video_url} onCommit={u => patch(a.id, { source_video_url: u })} /></td>
                       <td><UrlCell value={a.final_link} onCommit={u => patch(a.id, { final_link: u })} /></td>
                       <td>
@@ -408,7 +408,11 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
           title={selected.creative_id || 'Ad Creative'}
           fields={fields}
           values={selected}
-          onChangeField={(key, value) => { if (key === 'status') changeStatus(selected, value); else patch(selected.id, { [key]: value }); }}
+          onChangeField={(key, value) => {
+            if (key === 'status') changeStatus(selected, value);
+            else if (key === 'assigned_to_user_id') patch(selected.id, { assigned_to_user_id: value || null });
+            else patch(selected.id, { [key]: value });
+          }}
           onAddOption={addOption}
           comments={comments}
           activity={activity}
@@ -441,7 +445,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                 <EditPillSelect field="ad_angle" value={draft.angle} options={angleOpts} colors={angleColors} onChange={x => setDraft(d => ({ ...d, angle: x }))} onAddOption={addOption} allowAdd={isAdmin} allowEmpty />
               </DraftField>
               <DraftField label="Assigned To">
-                <UserPicker value={draft.assigned_to} profiles={profiles} onChange={uid => setDraft(d => ({ ...d, assigned_to: uid }))} />
+                <UserPicker value={draft.assigned_to_user_id} profiles={profiles} onChange={uid => setDraft(d => ({ ...d, assigned_to_user_id: uid }))} />
               </DraftField>
               <DraftField label="Final">
                 <input className="form-input" value={draft.final_link} onChange={e => setDraft(d => ({ ...d, final_link: e.target.value }))} placeholder="https://…" style={{ width: '100%', fontSize: 12 }} />

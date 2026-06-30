@@ -57,7 +57,8 @@ export interface StudioVideo {
   id: string;
   title: string;
   format?: string;
-  assigned_to?: string;
+  assigned_to?: string;            // legacy free-text/uuid (kept as migration fallback)
+  assigned_to_user_id?: string | null; // canonical reference to profiles.id
   status: string;
   priority: string;
   brief_url?: string;
@@ -100,7 +101,8 @@ export interface StudioAdCreative {
   platform?: string;
   deadline?: string;
   notes?: string;
-  assigned_to?: string;
+  assigned_to?: string;            // legacy free-text/uuid (kept as migration fallback)
+  assigned_to_user_id?: string | null; // canonical reference to profiles.id
   custom_values?: Record<string, string>;
   created_at?: string;
 }
