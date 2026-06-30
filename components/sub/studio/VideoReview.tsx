@@ -78,6 +78,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState<VideoDraft>(EMPTY_DRAFT);
   const [creating, setCreating] = useState(false);
+  const [adBusy, setAdBusy] = useState<string | null>(null);
 
   // Built-in Format & Status options are DB-backed (admin-managed) with defaults
   const statusFieldOpts = getFieldOptions(dropdownOptions, 'video_status', VIDEO_STATUSES, VIDEO_STATUS_COLORS);
@@ -107,18 +108,47 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
       p.revision_count = (v.revision_count || 0) + 1;
     }
     await logActivity('video', v.id, 'Status changed', v.status, status);
-    // Automation: spawn an Ad Creative entry when a video needs an ad variation
-    if (status === 'Ad Variation Needed') {
-      await supabase.from('studio_ad_creatives').insert([{
-        creative_id: v.title,
-        source_video_url: v.final_url || null,
-        date_added: todayISO(),
-        ad_format: 'Video',
-        status: 'Paused',
-      }]);
-      showToast(`Ad variation created for ${v.title}`);
-    }
     await patch(v.id, p);
+  }
+
+  // Fire-and-forget POST to the Ad Creative pipeline notify (server holds the
+  // Slack webhook URL, skips silently if unset). Never blocks the UI or throws.
+  function notifyAdPipeline(payload: { status: string; creativeId: string; editor: string; sourceLink: string; buyerFeedback: string }) {
+    fetch('/api/ads-notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).catch(err => console.warn('[VideoReview] /api/ads-notify call failed', err));
+  }
+
+  // "Ad Creative Needed": spawn a new Ad Creative row from this video to kick off
+  // the ad lifecycle. Pre-fills the creative id (video title + " — Ad"), the
+  // source link (the video's Final Product link), and the assigned editor; starts
+  // it at "Variation Needed", which pings the editor in #ad-creative-pipeline.
+  async function createAdCreative(v: StudioVideo) {
+    if (adBusy) return;
+    setAdBusy(v.id);
+    const creativeId = `${(v.title || 'Untitled').trim()} — Ad`;
+    const editorName = resolveAssignee(v.assigned_to, profiles) || '';
+    const sourceLink = v.final_url || '';
+    const row = {
+      creative_id: creativeId,
+      source_video_url: sourceLink || null,
+      assigned_to: v.assigned_to || null,
+      date_added: todayISO(),
+      ad_format: 'Video',
+      status: 'Variation Needed',
+    };
+    const { error } = await supabase.from('studio_ad_creatives').insert([row]);
+    setAdBusy(null);
+    if (error) {
+      console.error('[VideoReview] failed to create ad creative', { row, error });
+      alert(`Couldn't create ad creative: ${error.message}`);
+      return;
+    }
+    notifyAdPipeline({ status: 'Variation Needed', creativeId, editor: editorName, sourceLink, buyerFeedback: '' });
+    showToast(`Ad creative created for ${creativeId} → assigned to ${editorName || 'unassigned'}`);
+    onReload();
   }
 
   async function createVideo() {
@@ -249,6 +279,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                   <th>Deadline</th>
                   <th>Priority</th>
                   <th>Rev.</th>
+                  <th>Ad Creative</th>
                   <th></th>
                 </tr>
               </thead>
@@ -278,6 +309,17 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                           {v.revision_count > 0
                             ? <span className="badge" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }} title={`${v.revision_count} revision round(s)`}>{v.revision_count}</span>
                             : <span style={{ color: 'var(--text-faint)' }}>0</span>}
+                        </td>
+                        <td>
+                          <button
+                            className="btn-ghost"
+                            style={{ fontSize: 11, padding: '4px 10px', color: 'var(--accent)', whiteSpace: 'nowrap' }}
+                            onClick={() => createAdCreative(v)}
+                            disabled={adBusy === v.id}
+                            title="Create an Ad Creative from this video and start the ad lifecycle"
+                          >
+                            {adBusy === v.id ? '…' : '🎬 Ad Creative Needed'}
+                          </button>
                         </td>
                         <td><button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteVideo(v.id)}>✕</button></td>
                       </tr>

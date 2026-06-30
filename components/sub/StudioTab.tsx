@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile } from '@/lib/types';
+import { StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile, SlackUserMap } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { todayISO } from '@/lib/studio';
 import VideoReview from './studio/VideoReview';
@@ -29,11 +29,12 @@ interface Props {
   properties: CustomProperty[];
   customOptions: CustomPropertyOption[];
   profiles: Profile[];
+  slackUsers: SlackUserMap[];
   isAdmin: boolean;
   onReload: () => void;
 }
 
-export default function StudioTab({ videos, sequences, sessions, adCreatives, comments, activity, quickLinks, dropdownOptions, properties, customOptions, profiles, isAdmin, onReload }: Props) {
+export default function StudioTab({ videos, sequences, sessions, adCreatives, comments, activity, quickLinks, dropdownOptions, properties, customOptions, profiles, slackUsers, isAdmin, onReload }: Props) {
   const [sub, setSub] = usePersistedState<SubTab>('studio_subtab', 'videos');
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -96,17 +97,17 @@ export default function StudioTab({ videos, sequences, sessions, adCreatives, co
   // Ad Creative-specific cards, counted from real status values. Unknown status
   // names simply don't match, leaving the relevant card at 0.
   const adStats = useMemo(() => {
-    const live = adCreatives.filter(a => a.status === 'Live').length;
+    const readyForReview = adCreatives.filter(a => a.status === 'Ready for Review').length;
+    const testing = adCreatives.filter(a => a.status === 'Testing').length;
     const winners = adCreatives.filter(a => a.status === 'Winner').length;
-    const revisionRequested = adCreatives.filter(a => a.status === 'Revision Requested').length;
     const total = adCreatives.length;
-    return { live, winners, revisionRequested, total };
+    return { readyForReview, testing, winners, total };
   }, [adCreatives]);
 
   const adOverviewItems: { label: string; value: string; color?: string }[] = [
-    { label: 'Live', value: String(adStats.live), color: '#8b5cf6' },
+    { label: 'Ready for Review', value: String(adStats.readyForReview), color: adStats.readyForReview > 0 ? '#eab308' : 'var(--text)' },
+    { label: 'Testing', value: String(adStats.testing), color: '#8b5cf6' },
     { label: 'Winners', value: String(adStats.winners), color: 'var(--text)' },
-    { label: 'Revision Requested', value: String(adStats.revisionRequested), color: adStats.revisionRequested > 0 ? '#ef4444' : 'var(--text)' },
     { label: 'Total creatives', value: String(adStats.total), color: 'var(--text)' },
   ];
 
@@ -140,7 +141,7 @@ export default function StudioTab({ videos, sequences, sessions, adCreatives, co
       {sub === 'videos' && <VideoReview videos={videos} comments={comments} activity={activity} quickLinks={quickLinks} dropdownOptions={dropdownOptions} profiles={profiles} isAdmin={isAdmin} onReload={onReload} showToast={showToast} />}
       {sub === 'sequences' && <StorySequences sequences={sequences} comments={comments} activity={activity} dropdownOptions={dropdownOptions} properties={properties} customOptions={customOptions} profiles={profiles} isAdmin={isAdmin} onReload={onReload} />}
       {sub === 'sessions' && <FilmingSessions sessions={sessions} comments={comments} activity={activity} dropdownOptions={dropdownOptions} properties={properties} customOptions={customOptions} profiles={profiles} isAdmin={isAdmin} onReload={onReload} />}
-      {sub === 'ads' && <AdCreative adCreatives={adCreatives} comments={comments} activity={activity} quickLinks={quickLinks} dropdownOptions={dropdownOptions} properties={properties} customOptions={customOptions} profiles={profiles} isAdmin={isAdmin} onReload={onReload} showToast={showToast} />}
+      {sub === 'ads' && <AdCreative adCreatives={adCreatives} comments={comments} activity={activity} quickLinks={quickLinks} dropdownOptions={dropdownOptions} properties={properties} customOptions={customOptions} profiles={profiles} slackUsers={slackUsers} isAdmin={isAdmin} onReload={onReload} showToast={showToast} />}
 
       {/* Toast */}
       {toast && (

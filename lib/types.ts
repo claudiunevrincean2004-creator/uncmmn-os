@@ -122,6 +122,15 @@ export interface StudioDropdownOption {
   created_at?: string;
 }
 
+// Maps a person's name to their Slack user ID, so Ad Creative status pings can
+// @-mention the right person. Edited via the "Team Slack IDs" mini-editor.
+export interface SlackUserMap {
+  id: string;
+  person_name: string;
+  slack_user_id?: string | null;
+  created_at?: string;
+}
+
 export interface Profile {
   id: string;
   role?: string;

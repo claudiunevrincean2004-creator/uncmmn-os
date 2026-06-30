@@ -6,6 +6,10 @@ export const VIDEO_FORMATS = ['Short', 'Long Form', 'Reel', 'Story', 'Other'];
 // Hardcoded team list (editable later). Used for "Assigned To".
 export const TEAM = ['Unassigned', 'Nathan', 'Editor', 'Videographer', 'Scriptwriter', 'Thumbnail Designer'];
 
+// Video Review is purely organic content production — no ad-lifecycle statuses
+// live here. The ad lifecycle (Variation Needed → … → Winner/Killed) lives
+// entirely on Ad Creative; videos move through to "Posted" and spawn ad work via
+// the per-row "Ad Creative Needed" button instead of an in-flow status.
 export const VIDEO_STATUSES = [
   'Scripting',
   'Recording',
@@ -13,8 +17,6 @@ export const VIDEO_STATUSES = [
   'Editing',
   'In Review',
   'Revision Requested',
-  'Ad Variation Needed',
-  'Approved',
   'Posted',
 ];
 
@@ -25,21 +27,33 @@ export const VIDEO_STATUS_COLORS: Record<string, string> = {
   'Editing': '#f59e0b',             // orange
   'In Review': '#8b5cf6',           // purple
   'Revision Requested': '#ef4444',  // red
-  'Ad Variation Needed': '#ec4899', // pink
-  'Approved': '#10b981',            // green
   'Posted': '#14b8a6',              // teal
 };
 
-// Ad Creative pipeline
+// Ad Creative pipeline — full ad lifecycle (replaces the old Live/Paused/Winner/
+// Killed/Revision Requested set). "Ready to Test" is the approval gate (there is
+// no separate "Approved"). Status transitions ping #ad-creative-pipeline.
 export const AD_FORMATS = ['Video', 'Static'];
-export const AD_STATUSES = ['Live', 'Paused', 'Winner', 'Killed', 'Revision Requested'];
+export const AD_STATUSES = [
+  'Variation Needed',
+  'Editing',
+  'Ready for Review',
+  'Revisions Needed',
+  'Ready to Test',
+  'Testing',
+  'Winner',
+  'Killed',
+];
 
 export const AD_STATUS_COLORS: Record<string, string> = {
-  Live: '#10b981',                   // green
-  Paused: '#eab308',                 // yellow
-  Winner: '#14b8a6',                 // teal
-  Killed: '#ef4444',                 // red
-  'Revision Requested': '#f59e0b',   // orange
+  'Variation Needed': '#f59e0b',   // orange
+  'Editing': '#3b82f6',            // blue
+  'Ready for Review': '#eab308',   // yellow
+  'Revisions Needed': '#ef4444',   // red
+  'Ready to Test': '#14b8a6',      // teal
+  'Testing': '#8b5cf6',            // purple
+  'Winner': '#10b981',             // green
+  'Killed': '#6b7280',             // gray
 };
 
 export const PRIORITIES = ['Low', 'Normal', 'High', 'Urgent'];

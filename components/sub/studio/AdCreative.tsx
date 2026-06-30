@@ -1,7 +1,7 @@
 'use client';
 import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
-import { StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile } from '@/lib/types';
+import { StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile, SlackUserMap } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { usePagedRows } from '@/lib/use-paged-rows';
 import LoadMore from './LoadMore';
@@ -9,15 +9,18 @@ import { AD_FORMATS, AD_STATUSES, AD_STATUS_COLORS, todayISO, logActivity, merge
 import { EditPillSelect, MiniSelect, InlineDate, UrlCell } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import QuickLinks from './QuickLinks';
+import { UserPicker, resolveAssignee } from './UserPicker';
 import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal, AddPropertyButton } from './CustomColumns';
 import FieldOptionsManager from './FieldOptionsManager';
+import SlackUserMapEditor from './SlackUserMapEditor';
 import FilterField from './FilterField';
 
 type SortKey = 'date_added' | 'angle';
 const TABLE_KEY = 'ad';
 
-// Statuses whose transition fires a Slack notification (see /api/ads-notify).
-const ADS_NOTIFY_STATUSES = ['Ready to test', 'Revision Requested'];
+// Status transitions whose entry fires a Slack ping to #ad-creative-pipeline (see
+// /api/ads-notify). Editing / Testing / Winner / Killed are intentionally silent.
+const PIPELINE_NOTIFY_STATUSES = ['Variation Needed', 'Ready for Review', 'Revisions Needed', 'Ready to Test'];
 
 // In-code fallback options per built-in select field, so adding an option can
 // backfill them as rows instead of dropping them (see buildAddOptionRows).
@@ -37,6 +40,7 @@ interface AdDraft {
   ad_format: string;
   angle: string;
   final_link: string;
+  assigned_to: string;
   status: string;
 }
 const EMPTY_DRAFT: AdDraft = {
@@ -45,7 +49,8 @@ const EMPTY_DRAFT: AdDraft = {
   ad_format: '',
   angle: '',
   final_link: '',
-  status: 'Paused',
+  assigned_to: '',
+  status: 'Variation Needed',
 };
 
 
@@ -58,12 +63,13 @@ interface Props {
   properties: CustomProperty[];
   customOptions: CustomPropertyOption[];
   profiles: Profile[];
+  slackUsers: SlackUserMap[];
   isAdmin: boolean;
   onReload: () => void;
   showToast: (msg: string) => void;
 }
 
-export default function AdCreative({ adCreatives, comments, activity, quickLinks, dropdownOptions, properties, customOptions, profiles, isAdmin, onReload, showToast }: Props) {
+export default function AdCreative({ adCreatives, comments, activity, quickLinks, dropdownOptions, properties, customOptions, profiles, slackUsers, isAdmin, onReload, showToast }: Props) {
   const [fStatus, setFStatus] = usePersistedState<string>('studio_ad_status', 'All');
   const [fFormat, setFFormat] = usePersistedState<string>('studio_ad_format', 'All');
   const [fAngle, setFAngle] = usePersistedState<string>('studio_ad_angle', 'All');
@@ -79,6 +85,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState<AdDraft>(EMPTY_DRAFT);
   const [creating, setCreating] = useState(false);
+  const [slackOpen, setSlackOpen] = useState(false);
 
   const cprops = useMemo(() => sortProps(properties, TABLE_KEY), [properties]);
   const optsByProp = useMemo(() => groupOptions(customOptions), [customOptions]);
@@ -107,10 +114,10 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   async function patch(id: string, p: Partial<StudioAdCreative>) {
     // Detect a transition INTO a notify status from the pre-update row BEFORE
     // writing. Doing it here (rather than only in changeStatus) means the Slack
-    // notify fires no matter which handler set the status — the inline Status
-    // pill or the detail panel — and never on a re-save while already in it.
+    // ping fires no matter which handler set the status — the inline Status pill
+    // or the detail panel — and never on a re-save while already in it.
     const prev = adCreatives.find(x => x.id === id);
-    const becoming = p.status && ADS_NOTIFY_STATUSES.includes(p.status) && prev?.status !== p.status ? p.status : null;
+    const becoming = p.status && PIPELINE_NOTIFY_STATUSES.includes(p.status) && prev?.status !== p.status ? p.status : null;
 
     const { error } = await supabase.from('studio_ad_creatives').update(p).eq('id', id);
     if (error) {
@@ -121,11 +128,13 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
     onReload();
 
     if (!error && becoming) {
-      notifyStatus({
+      // Prefer a value included in this same patch, else the current row value.
+      notifyAdPipeline({
         status: becoming,
-        name: prev?.creative_id ?? '',
-        // Prefer a value included in this same patch, else the current row value.
-        finalUrl: (p.final_link ?? prev?.final_link) ?? '',
+        creativeId: prev?.creative_id ?? '',
+        editor: resolveAssignee((p.assigned_to ?? prev?.assigned_to) ?? null, profiles) ?? '',
+        sourceLink: (p.source_video_url ?? prev?.source_video_url) ?? '',
+        buyerFeedback: (p.buyer_feedback ?? prev?.buyer_feedback) ?? '',
       });
     }
   }
@@ -133,13 +142,14 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   async function changeStatus(a: StudioAdCreative, status: string) {
     if (status === a.status) return;
     await logActivity('ad', a.id, 'Status changed', a.status, status);
-    // patch() detects the transition into a notify status and fires the Slack notify.
+    // patch() detects the transition into a notify status and fires the Slack ping.
     await patch(a.id, { status });
   }
 
-  // Fire-and-forget POST to the server route, which holds the Slack webhook URL
-  // and skips silently if it's unset. Never blocks the UI or throws.
-  function notifyStatus(payload: { status: string; name: string; finalUrl: string }) {
+  // Fire-and-forget POST to the #ad-creative-pipeline notify route, which holds
+  // the Slack webhook URL and resolves @-mentions via slack_user_map. Skips
+  // silently if the webhook is unset. Never blocks the UI or throws.
+  function notifyAdPipeline(payload: { status: string; creativeId: string; editor: string; sourceLink: string; buyerFeedback: string }) {
     fetch('/api/ads-notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -150,13 +160,15 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   async function createAd() {
     if (creating) return;
     setCreating(true);
+    const status = draft.status || 'Variation Needed';
     const row = {
       creative_id: draft.creative_id.trim() || 'New Creative',
       date_added: draft.date_added || null,
       ad_format: draft.ad_format || null,
       angle: draft.angle.trim() || null,
       final_link: draft.final_link.trim() || null,
-      status: draft.status || 'Paused',
+      assigned_to: draft.assigned_to || null,
+      status,
     };
     const { error } = await supabase.from('studio_ad_creatives').insert([row]);
     setCreating(false);
@@ -164,6 +176,17 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
       console.error('[AdCreative] failed to create ad creative', { row, error });
       alert(`Couldn't create ad creative: ${error.message}`);
       return;
+    }
+    // A row created directly at a notify status pings the pipeline too (mirrors
+    // the "Ad Creative Needed" button creating one at "Variation Needed").
+    if (PIPELINE_NOTIFY_STATUSES.includes(status)) {
+      notifyAdPipeline({
+        status,
+        creativeId: row.creative_id,
+        editor: resolveAssignee(row.assigned_to, profiles) ?? '',
+        sourceLink: '',
+        buyerFeedback: '',
+      });
     }
     closeAdd();
     onReload();
@@ -265,7 +288,10 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
     { key: 'date_added', label: 'Date Added', type: 'date' },
     { key: 'ad_format', label: 'Format', type: 'pill', field: 'ad_format', options: formatValues, colors: formatColors, allowAdd: isAdmin, allowEmpty: true },
     { key: 'angle', label: 'Angle', type: 'pill', field: 'ad_angle', options: angleOpts, colors: angleColors, allowAdd: isAdmin, allowEmpty: true },
+    { key: 'assigned_to', label: 'Assigned To', type: 'user' },
+    { key: 'source_video_url', label: 'Source Video', type: 'url' },
     { key: 'final_link', label: 'Final', type: 'url' },
+    { key: 'buyer_feedback', label: 'Buyer Feedback', type: 'textarea', placeholder: 'Notes the editor should action' },
     { key: 'status', label: 'Status', type: 'pill', field: 'ad_status', options: statusValues, colors: statusColors, allowAdd: isAdmin },
   ], [formatValues, formatColors, angleOpts, angleColors, statusValues, statusColors, isAdmin]);
 
@@ -285,7 +311,13 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
             placeholder="Search Creative ID…"
             style={{ width: 240, padding: '5px 9px', fontSize: 11 }}
           />
-          <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={() => { setDraft({ ...EMPTY_DRAFT, date_added: todayISO() }); setAddOpen(true); }}>+ Add Ad Creative</button>
+          <button
+            className="btn-ghost"
+            style={{ fontSize: 11, padding: '5px 9px', marginLeft: 'auto' }}
+            onClick={() => setSlackOpen(true)}
+            title="Edit team Slack IDs (for #ad-creative-pipeline pings)"
+          >⚙ Team Slack IDs</button>
+          <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px' }} onClick={() => { setDraft({ ...EMPTY_DRAFT, date_added: todayISO() }); setAddOpen(true); }}>+ Add Ad Creative</button>
         </div>
 
         {/* Filter / sort row */}
@@ -315,7 +347,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
         </div>
 
         {rows.length === 0 ? (
-          <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>No ad creatives yet. Add one, or set a video&apos;s status to &quot;Ad Variation Needed&quot;.</div>
+          <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>No ad creatives yet. Add one, or click &quot;Ad Creative Needed&quot; on a video in Video Review.</div>
         ) : (
           <>
           <div style={{ overflowX: 'auto' }}>
@@ -326,6 +358,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                   <th>Date Added</th>
                   <th onClick={isAdmin ? () => setOptsField({ field: 'ad_format', title: 'Format' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Format{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <th onClick={isAdmin ? () => setOptsField({ field: 'ad_angle', title: 'Angle' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Angle{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
+                  <th>Assigned To</th>
                   <th>Final</th>
                   <th>Iterate</th>
                   <th onClick={isAdmin ? () => setOptsField({ field: 'ad_status', title: 'Status' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Status{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
@@ -343,6 +376,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                       <td><InlineDate value={a.date_added} onCommit={d => patch(a.id, { date_added: d || undefined })} /></td>
                       <td><EditPillSelect field="ad_format" value={a.ad_format || ''} options={formatValues} colors={formatColors} onChange={f => patch(a.id, { ad_format: f })} onAddOption={addOption} allowAdd={isAdmin} allowEmpty /></td>
                       <td><EditPillSelect field="ad_angle" value={a.angle || ''} options={angleOpts} colors={angleColors} onChange={x => patch(a.id, { angle: x })} onAddOption={addOption} allowAdd={isAdmin} allowEmpty /></td>
+                      <td><UserPicker value={a.assigned_to} profiles={profiles} onChange={uid => patch(a.id, { assigned_to: uid })} /></td>
                       <td><UrlCell value={a.final_link} onCommit={u => patch(a.id, { final_link: u })} /></td>
                       <td>
                         <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px', color: 'var(--accent)' }} onClick={() => handleIterate(a)} title="Trigger iteration">↻ Iterate</button>
@@ -400,6 +434,9 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
               <DraftField label="Angle">
                 <EditPillSelect field="ad_angle" value={draft.angle} options={angleOpts} colors={angleColors} onChange={x => setDraft(d => ({ ...d, angle: x }))} onAddOption={addOption} allowAdd={isAdmin} allowEmpty />
               </DraftField>
+              <DraftField label="Assigned To">
+                <UserPicker value={draft.assigned_to} profiles={profiles} onChange={uid => setDraft(d => ({ ...d, assigned_to: uid }))} />
+              </DraftField>
               <DraftField label="Final">
                 <input className="form-input" value={draft.final_link} onChange={e => setDraft(d => ({ ...d, final_link: e.target.value }))} placeholder="https://…" style={{ width: '100%', fontSize: 12 }} />
               </DraftField>
@@ -421,6 +458,9 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
       )}
       {optsField && (
         <FieldOptionsManager field={optsField.field} title={optsField.title} options={dropdownOptions} onClose={() => setOptsField(null)} onReload={onReload} />
+      )}
+      {slackOpen && (
+        <SlackUserMapEditor rows={slackUsers} onClose={() => setSlackOpen(false)} onReload={onReload} />
       )}
     </div>
   );

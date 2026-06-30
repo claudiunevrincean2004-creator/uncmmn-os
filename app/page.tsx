@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Role, canAccess } from '@/lib/auth-config';
 import { checkSchema, getMigrationSQL } from '@/lib/setup-db';
-import { Client, Post, DriveFolder, SubscriberSnapshot, ResearchItem, StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile, MainPage } from '@/lib/types';
+import { Client, Post, DriveFolder, SubscriberSnapshot, ResearchItem, StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile, SlackUserMap, MainPage } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 
 import Sidebar from '@/components/Sidebar';
@@ -61,6 +61,7 @@ export default function Home() {
   const [customProperties, setCustomProperties] = useState<CustomProperty[]>([]);
   const [customPropOptions, setCustomPropOptions] = useState<CustomPropertyOption[]>([]);
   const [studioProfiles, setStudioProfiles] = useState<Profile[]>([]);
+  const [slackUsers, setSlackUsers] = useState<SlackUserMap[]>([]);
   const [loading, setLoading] = useState(true);
   const [schemaMissing, setSchemaMissing] = useState<{ missing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[]; adColumnsMissing: string[]; sessionColumnsMissing: string[]; dropdownColsMissing: boolean } | null>(null);
   const [showMigrationSQL, setShowMigrationSQL] = useState(false);
@@ -140,7 +141,7 @@ export default function Home() {
   }, [mainPage, setMainPage]);
 
   const loadData = useCallback(async () => {
-    const [c, p, d, ss, ri, sv, sq, sn, ac, cm, av, ql, dr, cp, co, pr] = await Promise.all([
+    const [c, p, d, ss, ri, sv, sq, sn, ac, cm, av, ql, dr, cp, co, pr, su] = await Promise.all([
       safeSelect('clients', 'created_at'),
       safeSelect('posts', 'date', false),
       safeSelect('drive_folders', 'category'),
@@ -157,6 +158,7 @@ export default function Home() {
       safeSelect('custom_properties', 'position'),
       safeSelect('custom_property_options', 'position'),
       safeSelect('profiles', 'created_at'),
+      safeSelect('slack_user_map', 'created_at'),
     ]);
 
     let active = (c as Client[])[0] || null;
@@ -186,6 +188,7 @@ export default function Home() {
     setCustomProperties(cp as CustomProperty[]);
     setCustomPropOptions(co as CustomPropertyOption[]);
     setStudioProfiles(pr as Profile[]);
+    setSlackUsers(su as SlackUserMap[]);
     setLoading(false);
   }, []);
 
@@ -363,6 +366,7 @@ export default function Home() {
                 properties={customProperties}
                 customOptions={customPropOptions}
                 profiles={studioProfiles}
+                slackUsers={slackUsers}
                 isAdmin={role === 'admin'}
                 onReload={loadData}
               />

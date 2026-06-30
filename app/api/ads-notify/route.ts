@@ -1,67 +1,87 @@
 import { NextResponse } from 'next/server';
+import { createServerClient } from '@/lib/supabase-server';
 
-// Server-side only: posts to a Slack incoming webhook when an Ad Creative
-// transitions into one of the notify statuses. The webhook URL is read from
-// SLACK_ADS_WEBHOOK_URL (no NEXT_PUBLIC_ prefix) so it never reaches the
-// browser bundle.
+// Server-side only: posts to the #ad-creative-pipeline Slack webhook when an Ad
+// Creative transitions into (or is created at) one of the pipeline statuses. The
+// webhook URL is read from SLACK_AD_PIPELINE_WEBHOOK_URL, falling back to
+// SLACK_WEBHOOK_URL — neither has a NEXT_PUBLIC_ prefix so the URL never reaches
+// the browser bundle. People are @-mentioned by resolving their name through the
+// slack_user_map table (person_name -> slack_user_id).
 
-// Opener variants per status — one is picked at random per notification.
-// Plain names, no @-mentions.
-const OPENERS: Record<string, (name: string) => string[]> = {
-  'Ready to test': n => [
-    `🚀 Colin, a fresh ad creative is ready to test: ${n}. Let's get it live!`,
-    `🎯 Yo Colin! New creative ready for testing: ${n}. Go run it!`,
-  ],
-  'Revision Requested': n => [
-    `🔧 Heads up Claudiu — ${n} needs revisions before it's ready.`,
-    `📝 Revisions needed on ${n}, Claudiu.`,
-  ],
-};
-
-// "Revision Requested" frames the link as "Take a peek:"; "Ready to test" keeps
-// the "Find the final products here:" wording.
-const LINK_LABELS: Record<string, string> = {
-  'Ready to test': 'Find the final products here',
-  'Revision Requested': 'Take a peek',
-};
+// Statuses that fire a ping. Editing / Testing / Winner / Killed are intentionally
+// silent (the client never sends them, but we guard here too).
+const NOTIFY = new Set(['Variation Needed', 'Ready for Review', 'Revisions Needed', 'Ready to Test']);
 
 export async function POST(request: Request) {
-  const webhookUrl = process.env.SLACK_ADS_WEBHOOK_URL;
+  const webhookUrl = process.env.SLACK_AD_PIPELINE_WEBHOOK_URL || process.env.SLACK_WEBHOOK_URL;
   // Missing/empty webhook → skip silently, don't crash.
   if (!webhookUrl) return NextResponse.json({ skipped: true });
 
   let status = '';
-  let name = '';
-  let finalUrl = '';
+  let creativeId = '';
+  let editor = '';
+  let sourceLink = '';
+  let buyerFeedback = '';
   try {
-    const body = await request.json();
-    status = typeof body?.status === 'string' ? body.status.trim() : '';
-    name = typeof body?.name === 'string' ? body.name.trim() : '';
-    finalUrl = typeof body?.finalUrl === 'string' ? body.finalUrl.trim() : '';
+    const b = await request.json();
+    status = typeof b?.status === 'string' ? b.status.trim() : '';
+    creativeId = typeof b?.creativeId === 'string' ? b.creativeId.trim() : '';
+    editor = typeof b?.editor === 'string' ? b.editor.trim() : '';
+    sourceLink = typeof b?.sourceLink === 'string' ? b.sourceLink.trim() : '';
+    buyerFeedback = typeof b?.buyerFeedback === 'string' ? b.buyerFeedback.trim() : '';
   } catch {
-    // ignore malformed body; fall back to defaults below
+    // ignore malformed body; the guard below handles the empty status
   }
 
-  const variants = OPENERS[status];
-  // Unknown status → no message (the client only sends the two above, but guard
-  // so a stray call can't post a malformed notification).
-  if (!variants) return NextResponse.json({ skipped: true });
+  // Unknown/non-notify status → no message (guard against stray calls).
+  if (!NOTIFY.has(status)) return NextResponse.json({ skipped: true });
 
-  const choices = variants(name || 'this creative');
-  const head = choices[Math.floor(Math.random() * choices.length)];
-  const linkLabel = LINK_LABELS[status];
+  // Resolve @-mentions from slack_user_map. A present slack_user_id becomes a real
+  // Slack mention; a missing one falls back to plain text that still posts and
+  // flags the gap so it gets filled in via the "Team Slack IDs" editor.
+  let map: { person_name: string; slack_user_id: string | null }[] = [];
+  try {
+    const sb = createServerClient();
+    const { data } = await sb.from('slack_user_map').select('person_name, slack_user_id');
+    map = data ?? [];
+  } catch {
+    // No table / query failure → mentions degrade to the "(Slack ID not set)" form.
+  }
+  const mention = (name: string): string => {
+    const n = name.trim();
+    if (!n) return '';
+    const row = map.find(m => (m.person_name || '').trim().toLowerCase() === n.toLowerCase());
+    const id = row?.slack_user_id?.trim();
+    return id ? `<@${id}>` : `@${n} (Slack ID not set)`;
+  };
 
-  const lines = [
-    head,
-    '',
-    finalUrl ? `${linkLabel}: ${finalUrl}` : '⚠️ No final product link added tho!',
-  ];
+  const id = creativeId || 'this creative';
+  let text = '';
+  switch (status) {
+    case 'Variation Needed':
+      text = editor
+        ? `🎬 New ad creative needed — *${id}*, assigned to ${mention(editor)}.${sourceLink ? ` ${sourceLink}` : ''}`
+        : `🎬 New ad creative needed — *${id}*, ⚠️ unassigned — set an editor.${sourceLink ? ` ${sourceLink}` : ''}`;
+      break;
+    case 'Ready for Review':
+      // Single combined review gate — ping both reviewers in one message.
+      text = `${mention('Claudiu')} ${mention('Colin')} 👀 *${id}* is ready for review — take a look.`;
+      break;
+    case 'Revisions Needed':
+      text = `🔁 Revisions needed on *${id}* — back to ${editor ? mention(editor) : '⚠️ an editor (unassigned)'}.${buyerFeedback ? ` ${buyerFeedback}` : ''}`;
+      break;
+    case 'Ready to Test':
+      text = `${mention('Colin')} 🚀 *${id}* approved — ready to test, over to you.`;
+      break;
+    default:
+      return NextResponse.json({ skipped: true });
+  }
 
   try {
     await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: lines.join('\n') }),
+      body: JSON.stringify({ text }),
     });
   } catch {
     // Never let a Slack delivery failure surface to the user / crash the request.
