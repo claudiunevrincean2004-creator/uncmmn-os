@@ -128,9 +128,8 @@ export default function ClippersTab({ profiles, accounts, content, onReload }: P
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
           {filtered.map(c => {
             const accs = accountsByClipper[c.id] || [];
-            const posts = contentByClipper[c.id] || [];
-            const contentCount = posts.length;
-            const totalViews = posts.reduce((s, p) => s + (p.views || 0), 0);
+            // Distinct platforms this clipper runs, capitalized for display.
+            const cardPlatforms = Array.from(new Set(accs.map(a => (a.platform || '').toLowerCase()).filter(Boolean))).map(capPlatform);
             const active = isActive(c.clipper_status);
             return (
               <button
@@ -149,18 +148,14 @@ export default function ClippersTab({ profiles, accounts, content, onReload }: P
                     {active ? 'Active' : 'Inactive'}
                   </span>
                 </div>
-                {/* Quick all-time triage — replaces the platform-logos row. */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, borderTop: '0.5px solid var(--border)', paddingTop: 10 }}>
-                  {[
-                    { l: 'Views', v: fn(totalViews) },
-                    { l: 'Accts', v: String(accs.length) },
-                    { l: 'Posts', v: String(contentCount) },
-                  ].map(s => (
-                    <div key={s.l}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', lineHeight: 1.2 }}>{s.v}</div>
-                      <div style={{ fontSize: 9, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.l}</div>
-                    </div>
-                  ))}
+                {/* Identity: platforms they run + joined date (small & muted). */}
+                <div style={{ borderTop: '0.5px solid var(--border)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-faint)', letterSpacing: '0.02em' }}>
+                    {cardPlatforms.length ? cardPlatforms.join(' · ') : 'No accounts yet'}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-faint)' }}>
+                    Joined {fmtDate(c.joined_at || c.created_at)}
+                  </div>
                 </div>
               </button>
             );
