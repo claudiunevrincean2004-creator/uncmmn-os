@@ -76,7 +76,10 @@ export default function ClippersTab({ profiles, accounts, content, onReload }: P
   // ── Stat cards (grid view — unchanged) ───────────────────────────────────
   const stats = (() => {
     const activeClippers = clippers.filter(c => isActive(c.clipper_status)).length;
-    const activeAccounts = accounts.filter(a => isActive(a.status)).length;
+    // Only count active accounts whose owning profile is STILL a clipper — accounts
+    // left behind by a demoted user must not inflate the total.
+    const clipperIds = new Set(clippers.map(c => c.id));
+    const activeAccounts = accounts.filter(a => isActive(a.status) && clipperIds.has(a.clipper_id)).length;
     return { activeClippers, activeAccounts };
   })();
 
