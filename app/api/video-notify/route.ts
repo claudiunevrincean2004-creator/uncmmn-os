@@ -22,6 +22,7 @@ export async function POST(request: Request) {
   const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
   let status = '';
   let title = '';
+  let itemUrl = '';
   let briefLink = '';
   let rawFilesLink = '';
   let finalLink = '';
@@ -31,6 +32,7 @@ export async function POST(request: Request) {
     const b = await request.json();
     status = str(b?.status);
     title = str(b?.title);
+    itemUrl = str(b?.itemUrl);
     briefLink = str(b?.briefLink);
     rawFilesLink = str(b?.rawFilesLink);
     finalLink = str(b?.finalLink);
@@ -43,33 +45,39 @@ export async function POST(request: Request) {
   // Unknown/non-notify status → no message (guard against stray calls).
   if (!NOTIFY.has(status)) return NextResponse.json({ skipped: true });
 
-  const id = title || 'this video';
+  const name = title || 'Untitled';
   const editor = editorMention || '⚠️ an editor (unassigned)';
+  // Title on its own line: a Slack hyperlink to the row's page when we have a URL,
+  // else plain bold text.
+  const titleLine = `Title: ${itemUrl ? `<${itemUrl}|${name}>` : `*${name}*`}`;
   // Each message is a list of blocks separated by a blank line; null blocks drop
   // out before joining. Lines within a block are joined by a single newline.
   let blocks: (string | null)[] = [];
   switch (status) {
-    case 'Ready to Edit': {
-      const links = [
-        briefLink ? `Find the clip brief here: ${briefLink}` : null,
-        rawFilesLink ? `Raw files: ${rawFilesLink}` : null,
-      ].filter((l): l is string => l !== null);
+    case 'Ready to Edit':
       blocks = [
-        `🔵 New video ready to edit — *${id}*, over to you ${editor}!`,
-        links.length ? links.join('\n') : null,
+        `🔵 New video ready to edit, ${editor}!`,
+        [
+          titleLine,
+          briefLink ? `Find the clip brief here: ${briefLink}` : null,
+          rawFilesLink ? `Raw files: ${rawFilesLink}` : null,
+        ].filter((l): l is string => l !== null).join('\n'),
       ];
       break;
-    }
     case 'In Review':
       blocks = [
-        `🟣 *${id}* is ready for review, ${claudiuMention}!`,
-        finalLink ? `Take a peek: ${finalLink}` : null,
+        `🟣 New video ready for review, ${claudiuMention}!`,
+        [
+          titleLine,
+          finalLink ? `Take a peek: ${finalLink}` : null,
+        ].filter((l): l is string => l !== null).join('\n'),
       ];
       break;
     case 'Revisions Needed':
       blocks = [
-        `🔴 Revisions needed on *${id}*, back to you ${editor}.`,
+        `🔴 Revisions needed, ${editor}.`,
         [
+          titleLine,
           'Check the comments for what to fix.',
           finalLink ? `Find the final product here: ${finalLink}` : null,
         ].filter((l): l is string => l !== null).join('\n'),

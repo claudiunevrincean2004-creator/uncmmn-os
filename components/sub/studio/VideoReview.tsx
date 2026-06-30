@@ -1,5 +1,5 @@
 'use client';
-import { Fragment, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StudioVideo, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
@@ -65,11 +65,12 @@ interface Props {
   dropdownOptions: StudioDropdownOption[];
   profiles: Profile[];
   isAdmin: boolean;
+  openItemId?: string;
   onReload: () => void;
   showToast: (msg: string) => void;
 }
 
-export default function VideoReview({ videos, comments, activity, quickLinks, dropdownOptions, profiles, isAdmin, onReload, showToast }: Props) {
+export default function VideoReview({ videos, comments, activity, quickLinks, dropdownOptions, profiles, isAdmin, openItemId, onReload, showToast }: Props) {
   const [fStatus, setFStatus] = usePersistedState<string>('studio_v_status', 'All');
   const [fAssigned, setFAssigned] = usePersistedState<string>('studio_v_assigned', 'All');
   const [fFormat, setFFormat] = usePersistedState<string>('studio_v_format', 'All');
@@ -83,6 +84,9 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   const [draft, setDraft] = useState<VideoDraft>(EMPTY_DRAFT);
   const [creating, setCreating] = useState(false);
   const [adBusy, setAdBusy] = useState<string | null>(null);
+
+  // Open a row's panel when arriving via a deep link (Slack "Open in UNCMMN OS").
+  useEffect(() => { if (openItemId) setSelectedId(openItemId); }, [openItemId]);
 
   // Built-in Format & Status options are DB-backed (admin-managed) with defaults
   const statusFieldOpts = getFieldOptions(dropdownOptions, 'video_status', VIDEO_STATUSES, VIDEO_STATUS_COLORS);
@@ -118,6 +122,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
       notifyVideo({
         status,
         title: v.title || '',
+        itemUrl: videoUrl(v.id),
         briefLink: v.brief_url || '',
         rawFilesLink: v.raw_files_url || '',
         finalLink: v.final_url || '',
@@ -127,9 +132,15 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
     await patch(v.id, p);
   }
 
+  // Absolute URL to a video's own page (deep link into the side panel). Empty when
+  // there's no window (SSR) — the server then falls back to a plain bold title.
+  function videoUrl(id: string): string {
+    return typeof window !== 'undefined' ? `${window.location.origin}/studio/video/${id}` : '';
+  }
+
   // Fire-and-forget POST to the #main-ig-updates notify route (server holds the
   // Slack webhook URL, skips silently if unset). Never blocks the UI or throws.
-  function notifyVideo(payload: { status: string; title: string; briefLink: string; rawFilesLink: string; finalLink: string; editorMention: string; claudiuMention: string; colinMention: string }) {
+  function notifyVideo(payload: { status: string; title: string; itemUrl: string; briefLink: string; rawFilesLink: string; finalLink: string; editorMention: string; claudiuMention: string; colinMention: string }) {
     fetch('/api/video-notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -139,7 +150,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
 
   // Fire-and-forget POST to the Ad Creative pipeline notify (server holds the
   // Slack webhook URL, skips silently if unset). Never blocks the UI or throws.
-  function notifyAdPipeline(payload: { status: string; creativeId: string; sourceLink: string; finalLink: string; editorMention: string; claudiuMention: string; colinMention: string }) {
+  function notifyAdPipeline(payload: { status: string; creativeId: string; itemUrl: string; sourceLink: string; finalLink: string; editorMention: string; claudiuMention: string; colinMention: string }) {
     fetch('/api/ads-notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -166,14 +177,15 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
       ad_format: 'Video',
       status: 'Ad Creative Needed',
     };
-    const { error } = await supabase.from('studio_ad_creatives').insert([row]);
+    const { data: created, error } = await supabase.from('studio_ad_creatives').insert([row]).select().single();
     setAdBusy(null);
     if (error) {
       console.error('[VideoReview] failed to create ad creative', { row, error });
       alert(`Couldn't create ad creative: ${error.message}`);
       return;
     }
-    notifyAdPipeline({ status: 'Ad Creative Needed', creativeId, sourceLink, finalLink: '', ...mentions });
+    const adUrl = created?.id && typeof window !== 'undefined' ? `${window.location.origin}/studio/ad-creative/${created.id}` : '';
+    notifyAdPipeline({ status: 'Ad Creative Needed', creativeId, itemUrl: adUrl, sourceLink, finalLink: '', ...mentions });
     showToast(`Ad creative created for ${creativeId} → assigned to ${editorName || 'unassigned'}`);
     onReload();
   }
@@ -192,7 +204,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
       final_url: draft.final_url.trim() || null,
       deadline: draft.deadline || null,
     };
-    const { error } = await supabase.from('studio_videos').insert([row]);
+    const { data: created, error } = await supabase.from('studio_videos').insert([row]).select().single();
     setCreating(false);
     if (error) {
       console.error('[VideoReview] failed to create video', { row, error });
@@ -206,6 +218,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
       notifyVideo({
         status: row.status,
         title: row.title,
+        itemUrl: created?.id ? videoUrl(created.id) : '',
         briefLink: row.brief_url ?? '',
         rawFilesLink: row.raw_files_url ?? '',
         finalLink: row.final_url ?? '',

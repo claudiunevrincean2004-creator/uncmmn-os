@@ -1,5 +1,5 @@
 'use client';
-import { Fragment, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
@@ -63,11 +63,12 @@ interface Props {
   customOptions: CustomPropertyOption[];
   profiles: Profile[];
   isAdmin: boolean;
+  openItemId?: string;
   onReload: () => void;
   showToast: (msg: string) => void;
 }
 
-export default function AdCreative({ adCreatives, comments, activity, quickLinks, dropdownOptions, properties, customOptions, profiles, isAdmin, onReload, showToast }: Props) {
+export default function AdCreative({ adCreatives, comments, activity, quickLinks, dropdownOptions, properties, customOptions, profiles, isAdmin, openItemId, onReload, showToast }: Props) {
   const [fStatus, setFStatus] = usePersistedState<string>('studio_ad_status', 'All');
   const [fFormat, setFFormat] = usePersistedState<string>('studio_ad_format', 'All');
   const [fAngle, setFAngle] = usePersistedState<string>('studio_ad_angle', 'All');
@@ -83,6 +84,9 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState<AdDraft>(EMPTY_DRAFT);
   const [creating, setCreating] = useState(false);
+
+  // Open a row's panel when arriving via a deep link (Slack "Open in UNCMMN OS").
+  useEffect(() => { if (openItemId) setSelectedId(openItemId); }, [openItemId]);
 
   const cprops = useMemo(() => sortProps(properties, TABLE_KEY), [properties]);
   const optsByProp = useMemo(() => groupOptions(customOptions), [customOptions]);
@@ -129,6 +133,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
       notifyAdPipeline({
         status: becoming,
         creativeId: prev?.creative_id ?? '',
+        itemUrl: adUrl(id),
         sourceLink: (p.source_video_url ?? prev?.source_video_url) ?? '',
         finalLink: (p.final_link ?? prev?.final_link) ?? '',
         ...buildPipelineMentions((p.assigned_to ?? prev?.assigned_to) ?? null, profiles),
@@ -143,11 +148,17 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
     await patch(a.id, { status });
   }
 
+  // Absolute URL to an ad creative's own page (deep link into the side panel).
+  // Empty when there's no window (SSR) — the server falls back to a plain bold id.
+  function adUrl(id: string): string {
+    return typeof window !== 'undefined' ? `${window.location.origin}/studio/ad-creative/${id}` : '';
+  }
+
   // Fire-and-forget POST to the #ad-creative-pipeline notify route, which holds
   // the Slack webhook URL. @-mentions are resolved here from user profiles
   // (slack_user_id) and passed in pre-built. Skips silently if the webhook is
   // unset. Never blocks the UI or throws.
-  function notifyAdPipeline(payload: { status: string; creativeId: string; sourceLink: string; finalLink: string; editorMention: string; claudiuMention: string; colinMention: string }) {
+  function notifyAdPipeline(payload: { status: string; creativeId: string; itemUrl: string; sourceLink: string; finalLink: string; editorMention: string; claudiuMention: string; colinMention: string }) {
     fetch('/api/ads-notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -168,7 +179,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
       assigned_to: draft.assigned_to || null,
       status,
     };
-    const { error } = await supabase.from('studio_ad_creatives').insert([row]);
+    const { data: created, error } = await supabase.from('studio_ad_creatives').insert([row]).select().single();
     setCreating(false);
     if (error) {
       console.error('[AdCreative] failed to create ad creative', { row, error });
@@ -181,6 +192,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
       notifyAdPipeline({
         status,
         creativeId: row.creative_id,
+        itemUrl: created?.id ? adUrl(created.id) : '',
         sourceLink: '',
         finalLink: row.final_link ?? '',
         ...buildPipelineMentions(row.assigned_to, profiles),

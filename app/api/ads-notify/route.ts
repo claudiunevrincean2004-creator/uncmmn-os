@@ -23,6 +23,7 @@ export async function POST(request: Request) {
   const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
   let status = '';
   let creativeId = '';
+  let itemUrl = '';
   let sourceLink = '';
   let finalLink = '';
   let editorMention = '';
@@ -32,6 +33,7 @@ export async function POST(request: Request) {
     const b = await request.json();
     status = str(b?.status);
     creativeId = str(b?.creativeId);
+    itemUrl = str(b?.itemUrl);
     sourceLink = str(b?.sourceLink);
     finalLink = str(b?.finalLink);
     editorMention = str(b?.editorMention);
@@ -44,37 +46,43 @@ export async function POST(request: Request) {
   // Unknown/non-notify status → no message (guard against stray calls).
   if (!NOTIFY.has(status)) return NextResponse.json({ skipped: true });
 
-  const id = creativeId || 'this creative';
+  const name = creativeId || 'Untitled';
+  const editor = editorMention || '⚠️ an editor (unassigned)';
+  // Creative ID on its own line: a Slack hyperlink to the row's page when we have
+  // a URL, else plain bold text.
+  const idLine = `Creative ID: ${itemUrl ? `<${itemUrl}|${name}>` : `*${name}*`}`;
   // Each message is a list of blocks separated by a blank line; null blocks
   // (e.g. an absent Final link) drop out before joining.
   let blocks: (string | null)[] = [];
   switch (status) {
     case 'Ad Creative Needed':
       blocks = [
-        `🟠 New ad creative needed — *${id}*.`,
-        editorMention ? `Assigned to ${editorMention}.` : '⚠️ Unassigned — set an editor.',
-        `Source link: ${sourceLink}`,
+        `🟠 New ad creative needed, ${editor}!`,
+        [idLine, `Source link: ${sourceLink}`].join('\n'),
       ];
       break;
     case 'Ready for Review':
       // Single combined review gate — ping both reviewers in one message. The
       // link is the Ad Creative's OWN Final cut; omit the line when it's empty.
       blocks = [
-        `🟡 ${`${claudiuMention} ${colinMention}`.trim()} *${id}* is ready for review!`,
-        finalLink ? `Take a peek: ${finalLink}` : null,
+        `🟡 New ad creative ready for review, ${`${claudiuMention} ${colinMention}`.trim()}!`,
+        [idLine, finalLink ? `Take a peek: ${finalLink}` : null].filter((l): l is string => l !== null).join('\n'),
       ];
       break;
     case 'Revisions Needed':
       blocks = [
-        `🔴 Revisions needed on *${id}*, ${editorMention || '⚠️ an editor (unassigned)'}.`,
-        'Check comments for the revisions.',
-        finalLink ? `Find the final product here: ${finalLink}` : null,
+        `🔴 Revisions needed, ${editor}.`,
+        [
+          idLine,
+          'Check comments for the revisions.',
+          finalLink ? `Find the final product here: ${finalLink}` : null,
+        ].filter((l): l is string => l !== null).join('\n'),
       ];
       break;
     case 'Ready to Test':
       blocks = [
-        `🟢 *${id}* approved! Ready to test, over to you, ${colinMention}.`,
-        finalLink ? `Find the final product here: ${finalLink}` : null,
+        `🟢 Ad creative approved, ready to test — ${colinMention}!`,
+        [idLine, finalLink ? `Find the final product here: ${finalLink}` : null].filter((l): l is string => l !== null).join('\n'),
       ];
       break;
     default:

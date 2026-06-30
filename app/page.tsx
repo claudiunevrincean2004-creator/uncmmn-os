@@ -77,6 +77,26 @@ export default function Home() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [adminUsersOpen, setAdminUsersOpen] = useState(false);
+  // Deep link from a Slack ping ("/studio/video/<id>" → "/?item=video:<id>"):
+  // jump to Studio and open that row's side panel. Read from window (not
+  // useSearchParams) to keep the root statically prerendered.
+  const [deepLink, setDeepLink] = useState<{ type: 'video' | 'ad'; id: string } | null>(null);
+
+  // Parse a deep-link item param once on mount, route to Studio, then strip it
+  // from the URL so a refresh doesn't re-trigger it.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const item = params.get('item');
+    if (!item) return;
+    const sep = item.indexOf(':');
+    const type = sep >= 0 ? item.slice(0, sep) : '';
+    const id = sep >= 0 ? item.slice(sep + 1) : '';
+    if ((type === 'video' || type === 'ad') && id) {
+      setMainPage('studio');
+      setDeepLink({ type, id });
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, [setMainPage]);
 
   // Sync theme from storage on mount (the layout script already applied it pre-paint)
   useEffect(() => {
@@ -364,6 +384,7 @@ export default function Home() {
                 customOptions={customPropOptions}
                 profiles={studioProfiles}
                 isAdmin={role === 'admin'}
+                deepLink={deepLink}
                 onReload={loadData}
               />
             </div>
