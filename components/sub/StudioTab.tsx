@@ -76,12 +76,14 @@ export default function StudioTab({ videos, sequences, sessions, adCreatives, co
   const sessionStats = useMemo(() => {
     const month = todayISO().slice(0, 7); // YYYY-MM
     const planned = sessions.filter(s => s.status === 'Planned').length;
+    const readyToFilm = sessions.filter(s => s.status === 'Ready to Film').length;
     const filmedThisMonth = sessions.filter(s => s.status === 'Filmed' && (s.date || '').slice(0, 7) === month).length;
-    return { planned, filmedThisMonth };
+    return { planned, readyToFilm, filmedThisMonth };
   }, [sessions]);
 
   const sessionOverviewItems: { label: string; value: string; color?: string }[] = [
     { label: 'Planned', value: String(sessionStats.planned), color: '#8b5cf6' },
+    { label: 'Ready to Film', value: String(sessionStats.readyToFilm), color: '#eab308' },
     { label: 'Filmed this month', value: String(sessionStats.filmedThisMonth), color: 'var(--text)' },
   ];
 
