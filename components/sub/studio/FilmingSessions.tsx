@@ -93,12 +93,13 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
   }
 
   async function patch(id: string, p: Partial<StudioSession>) {
-    // Detect the not-Filmed → "Filmed" transition from the pre-update row BEFORE
-    // writing. Doing it here (rather than only in changeStatus) means the Slack
-    // notify fires no matter which handler set the status — the inline Status
-    // pill, the detail panel, or any future caller — and never on other status
-    // changes or on a re-save while already Filmed.
+    // Detect status transitions from the pre-update row BEFORE writing. Doing it
+    // here (rather than only in changeStatus) means the Slack notify fires no
+    // matter which handler set the status — the inline Status pill, the detail
+    // panel, or any future caller — and never on other status changes or on a
+    // re-save while already in that status.
     const prev = sessions.find(x => x.id === id);
+    const becomingReadyToFilm = p.status === 'Ready to Film' && prev?.status !== 'Ready to Film';
     const becomingFilmed = p.status === 'Filmed' && prev?.status !== 'Filmed';
 
     const { error } = await supabase.from('studio_sessions').update(p).eq('id', id);
@@ -110,12 +111,22 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
     }
     onReload();
 
+    const itemUrl = typeof window !== 'undefined' ? `${window.location.origin}/studio/filming/${id}` : '';
+    // Prefer a value included in this same patch, else the current row value.
+    if (!error && becomingReadyToFilm) {
+      notifyFilming({
+        status: 'Ready to Film',
+        id,
+        itemUrl,
+        scriptUrl: (p.script_url ?? prev?.script_url) ?? '',
+      });
+    }
     if (!error && becomingFilmed) {
-      notifyFilmed({
+      notifyFilming({
+        status: 'Filmed',
         id,
         name: prev?.name ?? '',
-        itemUrl: typeof window !== 'undefined' ? `${window.location.origin}/studio/filming/${id}` : '',
-        // Prefer a value included in this same patch, else the current row value.
+        itemUrl,
         type: (p.type ?? prev?.type) ?? '',
         footageLink: (p.footage_link ?? prev?.footage_link) ?? '',
       });
@@ -129,9 +140,10 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
     await patch(s.id, { status });
   }
 
-  // Fire-and-forget POST to the server route, which holds the Slack webhook URL
-  // and skips silently if it's unset. Never blocks the UI or throws.
-  function notifyFilmed(payload: { id: string; name: string; itemUrl: string; type: string; footageLink: string }) {
+  // Fire-and-forget POST to the server route, which holds the Slack webhook URL,
+  // picks the message from `status`, and skips silently if the URL is unset.
+  // Never blocks the UI or throws.
+  function notifyFilming(payload: { status: string; id: string; itemUrl: string; name?: string; type?: string; footageLink?: string; scriptUrl?: string }) {
     fetch('/api/filming-notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

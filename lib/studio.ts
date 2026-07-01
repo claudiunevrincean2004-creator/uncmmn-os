@@ -77,14 +77,13 @@ export const SEQUENCE_STATUS_COLORS: Record<string, string> = {
 
 export const SEQUENCE_PLATFORMS = ['Instagram', 'TikTok', 'YouTube'];
 
-export const SESSION_STATUSES = ['Planned', 'Confirmed', 'Filming', 'Filmed', 'Cancelled'];
+export const SESSION_STATUSES = ['Planned', 'Ready to Film', 'Filmed', 'Cancelled'];
 
 export const SESSION_STATUS_COLORS: Record<string, string> = {
-  Planned: '#6b7280',
-  Confirmed: '#3b82f6',
-  Filming: '#f59e0b',
-  Filmed: '#10b981',
-  Cancelled: '#ef4444',
+  Planned: '#3b82f6',          // blue
+  'Ready to Film': '#eab308',  // yellow
+  Filmed: '#10b981',           // green
+  Cancelled: '#ef4444',        // red
 };
 
 // Pre-migration fallback for the editable "Type" select (field: session_type).

@@ -386,7 +386,7 @@ insert into studio_dropdown_options (field, value, color, position) values
   ('video_status','Briefing','#6b7280',0),('video_status','Ready to Edit','#3b82f6',1),('video_status','Editing','#f59e0b',2),('video_status','In Review','#8b5cf6',3),('video_status','Revisions Needed','#ef4444',4),('video_status','Ready to Post','#eab308',5),('video_status','Posted','#10b981',6),
   ('video_format','Short',null,0),('video_format','Long Form',null,1),('video_format','Reel',null,2),('video_format','Story',null,3),('video_format','Other',null,4),
   ('sequence_status','Draft','#6b7280',0),('sequence_status','Ready for Review','#8b5cf6',1),('sequence_status','Revision Requested','#ef4444',2),('sequence_status','Approved','#10b981',3),('sequence_status','Posted','#14b8a6',4),
-  ('session_status','Planned','#6b7280',0),('session_status','Confirmed','#3b82f6',1),('session_status','Filming','#f59e0b',2),('session_status','Filmed','#10b981',3),('session_status','Cancelled','#ef4444',4),
+  ('session_status','Planned','#3b82f6',0),('session_status','Ready to Film','#eab308',1),('session_status','Filmed','#10b981',2),('session_status','Cancelled','#ef4444',3),
   ('ad_status','Live','#10b981',0),('ad_status','Paused','#eab308',1),('ad_status','Winner','#14b8a6',2),('ad_status','Killed','#ef4444',3),('ad_status','Revision Requested','#f59e0b',4),
   ('ad_format','Video',null,0),('ad_format','Static',null,1)
 on conflict (field, value) do nothing;`);
