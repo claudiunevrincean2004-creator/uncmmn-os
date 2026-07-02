@@ -16,10 +16,11 @@ interface Props {
   isAdmin: boolean;
   currentUserId: string | null;
   openItemId?: string; // a production row id from a deep link
+  onDeepLinkConsumed?: () => void;
   onReload: () => void;
 }
 
-export default function TrialReelsTab({ sources, productions, comments, activity, profiles, isAdmin, currentUserId, openItemId, onReload }: Props) {
+export default function TrialReelsTab({ sources, productions, comments, activity, profiles, isAdmin, currentUserId, openItemId, onDeepLinkConsumed, onReload }: Props) {
   // Editors never see the admin-only Source Library, so their tab is board-only.
   const [sub, setSub] = usePersistedState<SubTab>('trialreel_subtab', isAdmin ? 'library' : 'board');
   const [toast, setToast] = useState<string | null>(null);
@@ -93,6 +94,7 @@ export default function TrialReelsTab({ sources, productions, comments, activity
           isAdmin={isAdmin}
           currentUserId={currentUserId}
           openItemId={openItemId}
+          onOpened={onDeepLinkConsumed}
           onReload={onReload}
         />
       )}

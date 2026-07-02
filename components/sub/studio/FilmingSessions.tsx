@@ -54,10 +54,11 @@ interface Props {
   profiles: Profile[];
   isAdmin: boolean;
   openItemId?: string;
+  onOpened?: () => void;
   onReload: () => void;
 }
 
-export default function FilmingSessions({ sessions, comments, activity, dropdownOptions, properties, customOptions, profiles, isAdmin, openItemId, onReload }: Props) {
+export default function FilmingSessions({ sessions, comments, activity, dropdownOptions, properties, customOptions, profiles, isAdmin, openItemId, onOpened, onReload }: Props) {
   const [fStatus, setFStatus] = usePersistedState<string>('studio_f_status', 'All');
   const [fType, setFType] = usePersistedState<string>('studio_f_type', 'All');
   const [sortDir, setSortDir] = usePersistedState<'asc' | 'desc'>('studio_f_sortdir', 'asc');
@@ -72,7 +73,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
   const [creating, setCreating] = useState(false);
 
   // Open a row's panel when arriving via a deep link (Slack "Open in OS").
-  useEffect(() => { if (openItemId) setSelectedId(openItemId); }, [openItemId]);
+  useEffect(() => { if (openItemId) { setSelectedId(openItemId); onOpened?.(); } }, [openItemId, onOpened]);
 
   const cprops = useMemo(() => sortProps(properties, TABLE_KEY), [properties]);
   const optsByProp = useMemo(() => groupOptions(customOptions), [customOptions]);
@@ -189,7 +190,9 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
 
   const today = todayISO();
   const present = (vals: (string | undefined)[]) => ['All', ...Array.from(new Set(vals.filter(Boolean) as string[]))];
-  const statusPresent = present(sessions.map(s => s.status));
+  // Status filter always lists the FULL defined status set, unioned with any stray
+  // statuses present on rows. A no-match selection falls through to the empty state.
+  const statusPresent = ['All', ...Array.from(new Set([...statusValues, ...sessions.map(s => s.status).filter(Boolean) as string[]]))];
 
   const filtered = useMemo(() => {
     let r = sessions;

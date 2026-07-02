@@ -64,11 +64,12 @@ interface Props {
   profiles: Profile[];
   isAdmin: boolean;
   openItemId?: string;
+  onOpened?: () => void;
   onReload: () => void;
   showToast: (msg: string) => void;
 }
 
-export default function AdCreative({ adCreatives, comments, activity, quickLinks, dropdownOptions, properties, customOptions, profiles, isAdmin, openItemId, onReload, showToast }: Props) {
+export default function AdCreative({ adCreatives, comments, activity, quickLinks, dropdownOptions, properties, customOptions, profiles, isAdmin, openItemId, onOpened, onReload, showToast }: Props) {
   const [fStatus, setFStatus] = usePersistedState<string>('studio_ad_status', 'All');
   const [fFormat, setFFormat] = usePersistedState<string>('studio_ad_format', 'All');
   const [fAngle, setFAngle] = usePersistedState<string>('studio_ad_angle', 'All');
@@ -86,7 +87,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   const [creating, setCreating] = useState(false);
 
   // Open a row's panel when arriving via a deep link (Slack "Open in UNCMMN OS").
-  useEffect(() => { if (openItemId) setSelectedId(openItemId); }, [openItemId]);
+  useEffect(() => { if (openItemId) { setSelectedId(openItemId); onOpened?.(); } }, [openItemId, onOpened]);
 
   const cprops = useMemo(() => sortProps(properties, TABLE_KEY), [properties]);
   const optsByProp = useMemo(() => groupOptions(customOptions), [customOptions]);
@@ -261,7 +262,10 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   }
 
   const present = (vals: (string | undefined)[]) => ['All', ...Array.from(new Set(vals.filter(Boolean) as string[]))];
-  const statusPresent = present(adCreatives.map(a => a.status));
+  // Status filter always lists the FULL defined status set, unioned with any stray
+  // statuses present on rows so none become unreachable. A no-match selection falls
+  // through to the empty state.
+  const statusPresent = ['All', ...Array.from(new Set([...statusValues, ...adCreatives.map(a => a.status).filter(Boolean) as string[]]))];
   const formatPresent = present(adCreatives.map(a => a.ad_format));
   const anglePresent = present(adCreatives.map(a => a.angle));
 
@@ -350,7 +354,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
         </div>
 
         {rows.length === 0 ? (
-          <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>No ad creatives yet. Add one, or click &quot;Ad Creative Needed&quot; on a video in Video Review.</div>
+          <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>{fStatus !== 'All' ? `No ad creatives with status “${fStatus}”.` : 'No ad creatives yet. Add one, or click "Ad Creative Needed" on a video in Video Review.'}</div>
         ) : (
           <>
           <div style={{ overflowX: 'auto' }}>

@@ -19,15 +19,16 @@ interface Props {
   isAdmin: boolean;
   currentUserId: string | null;
   openItemId?: string;
+  onOpened?: () => void;
   onReload: () => void;
 }
 
-export default function ProductionBoard({ productions, sources, comments, activity, profiles, isAdmin, currentUserId, openItemId, onReload }: Props) {
+export default function ProductionBoard({ productions, sources, comments, activity, profiles, isAdmin, currentUserId, openItemId, onOpened, onReload }: Props) {
   const [fStatus, setFStatus] = usePersistedState<string>('trialreel_p_status', 'All');
   const [fAssigned, setFAssigned] = usePersistedState<string>('trialreel_p_assigned', 'All');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  useEffect(() => { if (openItemId) setSelectedId(openItemId); }, [openItemId]);
+  useEffect(() => { if (openItemId) { setSelectedId(openItemId); onOpened?.(); } }, [openItemId, onOpened]);
 
   const sourceById = useMemo(() => {
     const m = new Map<string, TrialReelSource>();
@@ -79,7 +80,9 @@ export default function ProductionBoard({ productions, sources, comments, activi
   }
 
   const present = (vals: (string | undefined)[]) => ['All', ...Array.from(new Set(vals.filter(Boolean) as string[]))];
-  const statusPresent = present(scoped.map(p => p.status));
+  // Status filter always lists the FULL defined flow (Assigned → … → Posted),
+  // unioned with any stray statuses present so none become unreachable.
+  const statusPresent = ['All', ...Array.from(new Set([...TRIAL_REEL_STATUSES, ...scoped.map(p => p.status).filter(Boolean) as string[]]))];
   const assignedPresent = present(scoped.map(p => resolveAssignee(p.assigned_to_user_id, profiles) || undefined));
 
   const filtered = useMemo(() => {
@@ -133,7 +136,9 @@ export default function ProductionBoard({ productions, sources, comments, activi
 
         {filtered.length === 0 ? (
           <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>
-            {isAdmin ? 'No reels in production yet. Generate today’s queue from the Source Library.' : 'No trial reels assigned to you yet.'}
+            {fStatus !== 'All'
+              ? `No trial reels with status “${fStatus}”.`
+              : isAdmin ? 'No reels in production yet. Generate today’s queue from the Source Library.' : 'No trial reels assigned to you yet.'}
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>

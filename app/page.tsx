@@ -439,6 +439,7 @@ export default function Home() {
                 profiles={studioProfiles}
                 isAdmin={role === 'admin'}
                 deepLink={deepLink}
+                onDeepLinkConsumed={() => setDeepLink(null)}
                 onReload={loadData}
               />
             </div>
@@ -454,6 +455,7 @@ export default function Home() {
                 isAdmin={role === 'admin'}
                 currentUserId={currentUserId}
                 openItemId={trialReelOpenId}
+                onDeepLinkConsumed={() => setTrialReelOpenId(undefined)}
                 onReload={loadData}
               />
             </div>

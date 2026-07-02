@@ -66,11 +66,12 @@ interface Props {
   profiles: Profile[];
   isAdmin: boolean;
   openItemId?: string;
+  onOpened?: () => void;
   onReload: () => void;
   showToast: (msg: string) => void;
 }
 
-export default function VideoReview({ videos, comments, activity, quickLinks, dropdownOptions, profiles, isAdmin, openItemId, onReload, showToast }: Props) {
+export default function VideoReview({ videos, comments, activity, quickLinks, dropdownOptions, profiles, isAdmin, openItemId, onOpened, onReload, showToast }: Props) {
   const [fStatus, setFStatus] = usePersistedState<string>('studio_v_status', 'All');
   const [fAssigned, setFAssigned] = usePersistedState<string>('studio_v_assigned', 'All');
   const [fFormat, setFFormat] = usePersistedState<string>('studio_v_format', 'All');
@@ -86,7 +87,9 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   const [adBusy, setAdBusy] = useState<string | null>(null);
 
   // Open a row's panel when arriving via a deep link (Slack "Open in UNCMMN OS").
-  useEffect(() => { if (openItemId) setSelectedId(openItemId); }, [openItemId]);
+  // Signal onOpened so the parent clears the one-shot deep link (returning to this
+  // tab later must not re-open the panel).
+  useEffect(() => { if (openItemId) { setSelectedId(openItemId); onOpened?.(); } }, [openItemId, onOpened]);
 
   // Built-in Format & Status options are DB-backed (admin-managed) with defaults
   const statusFieldOpts = getFieldOptions(dropdownOptions, 'video_status', VIDEO_STATUSES, VIDEO_STATUS_COLORS);
@@ -244,7 +247,11 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
 
   // Filter dropdowns only offer values actually present in the data
   const present = (vals: (string | undefined)[]) => ['All', ...Array.from(new Set(vals.filter(Boolean) as string[]))];
-  const statusPresent = present(videos.map(v => v.status));
+  // Status filter always lists the FULL defined status set (not just statuses
+  // present in the current rows), unioned with any stray statuses on existing rows
+  // so nothing becomes unreachable. Selecting a no-match status falls through to
+  // the empty state below.
+  const statusPresent = ['All', ...Array.from(new Set([...statusValues, ...videos.map(v => v.status).filter(Boolean) as string[]]))];
   const assignedPresent = present(videos.map(v => resolveAssignee(v.assigned_to_user_id, profiles) || undefined));
   const formatPresent = present(videos.map(v => v.format));
   const priorityPresent = present(videos.map(v => v.priority || 'Normal'));
