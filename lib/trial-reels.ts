@@ -143,20 +143,25 @@ export function parseSourceCSV(text: string): CSVParseResult {
   const iTalking = header.findIndex(h => h.startsWith('containstalking'));
   const iFull = idx('fullversionfile');                                 // "FULL version file"
   const iTs = idx('timestamp');                                         // "Timestamp"
-  // Snippet URL appears under different headers across CSV exports. Accept the
-  // snippet-specific names first, then fall back to a generic "Download link".
-  const SNIPPET_ALIASES = ['snippetdownloadlink', 'snippet', 'downloadlink'];
+  // Snippet URL appears under different headers across CSV exports. Match the
+  // generic "Download link" as well as the snippet-specific names — whichever is
+  // present. This is a SEPARATE column from FULL version file (full_version_file)
+  // and Google Drive Link (drive_url), so it can't be shadowed by either.
+  const SNIPPET_ALIASES = ['downloadlink', 'snippetdownloadlink', 'snippet'];
   let iSnippet = -1;
+  let snippetHeaderMatched = '';
   for (const alias of SNIPPET_ALIASES) {
     const i = header.indexOf(alias);
-    if (i >= 0) { iSnippet = i; break; }
+    if (i >= 0) { iSnippet = i; snippetHeaderMatched = grid[0][i]; break; }
   }
   // Surface the actual header names we matched so mapping issues are debuggable.
   if (typeof console !== 'undefined') {
     console.log(
-      '[trial-reels] CSV field mapping →',
-      'full_version_file:', iFull >= 0 ? JSON.stringify(grid[0][iFull]) : '(not found)',
-      '| snippet_download_link:', iSnippet >= 0 ? JSON.stringify(grid[0][iSnippet]) : '(not found)',
+      '[trial-reels] CSV header mapping →',
+      { posted_url: iUrl >= 0 ? grid[0][iUrl] : '(not found)',
+        full_version_file: iFull >= 0 ? grid[0][iFull] : '(not found)',
+        snippet_download_link: iSnippet >= 0 ? snippetHeaderMatched : '(not found)',
+        drive_url: iDrive >= 0 ? grid[0][iDrive] : '(not found)' },
     );
   }
   if (iUrl < 0) return { rows: [], skipped: 0, headersFound: false };
@@ -187,7 +192,13 @@ export function parseSourceCSV(text: string): CSVParseResult {
       snippet_download_link: iSnippet >= 0 ? (cells[iSnippet]?.trim() || null) : null,
     });
   }
-  return { rows: Array.from(byUrl.values()), skipped, headersFound: true };
+  const rows = Array.from(byUrl.values());
+  // Confirm the first mapped row so we can verify snippet_download_link (and
+  // posted_url) are actually populated on the upsert payload.
+  if (typeof console !== 'undefined' && rows.length > 0) {
+    console.log('[trial-reels] first mapped row:', rows[0]);
+  }
+  return { rows, skipped, headersFound: true };
 }
 
 export interface ImportResult { inserted: number; updated: number; }
