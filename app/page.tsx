@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Role, canAccess } from '@/lib/auth-config';
 import { checkSchema, getMigrationSQL } from '@/lib/setup-db';
-import { Client, Post, DriveFolder, SubscriberSnapshot, ResearchItem, StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile, ClipperAccount, ClipperContent, TrialReelSource, TrialReelProduction, MainPage } from '@/lib/types';
+import { Client, Post, DriveFolder, SubscriberSnapshot, ResearchItem, StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile, ClipperAccount, ClipperContent, TrialReelSource, TrialReelProduction, ClipSource, ClipSnippet, MainPage } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 
 import Sidebar from '@/components/Sidebar';
@@ -18,6 +18,7 @@ import AccountPanel from '@/components/AccountPanel';
 import AssigneeSettings from '@/components/sub/studio/AssigneeSettings';
 import ClippersTab from '@/components/sub/ClippersTab';
 import TrialReelsTab from '@/components/sub/TrialReelsTab';
+import ClipLibraryTab from '@/components/sub/ClipLibraryTab';
 import { profileName } from '@/lib/profile-name';
 
 async function safeSelect(table: string, orderCol: string, ascending = true) {
@@ -37,6 +38,7 @@ const PAGE_LABELS: Record<MainPage, string> = {
   drive: 'Assets',
   studio: 'Studio',
   trialreels: 'Trial Reels',
+  cliplibrary: 'Clip Library',
   clippers: 'Clippers',
 };
 
@@ -47,6 +49,7 @@ const PAGE_SUBTITLES: Record<MainPage, string> = {
   drive: 'Files & folders',
   studio: 'Review & production',
   trialreels: 'Recreate high-converting reels',
+  cliplibrary: 'Clips from long-form content',
   clippers: 'Distribution team',
 };
 
@@ -71,6 +74,8 @@ export default function Home() {
   const [clipperContent, setClipperContent] = useState<ClipperContent[]>([]);
   const [trialReelSources, setTrialReelSources] = useState<TrialReelSource[]>([]);
   const [trialReelProductions, setTrialReelProductions] = useState<TrialReelProduction[]>([]);
+  const [clipSources, setClipSources] = useState<ClipSource[]>([]);
+  const [clipSnippets, setClipSnippets] = useState<ClipSnippet[]>([]);
   const [loading, setLoading] = useState(true);
   const [schemaMissing, setSchemaMissing] = useState<{ missing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[]; adColumnsMissing: string[]; sessionColumnsMissing: string[]; dropdownColsMissing: boolean } | null>(null);
   const [showMigrationSQL, setShowMigrationSQL] = useState(false);
@@ -180,7 +185,7 @@ export default function Home() {
 
   // Migrate stale persisted page values from prior builds
   useEffect(() => {
-    if (!(['dashboard', 'content', 'research', 'drive', 'studio', 'clippers', 'trialreels'] as const).includes(mainPage)) {
+    if (!(['dashboard', 'content', 'research', 'drive', 'studio', 'clippers', 'trialreels', 'cliplibrary'] as const).includes(mainPage)) {
       setMainPage('dashboard');
     }
   }, [mainPage, setMainPage]);
@@ -205,11 +210,13 @@ export default function Home() {
       safeSelect('profiles', 'created_at'),
     ]);
 
-    const [ca, cc, trs, trp] = await Promise.all([
+    const [ca, cc, trs, trp, cls, cln] = await Promise.all([
       safeSelect('clipper_accounts', 'created_at'),
       safeSelect('clipper_content', 'created_at', false),
       safeSelect('trial_reel_source', 'created_at', false),
       safeSelect('trial_reel_production', 'created_at', false),
+      safeSelect('clip_source', 'name'),
+      safeSelect('clip_snippet', 'created_at'),
     ]);
 
     let active = (c as Client[])[0] || null;
@@ -243,6 +250,8 @@ export default function Home() {
     setClipperContent(cc as ClipperContent[]);
     setTrialReelSources(trs as TrialReelSource[]);
     setTrialReelProductions(trp as TrialReelProduction[]);
+    setClipSources(cls as ClipSource[]);
+    setClipSnippets(cln as ClipSnippet[]);
     setLoading(false);
   }, []);
 
@@ -456,6 +465,15 @@ export default function Home() {
                 currentUserId={currentUserId}
                 openItemId={trialReelOpenId}
                 onDeepLinkConsumed={() => setTrialReelOpenId(undefined)}
+                onReload={loadData}
+              />
+            </div>
+          )}
+          {client && mainPage === 'cliplibrary' && role === 'admin' && (
+            <div style={{ padding: '16px 24px' }}>
+              <ClipLibraryTab
+                sources={clipSources}
+                snippets={clipSnippets}
                 onReload={loadData}
               />
             </div>

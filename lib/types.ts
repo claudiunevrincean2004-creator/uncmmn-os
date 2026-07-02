@@ -51,7 +51,28 @@ export interface RevenueEntry {
   created_at?: string;
 }
 
-export type MainPage = 'dashboard' | 'content' | 'research' | 'drive' | 'studio' | 'clippers' | 'trialreels';
+export type MainPage = 'dashboard' | 'content' | 'research' | 'drive' | 'studio' | 'clippers' | 'trialreels' | 'cliplibrary';
+
+// A long-form piece in the Clip Library (Overview sheet). name is the unique key.
+export interface ClipSource {
+  id: string;
+  name?: string | null;
+  raw_full_version?: string | null;
+  created_at?: string;
+}
+
+// One clip carved from a long-form piece (Snippet database sheet). source_id is a
+// best-effort link to ClipSource by name (null when unmatched).
+export interface ClipSnippet {
+  id: string;
+  source_name?: string | null;
+  source_id?: string | null;
+  description?: string | null;
+  full_version_file?: string | null;
+  timestamp?: string | null;
+  snippet_download_link?: string | null;
+  created_at?: string;
+}
 
 // A backlog reel in the Trial Reels source library (imported/upserted from CSV).
 // eligible / times_recreated / last_assigned_at are system fields owned by the

@@ -16,6 +16,7 @@ const NAV: NavItem[] = [
   { key: 'research', label: 'Research', icon: '✦' },
   { key: 'studio', label: 'Studio', icon: '◈' },
   { key: 'trialreels', label: 'Trial Reels', icon: '↻' },
+  { key: 'cliplibrary', label: 'Clip Library', icon: '▧' },
   { key: 'drive', label: 'Assets', icon: '▤' },
   { key: 'clippers', label: 'Clippers', icon: '✂' },
 ];

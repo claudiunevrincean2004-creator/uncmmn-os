@@ -9,6 +9,7 @@ export async function checkSchema(): Promise<{ missing: string[]; postColumnsMis
     'studio_quick_links', 'studio_dropdown_options',
     'custom_properties',
     'trial_reel_source', 'trial_reel_production',
+    'clip_source', 'clip_snippet',
   ];
 
   const missing: string[] = [];
@@ -392,6 +393,39 @@ create table if not exists trial_reel_production (
 alter table trial_reel_production enable row level security;
 drop policy if exists "Allow all for anon" on trial_reel_production;
 create policy "Allow all for anon" on trial_reel_production for all using (true) with check (true);
+notify pgrst, 'reload schema';`);
+  }
+
+  if (missing.includes('clip_source')) {
+    parts.push(`-- Clip Library: long-form pieces (Overview sheet). name is the UNIQUE upsert key.
+create table if not exists clip_source (
+  id uuid primary key default gen_random_uuid(),
+  name text unique,
+  raw_full_version text,
+  created_at timestamptz default now()
+);
+create unique index if not exists clip_source_name_key on clip_source (name);
+alter table clip_source enable row level security;
+drop policy if exists "Allow all for anon" on clip_source;
+create policy "Allow all for anon" on clip_source for all using (true) with check (true);`);
+  }
+
+  if (missing.includes('clip_snippet')) {
+    parts.push(`-- Clip Library: individual clips (Snippet database sheet). source_id best-effort
+-- links to clip_source by name.
+create table if not exists clip_snippet (
+  id uuid primary key default gen_random_uuid(),
+  source_name text,
+  source_id uuid references clip_source(id) on delete set null,
+  description text,
+  full_version_file text,
+  "timestamp" text,
+  snippet_download_link text,
+  created_at timestamptz default now()
+);
+alter table clip_snippet enable row level security;
+drop policy if exists "Allow all for anon" on clip_snippet;
+create policy "Allow all for anon" on clip_snippet for all using (true) with check (true);
 notify pgrst, 'reload schema';`);
   }
 
