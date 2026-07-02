@@ -58,6 +58,8 @@ export interface ClipSource {
   id: string;
   name?: string | null;
   raw_full_version?: string | null;
+  date_added?: string | null;
+  format?: string | null;
   created_at?: string;
 }
 
@@ -71,6 +73,8 @@ export interface ClipSnippet {
   full_version_file?: string | null;
   timestamp?: string | null;
   snippet_download_link?: string | null;
+  date_added?: string | null;
+  format?: string | null;
   created_at?: string;
 }
 

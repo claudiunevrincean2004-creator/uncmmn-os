@@ -1,7 +1,9 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { ClipSource, ClipSnippet } from '@/lib/types';
+import { DateFilter, matchesDateFilter, byDateAddedDesc } from '@/lib/clip-library';
 import { MaybeUrl } from '../studio/cells';
+import { DateQuickFilter, FormatFilter, distinctFormats } from './ClipFilters';
 
 interface Props {
   sources: ClipSource[];
@@ -11,6 +13,8 @@ interface Props {
 
 export default function OverviewList({ sources, snippets, onDrill }: Props) {
   const [search, setSearch] = useState('');
+  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  const [formatFilter, setFormatFilter] = useState('');
 
   // Clip counts per source, matched by name (robust regardless of source_id links).
   const countByName = useMemo(() => {
@@ -22,11 +26,18 @@ export default function OverviewList({ sources, snippets, onDrill }: Props) {
     return m;
   }, [snippets]);
 
+  const formats = useMemo(() => distinctFormats(sources), [sources]);
+
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const r = q ? sources.filter(s => (s.name || '').toLowerCase().includes(q)) : sources;
-    return [...r].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  }, [sources, search]);
+    const r = sources.filter(s =>
+      (!q || (s.name || '').toLowerCase().includes(q)) &&
+      matchesDateFilter(s.date_added, dateFilter) &&
+      (!formatFilter || (s.format || '') === formatFilter),
+    );
+    // Newest first by date_added (undated last), then name for stable ties.
+    return [...r].sort((a, b) => byDateAddedDesc(a.date_added, b.date_added) || (a.name || '').localeCompare(b.name || ''));
+  }, [sources, search, dateFilter, formatFilter]);
 
   return (
     <div>
@@ -36,14 +47,16 @@ export default function OverviewList({ sources, snippets, onDrill }: Props) {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search long-form pieces…"
-          style={{ fontSize: 12, padding: '6px 10px', width: 280 }}
+          style={{ fontSize: 12, padding: '6px 10px', width: 260 }}
         />
-        <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{sources.length} long-form pieces</div>
+        <DateQuickFilter value={dateFilter} onChange={setDateFilter} />
+        <FormatFilter value={formatFilter} options={formats} onChange={setFormatFilter} />
+        <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{rows.length} of {sources.length} pieces</div>
       </div>
 
       {rows.length === 0 ? (
         <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>
-          No long-form pieces yet. Import the Overview CSV.
+          {sources.length === 0 ? 'No long-form pieces yet. Import the Overview CSV.' : 'No pieces match these filters.'}
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
@@ -51,6 +64,8 @@ export default function OverviewList({ sources, snippets, onDrill }: Props) {
             <thead>
               <tr>
                 <th style={{ minWidth: 260 }}>Name</th>
+                <th>Date Added</th>
+                <th>Format</th>
                 <th>RAW Full Version</th>
                 <th style={{ textAlign: 'center' }}>Clips</th>
               </tr>
@@ -67,6 +82,8 @@ export default function OverviewList({ sources, snippets, onDrill }: Props) {
                         title="View this piece’s clips"
                       >{s.name || '—'}</button>
                     </td>
+                    <td><span style={{ fontSize: 11, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{s.date_added ? s.date_added.slice(0, 10) : '—'}</span></td>
+                    <td><span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{s.format || '—'}</span></td>
                     <td><MaybeUrl value={s.raw_full_version} /></td>
                     <td style={{ textAlign: 'center' }}>
                       <button

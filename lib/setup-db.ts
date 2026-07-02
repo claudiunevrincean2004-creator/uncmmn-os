@@ -402,9 +402,13 @@ create table if not exists clip_source (
   id uuid primary key default gen_random_uuid(),
   name text unique,
   raw_full_version text,
+  date_added date,
+  format text,
   created_at timestamptz default now()
 );
 create unique index if not exists clip_source_name_key on clip_source (name);
+alter table clip_source add column if not exists date_added date;
+alter table clip_source add column if not exists format text;
 alter table clip_source enable row level security;
 drop policy if exists "Allow all for anon" on clip_source;
 create policy "Allow all for anon" on clip_source for all using (true) with check (true);`);
@@ -421,8 +425,12 @@ create table if not exists clip_snippet (
   full_version_file text,
   "timestamp" text,
   snippet_download_link text,
+  date_added date,
+  format text,
   created_at timestamptz default now()
 );
+alter table clip_snippet add column if not exists date_added date;
+alter table clip_snippet add column if not exists format text;
 alter table clip_snippet enable row level security;
 drop policy if exists "Allow all for anon" on clip_snippet;
 create policy "Allow all for anon" on clip_snippet for all using (true) with check (true);

@@ -15,9 +15,14 @@ create table if not exists public.clip_source (
   id uuid primary key default gen_random_uuid(),
   name text unique,                  -- e.g. "Questions w/ Eden - 5 January - 2024"
   raw_full_version text,             -- RAW full version file (may be "-"/empty → null)
+  date_added date,
+  format text,                       -- e.g. Podcast, Q&A, Raw Talk
   created_at timestamptz default now()
 );
 create unique index if not exists clip_source_name_key on public.clip_source (name);
+-- Date + format (idempotent — backfills installs whose tables predate them).
+alter table public.clip_source add column if not exists date_added date;
+alter table public.clip_source add column if not exists format text;
 alter table public.clip_source enable row level security;
 drop policy if exists "Allow all for anon" on public.clip_source;
 create policy "Allow all for anon" on public.clip_source for all using (true) with check (true);
@@ -32,8 +37,12 @@ create table if not exists public.clip_snippet (
   full_version_file text,
   "timestamp" text,
   snippet_download_link text,
+  date_added date,
+  format text,                       -- e.g. Podcast, Q&A, Raw Talk
   created_at timestamptz default now()
 );
+alter table public.clip_snippet add column if not exists date_added date;
+alter table public.clip_snippet add column if not exists format text;
 alter table public.clip_snippet enable row level security;
 drop policy if exists "Allow all for anon" on public.clip_snippet;
 create policy "Allow all for anon" on public.clip_snippet for all using (true) with check (true);

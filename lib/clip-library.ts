@@ -2,9 +2,57 @@
 // batched imports. Reuses the RFC-4180-ish CSV parser from trial-reels.
 import { supabase } from './supabase';
 import { parseCSV } from './trial-reels';
+import { todayISO, addDaysISO } from './studio';
 
 const norm = (h: string) => h.toLowerCase().replace(/[^a-z0-9]/g, '');
 const isBlank = (s: string | undefined) => !s || s.trim() === '';
+
+// Normalize a Date cell to yyyy-mm-dd. Accepts ISO, M/D/Y(Y) and M-D-Y(Y), and
+// falls back to Date parsing; returns null when blank/unparseable.
+function parseDate(v: string | undefined): string | null {
+  if (!v) return null;
+  const t = v.trim();
+  if (!t || t === '-') return null;
+  let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  m = t.match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{2,4})$/);
+  if (m) {
+    let [, mo, d, y] = m;
+    if (y.length === 2) y = '20' + y;
+    return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  const dt = new Date(t);
+  if (!isNaN(dt.getTime())) {
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+  }
+  return null;
+}
+
+// ── Shared date sort/filter (used by both the Overview and Snippet views) ─────
+
+export type DateFilter = 'all' | 'week' | 'month';
+
+// Time-bounded filter on a yyyy-mm-dd date_added. "week" = last 7 days (rolling),
+// "month" = current calendar month. Undated rows are excluded from bounded
+// filters (but always shown under "all").
+export function matchesDateFilter(dateStr: string | null | undefined, filter: DateFilter): boolean {
+  if (filter === 'all') return true;
+  if (!dateStr) return false;
+  const d = dateStr.slice(0, 10);
+  const today = todayISO();
+  if (filter === 'month') return d.slice(0, 7) === today.slice(0, 7);
+  return d >= addDaysISO(today, -6) && d <= today; // week
+}
+
+// Newest-first comparator by date_added; undated rows sort LAST.
+export function byDateAddedDesc(a: string | null | undefined, b: string | null | undefined): number {
+  const ad = a ? a.slice(0, 10) : '';
+  const bd = b ? b.slice(0, 10) : '';
+  if (ad && bd) return bd.localeCompare(ad);
+  if (ad) return -1;
+  if (bd) return 1;
+  return 0;
+}
 
 // Rows per request — keeps the existence-check `in.(...)` URL small and bounds the
 // failure blast radius (the Snippet database is ~900 rows).
@@ -25,6 +73,8 @@ function errText(e: unknown): string {
 export interface ParsedClipSource {
   name: string;
   raw_full_version: string | null;
+  date_added: string | null;
+  format: string | null;
 }
 
 export interface OverviewParseResult {
@@ -34,15 +84,18 @@ export interface OverviewParseResult {
 }
 
 // Columns: Video name, Row number in Snippet database, RAW full version file,
-// Shortcut to row in Snippet Database. Only Video name (→ name, the unique key)
-// and RAW full version file (→ raw_full_version) are used; the rest are ignored.
-// De-duplicated by name (last occurrence wins). "-"/blank raw values → null.
+// Shortcut to row in Snippet Database, plus optional Date added / Format. Video
+// name → name (unique key), RAW full version file → raw_full_version, Date added →
+// date_added, Format → format; the row-number/shortcut columns are ignored.
+// De-duplicated by name (last occurrence wins). "-"/blank values → null.
 export function parseOverviewCSV(text: string): OverviewParseResult {
   const grid = parseCSV(text).filter(r => r.some(c => c.trim() !== ''));
   if (grid.length === 0) return { rows: [], skipped: 0, headersFound: false };
   const header = grid[0].map(norm);
   const iName = header.indexOf('videoname');
   const iRaw = header.indexOf('rawfullversionfile');
+  const iDate = header.indexOf('dateadded');
+  const iFormat = header.indexOf('format');
   if (iName < 0) return { rows: [], skipped: 0, headersFound: false };
 
   const byName = new Map<string, ParsedClipSource>();
@@ -51,7 +104,13 @@ export function parseOverviewCSV(text: string): OverviewParseResult {
     const name = (grid[r][iName] || '').trim();
     if (!name) { skipped++; continue; }
     const raw = iRaw >= 0 ? (grid[r][iRaw] || '').trim() : '';
-    byName.set(name, { name, raw_full_version: raw && raw !== '-' ? raw : null });
+    const fmt = iFormat >= 0 ? (grid[r][iFormat] || '').trim() : '';
+    byName.set(name, {
+      name,
+      raw_full_version: raw && raw !== '-' ? raw : null,
+      date_added: iDate >= 0 ? parseDate(grid[r][iDate]) : null,
+      format: fmt && fmt !== '-' ? fmt : null,
+    });
   }
   return { rows: Array.from(byName.values()), skipped, headersFound: true };
 }
@@ -64,6 +123,8 @@ export interface ParsedClipSnippet {
   full_version_file: string | null;
   timestamp: string | null;
   snippet_download_link: string | null;
+  date_added: string | null;
+  format: string | null;
 }
 
 export interface SnippetParseResult {
@@ -90,6 +151,8 @@ export function parseSnippetsCSV(text: string): SnippetParseResult {
   const iDesc = header.indexOf('description');
   const iFull = header.indexOf('fullversionfile');
   const iTs = header.indexOf('timestamp');
+  const iDate = header.indexOf('dateadded');
+  const iFormat = header.indexOf('format');
   let iSnip = -1;
   for (const alias of ['snippetdownloadlink', 'downloadlink', 'snippet']) {
     const k = header.indexOf(alias);
@@ -111,6 +174,7 @@ export function parseSnippetsCSV(text: string): SnippetParseResult {
     const full = iFull >= 0 ? (cells[iFull] || '').trim() : '';
     const ts = iTs >= 0 ? (cells[iTs] || '').trim() : '';
     const snip = iSnip >= 0 ? (cells[iSnip] || '').trim() : '';
+    const fmt = iFormat >= 0 ? (cells[iFormat] || '').trim() : '';
     if (!desc && !full && !ts && !snip) continue; // nothing meaningful
     rows.push({
       source_name: current,
@@ -118,6 +182,8 @@ export function parseSnippetsCSV(text: string): SnippetParseResult {
       full_version_file: full || null,
       timestamp: ts || null,
       snippet_download_link: snip || null,
+      date_added: iDate >= 0 ? parseDate(cells[iDate]) : null,
+      format: fmt && fmt !== '-' ? fmt : null,
     });
   }
   return { rows, sourceCount: sources.size, headersFound: true };
@@ -179,6 +245,8 @@ export async function importClipSnippets(rows: ParsedClipSnippet[]): Promise<Sni
         full_version_file: r.full_version_file,
         timestamp: r.timestamp,
         snippet_download_link: r.snippet_download_link,
+        date_added: r.date_added,
+        format: r.format,
       };
     });
     const { error } = await supabase.from('clip_snippet').insert(payload);
