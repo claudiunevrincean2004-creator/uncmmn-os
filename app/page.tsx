@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Role, canAccess } from '@/lib/auth-config';
 import { checkSchema, getMigrationSQL } from '@/lib/setup-db';
-import { Client, Post, DriveFolder, SubscriberSnapshot, ResearchItem, StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile, ClipperAccount, ClipperContent, MainPage } from '@/lib/types';
+import { Client, Post, DriveFolder, SubscriberSnapshot, ResearchItem, StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile, ClipperAccount, ClipperContent, TrialReelSource, TrialReelProduction, MainPage } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 
 import Sidebar from '@/components/Sidebar';
@@ -17,6 +17,7 @@ import DisplayNamePrompt from '@/components/DisplayNamePrompt';
 import AccountPanel from '@/components/AccountPanel';
 import AssigneeSettings from '@/components/sub/studio/AssigneeSettings';
 import ClippersTab from '@/components/sub/ClippersTab';
+import TrialReelsTab from '@/components/sub/TrialReelsTab';
 import { profileName } from '@/lib/profile-name';
 
 async function safeSelect(table: string, orderCol: string, ascending = true) {
@@ -35,6 +36,7 @@ const PAGE_LABELS: Record<MainPage, string> = {
   research: 'Research',
   drive: 'Assets',
   studio: 'Studio',
+  trialreels: 'Trial Reels',
   clippers: 'Clippers',
 };
 
@@ -44,6 +46,7 @@ const PAGE_SUBTITLES: Record<MainPage, string> = {
   research: 'Ideas & references',
   drive: 'Files & folders',
   studio: 'Review & production',
+  trialreels: 'Recreate high-converting reels',
   clippers: 'Distribution team',
 };
 
@@ -66,6 +69,8 @@ export default function Home() {
   const [studioProfiles, setStudioProfiles] = useState<Profile[]>([]);
   const [clipperAccounts, setClipperAccounts] = useState<ClipperAccount[]>([]);
   const [clipperContent, setClipperContent] = useState<ClipperContent[]>([]);
+  const [trialReelSources, setTrialReelSources] = useState<TrialReelSource[]>([]);
+  const [trialReelProductions, setTrialReelProductions] = useState<TrialReelProduction[]>([]);
   const [loading, setLoading] = useState(true);
   const [schemaMissing, setSchemaMissing] = useState<{ missing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[]; adColumnsMissing: string[]; sessionColumnsMissing: string[]; dropdownColsMissing: boolean } | null>(null);
   const [showMigrationSQL, setShowMigrationSQL] = useState(false);
@@ -86,17 +91,31 @@ export default function Home() {
   // jump to Studio and open that row's side panel. Read from window (not
   // useSearchParams) to keep the root statically prerendered.
   const [deepLink, setDeepLink] = useState<{ type: 'video' | 'ad' | 'story' | 'filming'; id: string } | null>(null);
+  // Trial Reels deep link: a production row id ("/?item=trialreel:<id>") opens the
+  // Trial Reels tab → Production Board with that reel's detail panel.
+  const [trialReelOpenId, setTrialReelOpenId] = useState<string | undefined>(undefined);
 
-  // Parse a deep-link item param once on mount, route to Studio, then strip it
-  // from the URL so a refresh doesn't re-trigger it.
+  // Parse a deep-link item param once on mount, route to the right tab, then strip
+  // it from the URL so a refresh doesn't re-trigger it. Also supports "?view=<tab>"
+  // for links that just switch tabs (e.g. the Trial Reels queue digest → board).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const view = params.get('view');
+    if (view === 'trialreels') {
+      setMainPage('trialreels');
+      window.history.replaceState(null, '', window.location.pathname);
+      return;
+    }
     const item = params.get('item');
     if (!item) return;
     const sep = item.indexOf(':');
     const type = sep >= 0 ? item.slice(0, sep) : '';
     const id = sep >= 0 ? item.slice(sep + 1) : '';
-    if ((type === 'video' || type === 'ad' || type === 'story' || type === 'filming') && id) {
+    if (type === 'trialreel' && id) {
+      setMainPage('trialreels');
+      setTrialReelOpenId(id);
+      window.history.replaceState(null, '', window.location.pathname);
+    } else if ((type === 'video' || type === 'ad' || type === 'story' || type === 'filming') && id) {
       setMainPage('studio');
       setDeepLink({ type, id });
       window.history.replaceState(null, '', window.location.pathname);
@@ -161,7 +180,7 @@ export default function Home() {
 
   // Migrate stale persisted page values from prior builds
   useEffect(() => {
-    if (!(['dashboard', 'content', 'research', 'drive', 'studio', 'clippers'] as const).includes(mainPage)) {
+    if (!(['dashboard', 'content', 'research', 'drive', 'studio', 'clippers', 'trialreels'] as const).includes(mainPage)) {
       setMainPage('dashboard');
     }
   }, [mainPage, setMainPage]);
@@ -186,9 +205,11 @@ export default function Home() {
       safeSelect('profiles', 'created_at'),
     ]);
 
-    const [ca, cc] = await Promise.all([
+    const [ca, cc, trs, trp] = await Promise.all([
       safeSelect('clipper_accounts', 'created_at'),
       safeSelect('clipper_content', 'created_at', false),
+      safeSelect('trial_reel_source', 'created_at', false),
+      safeSelect('trial_reel_production', 'created_at', false),
     ]);
 
     let active = (c as Client[])[0] || null;
@@ -220,6 +241,8 @@ export default function Home() {
     setStudioProfiles(pr as Profile[]);
     setClipperAccounts(ca as ClipperAccount[]);
     setClipperContent(cc as ClipperContent[]);
+    setTrialReelSources(trs as TrialReelSource[]);
+    setTrialReelProductions(trp as TrialReelProduction[]);
     setLoading(false);
   }, []);
 
@@ -416,6 +439,21 @@ export default function Home() {
                 profiles={studioProfiles}
                 isAdmin={role === 'admin'}
                 deepLink={deepLink}
+                onReload={loadData}
+              />
+            </div>
+          )}
+          {client && mainPage === 'trialreels' && (role === 'admin' || role === 'editor') && (
+            <div style={{ padding: '16px 24px' }}>
+              <TrialReelsTab
+                sources={trialReelSources}
+                productions={trialReelProductions}
+                comments={studioComments}
+                activity={studioActivity}
+                profiles={studioProfiles}
+                isAdmin={role === 'admin'}
+                currentUserId={currentUserId}
+                openItemId={trialReelOpenId}
                 onReload={loadData}
               />
             </div>

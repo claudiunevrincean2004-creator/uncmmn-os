@@ -8,6 +8,7 @@ export async function checkSchema(): Promise<{ missing: string[]; postColumnsMis
     'studio_ad_creatives', 'studio_comments', 'studio_activity',
     'studio_quick_links', 'studio_dropdown_options',
     'custom_properties',
+    'trial_reel_source', 'trial_reel_production',
   ];
 
   const missing: string[] = [];
@@ -343,6 +344,49 @@ update research_items set title = coalesce(nullif(title, ''), left(coalesce(cont
 
   if (postColumnsMissing.includes('post_url')) {
     parts.push(`alter table posts add column if not exists post_url text;`);
+  }
+
+  if (missing.includes('trial_reel_source')) {
+    parts.push(`-- Trial Reels backlog library (imported/upserted from CSV). posted_url is the
+-- UNIQUE upsert key. eligible / times_recreated / last_assigned_at are system
+-- fields owned by the queue engine and preserved across CSV re-imports.
+create table if not exists trial_reel_source (
+  id uuid primary key default gen_random_uuid(),
+  posted_url text unique,
+  description text,
+  drive_url text,
+  posted_date date,
+  views bigint,
+  follows bigint,
+  follows_per_1k numeric,
+  contains_talking boolean,
+  eligible boolean default true,
+  times_recreated int default 0,
+  last_assigned_at timestamptz,
+  created_at timestamptz default now()
+);
+create unique index if not exists trial_reel_source_posted_url_key on trial_reel_source (posted_url);
+alter table trial_reel_source enable row level security;
+drop policy if exists "Allow all for anon" on trial_reel_source;
+create policy "Allow all for anon" on trial_reel_source for all using (true) with check (true);`);
+  }
+
+  if (missing.includes('trial_reel_production')) {
+    parts.push(`-- Trial Reels production board — one row per recreated reel. Statuses mirror
+-- Video Review: Assigned -> Editing -> In Review -> Posted.
+create table if not exists trial_reel_production (
+  id uuid primary key default gen_random_uuid(),
+  source_id uuid references trial_reel_source(id) on delete set null,
+  assigned_to_user_id uuid references profiles(id) on delete set null,
+  status text default 'Assigned',
+  final_url text,
+  queued_date date,
+  created_at timestamptz default now()
+);
+alter table trial_reel_production enable row level security;
+drop policy if exists "Allow all for anon" on trial_reel_production;
+create policy "Allow all for anon" on trial_reel_production for all using (true) with check (true);
+notify pgrst, 'reload schema';`);
   }
 
   if (missing.includes('custom_properties')) {

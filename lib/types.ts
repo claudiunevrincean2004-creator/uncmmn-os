@@ -51,7 +51,37 @@ export interface RevenueEntry {
   created_at?: string;
 }
 
-export type MainPage = 'dashboard' | 'content' | 'research' | 'drive' | 'studio' | 'clippers';
+export type MainPage = 'dashboard' | 'content' | 'research' | 'drive' | 'studio' | 'clippers' | 'trialreels';
+
+// A backlog reel in the Trial Reels source library (imported/upserted from CSV).
+// eligible / times_recreated / last_assigned_at are system fields owned by the
+// queue engine and preserved across CSV re-imports.
+export interface TrialReelSource {
+  id: string;
+  posted_url?: string | null;      // Instagram reel link — the unique upsert key
+  description?: string | null;
+  drive_url?: string | null;
+  posted_date?: string | null;
+  views?: number | null;
+  follows?: number | null;
+  follows_per_1k?: number | null;
+  contains_talking?: boolean | null;
+  eligible: boolean;
+  times_recreated: number;
+  last_assigned_at?: string | null; // null = never assigned; drives round-robin
+  created_at?: string;
+}
+
+// One recreated reel in production. Statuses mirror Video Review's flow.
+export interface TrialReelProduction {
+  id: string;
+  source_id?: string | null;
+  assigned_to_user_id?: string | null;
+  status: string;
+  final_url?: string | null;       // the new recreated reel, filled by the editor
+  queued_date?: string | null;
+  created_at?: string;
+}
 
 export interface StudioVideo {
   id: string;
