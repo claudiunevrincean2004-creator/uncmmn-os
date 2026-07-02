@@ -24,11 +24,20 @@ create table if not exists public.trial_reel_source (
   follows bigint,
   follows_per_1k numeric,
   contains_talking boolean,
+  full_version_file text,            -- name of the full source video
+  "timestamp" text,                  -- exact moment, e.g. "00:05 - 05:21"
+  snippet_download_link text,
   eligible boolean default true,     -- admin can exclude a video from ever being queued
   times_recreated int default 0,
   last_assigned_at timestamptz,      -- null = never assigned; drives round-robin
   created_at timestamptz default now()
 );
+
+-- Raw-file fields (idempotent — backfills existing installs whose table predates
+-- these columns). Editors use them to find the source material without hunting.
+alter table public.trial_reel_source add column if not exists full_version_file text;
+alter table public.trial_reel_source add column if not exists "timestamp" text;
+alter table public.trial_reel_source add column if not exists snippet_download_link text;
 
 -- Ensure the UNIQUE constraint on posted_url exists even if the table predates it
 -- (needed as the ON CONFLICT target for the CSV upsert).

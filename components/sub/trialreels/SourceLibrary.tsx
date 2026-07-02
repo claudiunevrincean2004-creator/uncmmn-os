@@ -9,7 +9,7 @@ import {
   parseSourceCSV, importSourceRows, buildQueueCandidates, fmtRatio,
   DEFAULT_RATIO_FLOOR, DEFAULT_QUEUE_COUNT,
 } from '@/lib/trial-reels';
-import { UrlCell, MiniSelect } from '../studio/cells';
+import { UrlCell, MiniSelect, InlineText } from '../studio/cells';
 import { UserPicker, slackMentionByAssignee, resolveAssignee } from '../studio/UserPicker';
 
 interface Props {
@@ -50,6 +50,8 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
   const [sortDir, setSortDir] = usePersistedState<'asc' | 'desc'>('trialreel_sortdir', 'desc');
   const [importing, setImporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [clearOpen, setClearOpen] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   // Generate-queue state
   const [genOpen, setGenOpen] = useState(false);
@@ -68,6 +70,28 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
   async function deleteRow(id: string) {
     if (!confirm('Delete this source reel from the library?')) return;
     await supabase.from('trial_reel_source').delete().eq('id', id);
+    onReload();
+  }
+
+  // Wipe the ENTIRE source library for a clean re-import. Deletes only
+  // trial_reel_source — trial_reel_production rows (existing assignments) are left
+  // untouched. Guarded behind the are-you-sure modal below. The `.neq(id, …)`
+  // filter matches every real row (PostgREST requires a filter on DELETE).
+  async function clearLibrary() {
+    if (clearing) return;
+    setClearing(true);
+    const { error } = await supabase
+      .from('trial_reel_source')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+    setClearing(false);
+    if (error) {
+      console.error('[SourceLibrary] failed to clear library', error);
+      alert(`Couldn't clear library: ${error.message}`);
+      return;
+    }
+    setClearOpen(false);
+    showToast('Source library cleared');
     onReload();
   }
 
@@ -221,6 +245,9 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
           {importing ? 'Importing…' : '⬆ Import CSV'}
         </button>
         <button className="btn-primary" style={{ fontSize: 11, padding: '6px 12px' }} onClick={openGenerate}>🎬 Generate today’s queue</button>
+        {sources.length > 0 && (
+          <button className="btn-ghost" style={{ fontSize: 11, padding: '6px 12px', color: '#ef4444' }} onClick={() => setClearOpen(true)} title="Delete every source reel (production assignments are kept)">🗑 Clear Library</button>
+        )}
       </div>
 
       {rows.length === 0 ? (
@@ -238,6 +265,9 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
                 {th('follows', 'Follows')}
                 {th('follows_per_1k', 'Follows/1k')}
                 <th>Talking</th>
+                <th>Full Version</th>
+                <th>Timestamp</th>
+                <th>Snippet</th>
                 <th>Eligible</th>
                 {th('times_recreated', 'Recreated')}
                 {th('last_assigned_at', 'Last Assigned')}
@@ -262,6 +292,9 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
                       onChange={v => patch(s.id, { contains_talking: v === '' ? null : v === 'Yes' })}
                     />
                   </td>
+                  <td><InlineText value={s.full_version_file ?? undefined} onCommit={v => patch(s.id, { full_version_file: v || null })} placeholder="—" style={{ width: 150 }} /></td>
+                  <td><InlineText value={s.timestamp ?? undefined} onCommit={v => patch(s.id, { timestamp: v || null })} placeholder="—" style={{ width: 110 }} /></td>
+                  <td><UrlCell value={s.snippet_download_link ?? undefined} onCommit={u => patch(s.id, { snippet_download_link: u || null })} /></td>
                   <td style={{ textAlign: 'center' }}>
                     <button
                       className="btn-ghost"
@@ -356,6 +389,25 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
               <button className="btn-ghost" style={{ fontSize: 12, padding: '8px 14px' }} onClick={() => setGenOpen(false)}>Cancel</button>
               <button className="btn-primary" style={{ fontSize: 12, padding: '8px 14px' }} onClick={confirmQueue} disabled={generating || proposed.length === 0 || !editorId}>
                 {generating ? 'Queuing…' : `Confirm & assign ${proposed.length}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {clearOpen && (
+        <div className="modal-overlay" onClick={() => !clearing && setClearOpen(false)}>
+          <div className="modal-box" style={{ width: 440 }} onClick={e => e.stopPropagation()}>
+            <div className="font-head" style={{ fontSize: 17, fontWeight: 700, marginBottom: 10 }}>Clear the source library?</div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.5, marginBottom: 18 }}>
+              This permanently deletes <strong style={{ color: 'var(--text)' }}>all {sources.length} source reel{sources.length === 1 ? '' : 's'}</strong> from the library so you can re-import a clean file.
+              <br /><br />
+              Reels already in production (the Production Board and existing editor assignments) are <strong style={{ color: 'var(--text)' }}>not</strong> affected. This can’t be undone.
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+              <button className="btn-ghost" style={{ fontSize: 12, padding: '8px 14px' }} onClick={() => setClearOpen(false)} disabled={clearing}>Cancel</button>
+              <button className="btn-danger" style={{ fontSize: 12, padding: '8px 14px' }} onClick={clearLibrary} disabled={clearing}>
+                {clearing ? 'Clearing…' : `Delete all ${sources.length}`}
               </button>
             </div>
           </div>

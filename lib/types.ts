@@ -66,6 +66,9 @@ export interface TrialReelSource {
   follows?: number | null;
   follows_per_1k?: number | null;
   contains_talking?: boolean | null;
+  full_version_file?: string | null;      // name of the full source video
+  timestamp?: string | null;              // exact moment, e.g. "00:05 - 05:21"
+  snippet_download_link?: string | null;
   eligible: boolean;
   times_recreated: number;
   last_assigned_at?: string | null; // null = never assigned; drives round-robin

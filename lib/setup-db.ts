@@ -360,11 +360,17 @@ create table if not exists trial_reel_source (
   follows bigint,
   follows_per_1k numeric,
   contains_talking boolean,
+  full_version_file text,
+  "timestamp" text,
+  snippet_download_link text,
   eligible boolean default true,
   times_recreated int default 0,
   last_assigned_at timestamptz,
   created_at timestamptz default now()
 );
+alter table trial_reel_source add column if not exists full_version_file text;
+alter table trial_reel_source add column if not exists "timestamp" text;
+alter table trial_reel_source add column if not exists snippet_download_link text;
 create unique index if not exists trial_reel_source_posted_url_key on trial_reel_source (posted_url);
 alter table trial_reel_source enable row level security;
 drop policy if exists "Allow all for anon" on trial_reel_source;

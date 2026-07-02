@@ -69,6 +69,9 @@ export interface ParsedSourceRow {
   follows: number | null;
   follows_per_1k: number | null;
   contains_talking: boolean | null;
+  full_version_file: string | null;
+  timestamp: string | null;
+  snippet_download_link: string | null;
 }
 
 const norm = (h: string) => h.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -118,11 +121,12 @@ export interface CSVParseResult {
 }
 
 // Parse a content-database CSV export into source rows. Columns (case/spacing
-// insensitive): Date, Description, Google Drive Link, Link to posted video,
-// Views, Follows, Follows/ 1k views, Contains talking?. Rows are de-duplicated by
-// posted_url within the file (last occurrence wins) so one import can't produce
-// duplicates. follows_per_1k is computed from follows/views when the column is
-// absent/blank.
+// insensitive, all optional except the posted link): Date, Description, Google
+// Drive Link, Link to posted video, Views, Follows, Follows/ 1k views, Contains
+// talking?, FULL version file, Timestamp, Snippet download link. Missing columns
+// simply map to null. Rows are de-duplicated by posted_url within the file (last
+// occurrence wins) so one import can't produce duplicates. follows_per_1k is
+// computed from follows/views when the column is absent/blank.
 export function parseSourceCSV(text: string): CSVParseResult {
   const grid = parseCSV(text).filter(r => r.some(c => c.trim() !== ''));
   if (grid.length === 0) return { rows: [], skipped: 0, headersFound: false };
@@ -136,6 +140,9 @@ export function parseSourceCSV(text: string): CSVParseResult {
   const iFollows = idx('follows');
   const iRatio = header.findIndex(h => h.startsWith('follows1k'));      // "follows1kviews"
   const iTalking = header.findIndex(h => h.startsWith('containstalking'));
+  const iFull = idx('fullversionfile');                                 // "FULL version file"
+  const iTs = idx('timestamp');                                         // "Timestamp"
+  const iSnippet = idx('snippetdownloadlink');                          // "Snippet download link"
   if (iUrl < 0) return { rows: [], skipped: 0, headersFound: false };
 
   const byUrl = new Map<string, ParsedSourceRow>();
@@ -159,6 +166,9 @@ export function parseSourceCSV(text: string): CSVParseResult {
       follows,
       follows_per_1k: ratio != null ? Math.round(ratio * 100) / 100 : null,
       contains_talking: iTalking >= 0 ? parseBool(cells[iTalking]) : null,
+      full_version_file: iFull >= 0 ? (cells[iFull]?.trim() || null) : null,
+      timestamp: iTs >= 0 ? (cells[iTs]?.trim() || null) : null,
+      snippet_download_link: iSnippet >= 0 ? (cells[iSnippet]?.trim() || null) : null,
     });
   }
   return { rows: Array.from(byUrl.values()), skipped, headersFound: true };

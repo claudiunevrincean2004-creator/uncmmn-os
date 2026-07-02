@@ -95,6 +95,9 @@ export default function ProductionBoard({ productions, sources, comments, activi
   const fields: FieldDef[] = useMemo(() => {
     const base: FieldDef[] = [
       { key: 'source_description', label: 'Description', type: 'readonly' },
+      { key: 'full_version_file', label: 'Full Version File', type: 'readonly' },
+      { key: 'source_timestamp', label: 'Timestamp', type: 'readonly' },
+      { key: 'snippet_download_link', label: 'Snippet Download', type: 'readonly-url' },
       { key: 'posted_url', label: 'Original Reel · reference', type: 'readonly-url' },
       { key: 'drive_url', label: 'Drive · reference', type: 'readonly-url' },
     ];
@@ -112,6 +115,9 @@ export default function ProductionBoard({ productions, sources, comments, activi
   const panelValues = selected ? {
     ...selected,
     source_description: selectedSource?.description || '',
+    full_version_file: selectedSource?.full_version_file || '',
+    source_timestamp: selectedSource?.timestamp || '',
+    snippet_download_link: selectedSource?.snippet_download_link || '',
     posted_url: selectedSource?.posted_url || '',
     drive_url: selectedSource?.drive_url || '',
     assigned_name: resolveAssignee(selected.assigned_to_user_id, profiles) || 'Unassigned',
@@ -152,10 +158,16 @@ export default function ProductionBoard({ productions, sources, comments, activi
                       <tr style={selectedId === p.id ? { background: 'var(--surface-2)' } : undefined}>
                         <td style={{ minWidth: 220 }}>
                           <button onClick={() => setSelectedId(p.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{desc}</button>
+                          {(src?.full_version_file || src?.timestamp) && (
+                            <div style={{ fontSize: 10, color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={[src?.full_version_file, src?.timestamp].filter(Boolean).join(' · ')}>
+                              {[src?.full_version_file, src?.timestamp].filter(Boolean).join(' · ')}
+                            </div>
+                          )}
                         </td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                             {src?.posted_url ? <a href={src.posted_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', fontSize: 11, textDecoration: 'none', whiteSpace: 'nowrap' }} title="Original reel (reference)">Reel ↗</a> : <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>—</span>}
+                            {src?.snippet_download_link ? <a href={src.snippet_download_link} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', fontSize: 11, textDecoration: 'none', whiteSpace: 'nowrap' }} title="Snippet download">Snippet ↗</a> : null}
                             {src?.drive_url ? <a href={src.drive_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', fontSize: 11, textDecoration: 'none', whiteSpace: 'nowrap' }} title="Drive (reference)">Drive ↗</a> : null}
                           </div>
                         </td>
