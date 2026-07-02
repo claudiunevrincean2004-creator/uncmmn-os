@@ -166,26 +166,60 @@ export function parseSourceCSV(text: string): CSVParseResult {
 
 export interface ImportResult { inserted: number; updated: number; }
 
-// Upsert parsed rows into trial_reel_source, keyed on posted_url. The payload
-// contains ONLY content columns — eligible / times_recreated / last_assigned_at
-// are deliberately omitted so ON CONFLICT DO UPDATE never touches them (existing
-// rows keep their system values) while new rows fall back to the DB defaults.
-// Returns inserted vs updated counts (computed from which URLs already existed).
+// Rows per request. The existence pre-check uses a `posted_url=in.(...)` GET
+// filter whose whole URL must stay well under server limits, so batches are kept
+// small (a 2,000-row file in one `in.(...)` produces a ~70KB URL the server
+// rejects with ERR_FAILED). The upsert reuses the same batch (its rows travel in
+// the POST body, so size isn't the constraint — batching just keeps the two in
+// lockstep and bounds the failure blast radius).
+const IMPORT_BATCH = 200;
+
+// Turn a Supabase error (a plain object, not an Error) into a readable string so
+// callers never surface "[object Object]".
+function errText(e: unknown): string {
+  if (!e) return 'unknown error';
+  if (e instanceof Error) return e.message;
+  if (typeof e === 'object') {
+    const o = e as { message?: string; details?: string; hint?: string; code?: string };
+    return [o.message, o.details, o.hint, o.code && `(${o.code})`].filter(Boolean).join(' — ') || JSON.stringify(e);
+  }
+  return String(e);
+}
+
+// Upsert parsed rows into trial_reel_source, keyed on posted_url, IN BATCHES so it
+// scales to thousands of rows. The payload contains ONLY content columns —
+// eligible / times_recreated / last_assigned_at are deliberately omitted so
+// ON CONFLICT DO UPDATE never touches them (existing rows keep their system
+// values) while new rows fall back to the DB defaults. Returns total inserted vs
+// updated across all batches (computed from which URLs already existed per batch).
+// On failure, throws an Error naming the failing batch's row range + real message.
 export async function importSourceRows(rows: ParsedSourceRow[]): Promise<ImportResult> {
-  if (rows.length === 0) return { inserted: 0, updated: 0 };
-  const urls = rows.map(r => r.posted_url);
-  const { data: existing, error: selErr } = await supabase
-    .from('trial_reel_source')
-    .select('posted_url')
-    .in('posted_url', urls);
-  if (selErr) throw selErr;
-  const existingSet = new Set((existing || []).map((e: { posted_url: string }) => e.posted_url));
-  const inserted = rows.filter(r => !existingSet.has(r.posted_url)).length;
-  const updated = rows.length - inserted;
-  const { error } = await supabase
-    .from('trial_reel_source')
-    .upsert(rows, { onConflict: 'posted_url' });
-  if (error) throw error;
+  let inserted = 0;
+  let updated = 0;
+  for (let i = 0; i < rows.length; i += IMPORT_BATCH) {
+    const batch = rows.slice(i, i + IMPORT_BATCH);
+    const from = i + 1;
+    const to = i + batch.length;
+    const urls = batch.map(r => r.posted_url);
+
+    // Batched existence check → drives this batch's inserted vs updated split.
+    const { data: existing, error: selErr } = await supabase
+      .from('trial_reel_source')
+      .select('posted_url')
+      .in('posted_url', urls);
+    if (selErr) throw new Error(`Import failed at rows ${from}–${to} (existence check): ${errText(selErr)}`);
+    const existingSet = new Set((existing || []).map((e: { posted_url: string }) => e.posted_url));
+    const batchInserted = batch.filter(r => !existingSet.has(r.posted_url)).length;
+
+    // Single insert-or-update for the batch (server-side ON CONFLICT).
+    const { error } = await supabase
+      .from('trial_reel_source')
+      .upsert(batch, { onConflict: 'posted_url' });
+    if (error) throw new Error(`Import failed at rows ${from}–${to} (upsert): ${errText(error)}`);
+
+    inserted += batchInserted;
+    updated += batch.length - batchInserted;
+  }
   return { inserted, updated };
 }
 
