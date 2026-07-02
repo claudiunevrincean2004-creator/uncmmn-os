@@ -123,8 +123,9 @@ export interface CSVParseResult {
 // Parse a content-database CSV export into source rows. Columns (case/spacing
 // insensitive, all optional except the posted link): Date, Description, Google
 // Drive Link, Link to posted video, Views, Follows, Follows/ 1k views, Contains
-// talking?, FULL version file, Timestamp, Snippet download link. Missing columns
-// simply map to null. Rows are de-duplicated by posted_url within the file (last
+// talking?, FULL version file, Timestamp, and the snippet URL under any of
+// "Download link" / "Snippet download link" / "Snippet". Missing columns simply
+// map to null. Rows are de-duplicated by posted_url within the file (last
 // occurrence wins) so one import can't produce duplicates. follows_per_1k is
 // computed from follows/views when the column is absent/blank.
 export function parseSourceCSV(text: string): CSVParseResult {
@@ -142,7 +143,22 @@ export function parseSourceCSV(text: string): CSVParseResult {
   const iTalking = header.findIndex(h => h.startsWith('containstalking'));
   const iFull = idx('fullversionfile');                                 // "FULL version file"
   const iTs = idx('timestamp');                                         // "Timestamp"
-  const iSnippet = idx('snippetdownloadlink');                          // "Snippet download link"
+  // Snippet URL appears under different headers across CSV exports. Accept the
+  // snippet-specific names first, then fall back to a generic "Download link".
+  const SNIPPET_ALIASES = ['snippetdownloadlink', 'snippet', 'downloadlink'];
+  let iSnippet = -1;
+  for (const alias of SNIPPET_ALIASES) {
+    const i = header.indexOf(alias);
+    if (i >= 0) { iSnippet = i; break; }
+  }
+  // Surface the actual header names we matched so mapping issues are debuggable.
+  if (typeof console !== 'undefined') {
+    console.log(
+      '[trial-reels] CSV field mapping →',
+      'full_version_file:', iFull >= 0 ? JSON.stringify(grid[0][iFull]) : '(not found)',
+      '| snippet_download_link:', iSnippet >= 0 ? JSON.stringify(grid[0][iSnippet]) : '(not found)',
+    );
+  }
   if (iUrl < 0) return { rows: [], skipped: 0, headersFound: false };
 
   const byUrl = new Map<string, ParsedSourceRow>();

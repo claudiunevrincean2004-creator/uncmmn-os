@@ -5,7 +5,7 @@ import { TrialReelSource, TrialReelProduction, StudioComment, StudioActivity, Pr
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { logActivity } from '@/lib/studio';
 import { TRIAL_REEL_STATUSES, TRIAL_REEL_STATUS_COLORS, TRIAL_REEL_NOTIFY_STATUSES } from '@/lib/trial-reels';
-import { EditPillSelect, UrlCell, MiniSelect } from '../studio/cells';
+import { EditPillSelect, UrlCell, MiniSelect, isHttpUrl } from '../studio/cells';
 import { UserPicker, resolveAssignee } from '../studio/UserPicker';
 import FilterField from '../studio/FilterField';
 import ItemPanel, { FieldDef } from '../studio/ItemPanel';
@@ -98,7 +98,7 @@ export default function ProductionBoard({ productions, sources, comments, activi
   const fields: FieldDef[] = useMemo(() => {
     const base: FieldDef[] = [
       { key: 'source_description', label: 'Description', type: 'readonly' },
-      { key: 'full_version_file', label: 'Full Version File', type: 'readonly' },
+      { key: 'full_version_file', label: 'Full Version File', type: 'readonly-maybe-url' },
       { key: 'source_timestamp', label: 'Timestamp', type: 'readonly' },
       { key: 'snippet_download_link', label: 'Snippet Download', type: 'readonly-url' },
       { key: 'posted_url', label: 'Original Reel · reference', type: 'readonly-url' },
@@ -165,7 +165,11 @@ export default function ProductionBoard({ productions, sources, comments, activi
                           <button onClick={() => setSelectedId(p.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{desc}</button>
                           {(src?.full_version_file || src?.timestamp) && (
                             <div style={{ fontSize: 10, color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={[src?.full_version_file, src?.timestamp].filter(Boolean).join(' · ')}>
-                              {[src?.full_version_file, src?.timestamp].filter(Boolean).join(' · ')}
+                              {src?.full_version_file && (isHttpUrl(src.full_version_file)
+                                ? <a href={src.full_version_file} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }} title={src.full_version_file}>Full version ↗</a>
+                                : <span>{src.full_version_file}</span>)}
+                              {src?.full_version_file && src?.timestamp ? ' · ' : ''}
+                              {src?.timestamp && <span>{src.timestamp}</span>}
                             </div>
                           )}
                         </td>

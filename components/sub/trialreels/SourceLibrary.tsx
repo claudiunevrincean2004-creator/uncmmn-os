@@ -9,7 +9,7 @@ import {
   parseSourceCSV, importSourceRows, buildQueueCandidates, fmtRatio,
   DEFAULT_RATIO_FLOOR, DEFAULT_QUEUE_COUNT,
 } from '@/lib/trial-reels';
-import { UrlCell, MiniSelect, InlineText } from '../studio/cells';
+import { UrlCell, MiniSelect, InlineText, MaybeUrlCell } from '../studio/cells';
 import { UserPicker, slackMentionByAssignee, resolveAssignee } from '../studio/UserPicker';
 
 interface Props {
@@ -292,7 +292,7 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
                       onChange={v => patch(s.id, { contains_talking: v === '' ? null : v === 'Yes' })}
                     />
                   </td>
-                  <td><InlineText value={s.full_version_file ?? undefined} onCommit={v => patch(s.id, { full_version_file: v || null })} placeholder="—" style={{ width: 150 }} /></td>
+                  <td><MaybeUrlCell value={s.full_version_file ?? undefined} onCommit={v => patch(s.id, { full_version_file: v || null })} /></td>
                   <td><InlineText value={s.timestamp ?? undefined} onCommit={v => patch(s.id, { timestamp: v || null })} placeholder="—" style={{ width: 110 }} /></td>
                   <td><UrlCell value={s.snippet_download_link ?? undefined} onCommit={u => patch(s.id, { snippet_download_link: u || null })} /></td>
                   <td style={{ textAlign: 'center' }}>

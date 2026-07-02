@@ -240,6 +240,74 @@ export function shortUrl(raw: string, max = 30): string {
   return s.length > max ? s.slice(0, max - 1) + '…' : s;
 }
 
+// True when a value looks like an http(s) URL.
+export function isHttpUrl(v?: string | null): boolean {
+  return !!v && /^https?:\/\//i.test(v.trim());
+}
+
+// Read-only display that adapts to its value: a clickable link when the value is
+// an http(s) URL, otherwise plain text. Used for fields like "Full version file"
+// that may hold either a Drive URL or a bare filename.
+export function MaybeUrl({ value }: { value?: string | null }) {
+  if (!value) return <span style={{ color: 'var(--text-faint)' }}>—</span>;
+  if (isHttpUrl(value)) {
+    return (
+      <a href={value} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={value}>
+        {shortUrl(value)}
+      </a>
+    );
+  }
+  return <span style={{ fontSize: 12 }} title={value}>{value}</span>;
+}
+
+// Editable variant of MaybeUrl: shows a clickable link (when http) or plain text,
+// with a pencil to edit inline. Commits on blur/Enter, reverts on Escape.
+export function MaybeUrlCell({
+  value,
+  onCommit,
+}: {
+  value?: string;
+  onCommit: (v: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [v, setV] = useState(value ?? '');
+  useEffect(() => { setV(value ?? ''); }, [value]);
+  const skipCommit = useRef(false);
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        className="form-input"
+        style={{ width: 150, padding: '4px 7px', fontSize: 11 }}
+        value={v}
+        placeholder="https://… or filename"
+        onChange={e => setV(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Escape') { skipCommit.current = true; setV(value ?? ''); e.currentTarget.blur(); }
+          else if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); }
+        }}
+        onBlur={() => {
+          if (skipCommit.current) skipCommit.current = false;
+          else if ((v ?? '') !== (value ?? '')) onCommit(v.trim());
+          setEditing(false);
+        }}
+      />
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, maxWidth: 220 }}>
+      <MaybeUrl value={value} />
+      <button
+        onClick={() => setEditing(true)}
+        style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 11, padding: 0, flexShrink: 0 }}
+        title={value ? 'Edit' : 'Add'}
+      >✎</button>
+    </div>
+  );
+}
+
 // A clickable, readable link (short URL) with an inline-editable URL behind a pencil.
 export function UrlCell({
   value,
