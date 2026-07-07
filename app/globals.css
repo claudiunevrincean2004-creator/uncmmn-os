@@ -442,6 +442,16 @@ html, body {
   100% { transform: rotate(360deg); filter: drop-shadow(0 0 0 transparent); }
 }
 
+/* Splash / loading logo — smooth continuous rotation */
+.splash-spin {
+  animation: splashSpin 2.4s linear infinite;
+  transform-origin: 50% 50%;
+}
+@keyframes splashSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* 🌆 gentle fade/pulse */
 .emoji-fade {
   animation: emojiFade 3.5s ease-in-out infinite;

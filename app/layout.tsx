@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "NATHAN OS",
-  description: "Nathan Nazareth — Creator Operating System",
+  title: "Content OS",
+  description: "Nathan Nazareth — Content Operating System",
 };
 
 // Set the theme before first paint to avoid a flash. Defaults to light "aurora".

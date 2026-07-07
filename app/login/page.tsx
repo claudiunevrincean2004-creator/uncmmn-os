@@ -52,7 +52,7 @@ export default function LoginPage() {
       >
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginBottom: 4 }}>
           <StarLogo size={40} />
-          <div className="font-head" style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>Nathan OS</div>
+          <div className="font-head" style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>Content OS</div>
           <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Sign in to continue</div>
         </div>
 

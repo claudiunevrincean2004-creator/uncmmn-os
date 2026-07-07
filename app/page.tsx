@@ -19,6 +19,7 @@ import AssigneeSettings from '@/components/sub/studio/AssigneeSettings';
 import ClippersTab from '@/components/sub/ClippersTab';
 import TrialReelsTab from '@/components/sub/TrialReelsTab';
 import ClipLibraryTab from '@/components/sub/ClipLibraryTab';
+import StarLogo from '@/components/StarLogo';
 import { profileName } from '@/lib/profile-name';
 
 async function safeSelect(table: string, orderCol: string, ascending = true) {
@@ -266,10 +267,9 @@ export default function Home() {
 
   if (loading || !role) {
     return (
-      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px', marginBottom: 8 }}>NATHAN</div>
-          <div style={{ fontSize: 11, color: 'var(--text-faint)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Loading...</div>
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+        <div className="splash-spin">
+          <StarLogo size={56} />
         </div>
       </div>
     );
