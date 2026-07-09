@@ -49,7 +49,8 @@ drop policy if exists "Allow all for anon" on public.trial_reel_source;
 create policy "Allow all for anon" on public.trial_reel_source for all using (true) with check (true);
 
 -- 2) trial_reel_production — one row per recreated reel in production.
---    Statuses mirror Video Review's flow: Assigned → Editing → In Review → Posted.
+--    Status flow: Assigned → Editing → In Review → Revisions Needed → Posted
+--    (free text; the option list lives in lib/trial-reels.ts, not a DB enum).
 create table if not exists public.trial_reel_production (
   id uuid primary key default gen_random_uuid(),
   source_id uuid references public.trial_reel_source(id) on delete set null,

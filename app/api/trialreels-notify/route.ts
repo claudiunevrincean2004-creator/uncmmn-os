@@ -5,13 +5,16 @@ import { TEAM_SLACK_IDS, mention } from '@/lib/team-slack';
 // URL is read from SLACK_TRIALREELS_WEBHOOK_URL (no NEXT_PUBLIC_ prefix, so it
 // never reaches the browser bundle). Missing/empty → skip silently.
 //
-// Two ping kinds only:
-//   • queue_digest — ONE message per confirmed daily batch, @-mentioning the
+// Three ping kinds only:
+//   • queue_digest     — ONE message per confirmed daily batch, @-mentioning the
 //     assigned editor and linking to the board (one message can't deep-link N
 //     reels). The editor mention is resolved client-side (assigned_to_user_id →
 //     profile → slack_user_id) and passed in pre-built.
-//   • in_review   — a single production row moved to In Review; pings the reviewer
-//     (Claudiu, from the hardcoded TEAM_SLACK_IDS) with the reel's Open-in-OS link.
+//   • in_review        — a single production row moved to In Review; pings the
+//     reviewer (Claudiu, from the hardcoded TEAM_SLACK_IDS) with the Open-in-OS link.
+//   • revisions_needed — a single production row moved to Revisions Needed; pings
+//     the ASSIGNED EDITOR (mention resolved client-side, same chain as the digest)
+//     with the reel's Open-in-OS link.
 // Editing / Posted / Assigned fire no ping here (Assigned is covered by the batch
 // digest at queue-confirm).
 
@@ -51,12 +54,19 @@ export async function POST(request: Request) {
     const editor = editorMention || '⚠️ Unassigned — set an editor';
     const n = count > 0 ? count : 0;
     blocks = [
-      `🎬 ${editor} ${n} trial reel${n === 1 ? '' : 's'} queued for today — recreate ${n === 1 ? 'this' : 'these'} from scratch.`,
+      `🎬 ${editor} ${n} trial reel${n === 1 ? '' : 's'} queued for today.`,
       boardUrl ? `<${boardUrl}|🔗 Open today's queue>` : null,
     ];
   } else if (kind === 'in_review') {
     blocks = [
       `🟣 A trial reel is ready for review, ${mention(TEAM_SLACK_IDS.claudiu)}!`,
+      itemUrl ? `<${itemUrl}|🔗 Open in OS>` : null,
+      block([description ? `Recreated from: ${description}` : null]),
+    ];
+  } else if (kind === 'revisions_needed') {
+    const editor = editorMention || '⚠️ Unassigned — set an editor';
+    blocks = [
+      `🔴 Revisions needed on your trial reel, ${editor}.`,
       itemUrl ? `<${itemUrl}|🔗 Open in OS>` : null,
       block([description ? `Recreated from: ${description}` : null]),
     ];

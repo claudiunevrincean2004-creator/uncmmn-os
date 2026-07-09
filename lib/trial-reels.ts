@@ -2,20 +2,25 @@
 import { supabase } from './supabase';
 import { TrialReelSource } from './types';
 
-// Production flow — mirrors Video Review (Assigned → Editing → In Review → Posted).
-export const TRIAL_REEL_STATUSES = ['Assigned', 'Editing', 'In Review', 'Posted'];
+// Production flow — Assigned → Editing → In Review → Revisions Needed → Posted.
+export const TRIAL_REEL_STATUSES = ['Assigned', 'Editing', 'In Review', 'Revisions Needed', 'Posted'];
 
 export const TRIAL_REEL_STATUS_COLORS: Record<string, string> = {
-  'Assigned': '#3b82f6',   // blue
-  'Editing': '#f59e0b',    // orange
-  'In Review': '#8b5cf6',  // purple
-  'Posted': '#10b981',     // green
+  'Assigned': '#3b82f6',         // blue
+  'Editing': '#f59e0b',          // orange
+  'In Review': '#8b5cf6',        // purple
+  'Revisions Needed': '#ef4444', // red
+  'Posted': '#10b981',           // green
 };
 
-// Only "In Review" pings (the reviewer). The day's batch is announced by ONE
+// "In Review" pings the reviewer (Claudiu). The day's batch is announced by ONE
 // digest ping fired at queue-confirm, not per-row on "Assigned"; Editing / Posted
-// are intentionally silent.
+// are intentionally silent. "Revisions Needed" pings the assigned editor via a
+// separate path (see TRIAL_REEL_REVISIONS_STATUS below).
 export const TRIAL_REEL_NOTIFY_STATUSES = ['In Review'];
+
+// When a row moves TO this status, the assigned editor is pinged (revisions ping).
+export const TRIAL_REEL_REVISIONS_STATUS = 'Revisions Needed';
 
 export const DEFAULT_RATIO_FLOOR = 1.0;
 export const DEFAULT_QUEUE_COUNT = 10;

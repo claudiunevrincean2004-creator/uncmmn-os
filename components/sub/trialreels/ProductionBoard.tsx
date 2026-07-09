@@ -4,9 +4,9 @@ import { supabase } from '@/lib/supabase';
 import { TrialReelSource, TrialReelProduction, StudioComment, StudioActivity, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { logActivity } from '@/lib/studio';
-import { TRIAL_REEL_STATUSES, TRIAL_REEL_STATUS_COLORS, TRIAL_REEL_NOTIFY_STATUSES } from '@/lib/trial-reels';
+import { TRIAL_REEL_STATUSES, TRIAL_REEL_STATUS_COLORS, TRIAL_REEL_NOTIFY_STATUSES, TRIAL_REEL_REVISIONS_STATUS } from '@/lib/trial-reels';
 import { EditPillSelect, UrlCell, MiniSelect, isHttpUrl } from '../studio/cells';
-import { UserPicker, resolveAssignee } from '../studio/UserPicker';
+import { UserPicker, resolveAssignee, slackMentionByAssignee } from '../studio/UserPicker';
 import FilterField from '../studio/FilterField';
 import ItemPanel, { FieldDef } from '../studio/ItemPanel';
 
@@ -56,6 +56,16 @@ export default function ProductionBoard({ productions, sources, comments, activi
     }).catch(err => console.warn('[ProductionBoard] /api/trialreels-notify call failed', err));
   }
 
+  // Revisions Needed → ping the assigned editor (mention resolved the same way as
+  // the queue digest: assigned_to_user_id → profile → slack_user_id).
+  function notifyRevisions(payload: { editorMention: string; itemUrl: string; description: string }) {
+    fetch('/api/trialreels-notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'revisions_needed', ...payload }),
+    }).catch(err => console.warn('[ProductionBoard] /api/trialreels-notify call failed', err));
+  }
+
   async function patch(id: string, p: Partial<TrialReelProduction>) {
     await supabase.from('trial_reel_production').update(p).eq('id', id);
     onReload();
@@ -64,10 +74,18 @@ export default function ProductionBoard({ productions, sources, comments, activi
   async function changeStatus(row: TrialReelProduction, status: string) {
     if (status === row.status) return;
     await logActivity('trialreel', row.id, 'Status changed', row.status, status);
+    const src = row.source_id ? sourceById.get(row.source_id) : undefined;
     // Fire the reviewer ping only on the In Review transition (single status path).
     if (TRIAL_REEL_NOTIFY_STATUSES.includes(status)) {
-      const src = row.source_id ? sourceById.get(row.source_id) : undefined;
       notifyInReview({ itemUrl: reelUrl(row.id), description: src?.description || '' });
+    }
+    // Revisions Needed → ping the assigned editor for this reel.
+    if (status === TRIAL_REEL_REVISIONS_STATUS) {
+      notifyRevisions({
+        editorMention: slackMentionByAssignee(row.assigned_to_user_id, profiles),
+        itemUrl: reelUrl(row.id),
+        description: src?.description || '',
+      });
     }
     await patch(row.id, { status });
   }
