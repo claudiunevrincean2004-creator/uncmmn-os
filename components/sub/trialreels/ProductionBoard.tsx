@@ -48,7 +48,7 @@ export default function ProductionBoard({ productions, sources, comments, activi
     return typeof window !== 'undefined' ? `${window.location.origin}/trialreel/${id}` : '';
   }
 
-  function notifyInReview(payload: { itemUrl: string; description: string }) {
+  function notifyInReview(payload: { itemUrl: string; description: string; sourceUrl: string }) {
     fetch('/api/trialreels-notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -58,7 +58,7 @@ export default function ProductionBoard({ productions, sources, comments, activi
 
   // Revisions Needed → ping the assigned editor (mention resolved the same way as
   // the queue digest: assigned_to_user_id → profile → slack_user_id).
-  function notifyRevisions(payload: { editorMention: string; itemUrl: string; description: string }) {
+  function notifyRevisions(payload: { editorMention: string; itemUrl: string; description: string; sourceUrl: string }) {
     fetch('/api/trialreels-notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -77,7 +77,7 @@ export default function ProductionBoard({ productions, sources, comments, activi
     const src = row.source_id ? sourceById.get(row.source_id) : undefined;
     // Fire the reviewer ping only on the In Review transition (single status path).
     if (TRIAL_REEL_NOTIFY_STATUSES.includes(status)) {
-      notifyInReview({ itemUrl: reelUrl(row.id), description: src?.description || '' });
+      notifyInReview({ itemUrl: reelUrl(row.id), description: src?.description || '', sourceUrl: src?.posted_url || '' });
     }
     // Revisions Needed → ping the assigned editor for this reel.
     if (status === TRIAL_REEL_REVISIONS_STATUS) {
@@ -85,6 +85,7 @@ export default function ProductionBoard({ productions, sources, comments, activi
         editorMention: slackMentionByAssignee(row.assigned_to_user_id, profiles),
         itemUrl: reelUrl(row.id),
         description: src?.description || '',
+        sourceUrl: src?.posted_url || '',
       });
     }
     await patch(row.id, { status });

@@ -29,6 +29,7 @@ export async function POST(request: Request) {
   let count = 0;
   let itemUrl = '';
   let description = '';
+  let sourceUrl = '';
   try {
     const b = await request.json();
     kind = str(b?.kind);
@@ -37,15 +38,18 @@ export async function POST(request: Request) {
     count = Number(b?.count) || 0;
     itemUrl = str(b?.itemUrl);
     description = str(b?.description);
+    sourceUrl = str(b?.sourceUrl);
   } catch {
     // ignore malformed body; the guard below handles the empty kind
   }
 
-  // Collapse a list of lines (dropping empties) into one block joined by single
-  // newlines, or null if nothing remains.
-  const block = (lines: (string | null)[]): string | null => {
-    const kept = lines.filter((l): l is string => !!l);
-    return kept.length ? kept.join('\n') : null;
+  // "Source:" line — links to the ORIGINAL POSTED reel (source's posted URL) using
+  // the description as the clickable label. Falls back to plain-text description
+  // when the source has no posted URL (never renders a broken link). Null when
+  // there's no description to show.
+  const sourceLine = (): string | null => {
+    if (!description) return null;
+    return sourceUrl ? `Source: <${sourceUrl}|${description}>` : `Source: ${description}`;
   };
 
   // Logical blocks separated by a blank line (double newline); null blocks drop.
@@ -61,14 +65,14 @@ export async function POST(request: Request) {
     blocks = [
       `🟣 A trial reel is ready for review, ${mention(TEAM_SLACK_IDS.claudiu)}!`,
       itemUrl ? `<${itemUrl}|🔗 Open in OS>` : null,
-      block([description ? `Recreated from: ${description}` : null]),
+      sourceLine(),
     ];
   } else if (kind === 'revisions_needed') {
     const editor = editorMention || '⚠️ Unassigned — set an editor';
     blocks = [
       `🔴 Revisions needed on your trial reel, ${editor}.`,
       itemUrl ? `<${itemUrl}|🔗 Open in OS>` : null,
-      block([description ? `Recreated from: ${description}` : null]),
+      sourceLine(),
     ];
   } else {
     return NextResponse.json({ skipped: true });
