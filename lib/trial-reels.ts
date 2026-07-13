@@ -77,6 +77,7 @@ export interface ParsedSourceRow {
   full_version_file: string | null;
   timestamp: string | null;
   snippet_download_link: string | null;
+  final_product: string | null;
 }
 
 const norm = (h: string) => h.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -128,8 +129,8 @@ export interface CSVParseResult {
 // Parse a content-database CSV export into source rows. Columns (case/spacing
 // insensitive, all optional except the posted link): Date, Description, Google
 // Drive Link, Link to posted video, Views, Follows, Follows/ 1k views, Contains
-// talking?, FULL version file, Timestamp, and the snippet URL under any of
-// "Download link" / "Snippet download link" / "Snippet". Missing columns simply
+// talking?, FULL version file, Timestamp, Final product, and the snippet URL under
+// any of "Download link" / "Snippet download link" / "Snippet". Missing columns simply
 // map to null. Rows are de-duplicated by posted_url within the file (last
 // occurrence wins) so one import can't produce duplicates. follows_per_1k is
 // computed from follows/views when the column is absent/blank.
@@ -148,6 +149,7 @@ export function parseSourceCSV(text: string): CSVParseResult {
   const iTalking = header.findIndex(h => h.startsWith('containstalking'));
   const iFull = idx('fullversionfile');                                 // "FULL version file"
   const iTs = idx('timestamp');                                         // "Timestamp"
+  const iFinal = idx('finalproduct');                                   // "Final product" — link to finished original
   // Snippet URL appears under different headers across CSV exports. Match the
   // generic "Download link" as well as the snippet-specific names — whichever is
   // present. This is a SEPARATE column from FULL version file (full_version_file)
@@ -166,6 +168,7 @@ export function parseSourceCSV(text: string): CSVParseResult {
       { posted_url: iUrl >= 0 ? grid[0][iUrl] : '(not found)',
         full_version_file: iFull >= 0 ? grid[0][iFull] : '(not found)',
         snippet_download_link: iSnippet >= 0 ? snippetHeaderMatched : '(not found)',
+        final_product: iFinal >= 0 ? grid[0][iFinal] : '(not found)',
         drive_url: iDrive >= 0 ? grid[0][iDrive] : '(not found)' },
     );
   }
@@ -195,6 +198,7 @@ export function parseSourceCSV(text: string): CSVParseResult {
       full_version_file: iFull >= 0 ? (cells[iFull]?.trim() || null) : null,
       timestamp: iTs >= 0 ? (cells[iTs]?.trim() || null) : null,
       snippet_download_link: iSnippet >= 0 ? (cells[iSnippet]?.trim() || null) : null,
+      final_product: iFinal >= 0 ? (cells[iFinal]?.trim() || null) : null,
     });
   }
   const rows = Array.from(byUrl.values());

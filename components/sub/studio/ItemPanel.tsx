@@ -11,7 +11,7 @@ import Avatar from '@/components/Avatar';
 export interface FieldDef {
   key: string;
   label: string;
-  type: 'text' | 'textarea' | 'select' | 'pill' | 'url' | 'date' | 'number' | 'readonly' | 'readonly-url' | 'readonly-maybe-url' | 'user';
+  type: 'text' | 'textarea' | 'select' | 'pill' | 'url' | 'date' | 'number' | 'readonly' | 'readonly-multiline' | 'readonly-url' | 'readonly-maybe-url' | 'user';
   options?: string[];
   colors?: Record<string, string>;
   placeholder?: string;
@@ -72,6 +72,11 @@ function FieldControl({ field, values, onChangeField, onAddOption, profiles }: {
     case 'readonly-maybe-url':
       // Link when the value is an http(s) URL, otherwise plain text (e.g. a filename).
       return <MaybeUrl value={value} />;
+    case 'readonly-multiline':
+      // Read-only free text that preserves the author's line breaks (e.g. a clip brief).
+      return value != null && value !== ''
+        ? <div style={{ color: 'var(--text-dim)', fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.5 }}>{String(value)}</div>
+        : <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>—</span>;
     case 'readonly':
     default:
       return <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>{value != null && value !== '' ? String(value) : '—'}</span>;

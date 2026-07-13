@@ -117,10 +117,12 @@ export default function ProductionBoard({ productions, sources, comments, activi
   const fields: FieldDef[] = useMemo(() => {
     const base: FieldDef[] = [
       { key: 'source_description', label: 'Description', type: 'readonly' },
+      { key: 'clip_brief', label: 'Clip Brief', type: 'readonly-multiline' },
       { key: 'full_version_file', label: 'Full Version File', type: 'readonly-maybe-url' },
       { key: 'source_timestamp', label: 'Timestamp', type: 'readonly' },
       { key: 'snippet_download_link', label: 'Snippet Download', type: 'readonly-url' },
       { key: 'posted_url', label: 'Original Reel · reference', type: 'readonly-url' },
+      { key: 'final_product', label: 'Final Product · reference', type: 'readonly-url' },
       { key: 'drive_url', label: 'Drive · reference', type: 'readonly-url' },
     ];
     base.push(isAdmin
@@ -137,10 +139,12 @@ export default function ProductionBoard({ productions, sources, comments, activi
   const panelValues = selected ? {
     ...selected,
     source_description: selectedSource?.description || '',
+    clip_brief: selectedSource?.clip_brief || '',
     full_version_file: selectedSource?.full_version_file || '',
     source_timestamp: selectedSource?.timestamp || '',
     snippet_download_link: selectedSource?.snippet_download_link || '',
     posted_url: selectedSource?.posted_url || '',
+    final_product: selectedSource?.final_product || '',
     drive_url: selectedSource?.drive_url || '',
     assigned_name: resolveAssignee(selected.assigned_to_user_id, profiles) || 'Unassigned',
   } : {};

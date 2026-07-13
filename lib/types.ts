@@ -94,6 +94,8 @@ export interface TrialReelSource {
   full_version_file?: string | null;      // name of the full source video
   timestamp?: string | null;              // exact moment, e.g. "00:05 - 05:21"
   snippet_download_link?: string | null;
+  clip_brief?: string | null;             // editor instructions authored in the queue modal
+  final_product?: string | null;          // link to the finished original video (CSV "Final product")
   eligible: boolean;
   times_recreated: number;
   last_assigned_at?: string | null; // null = never assigned; drives round-robin

@@ -9,7 +9,7 @@ import {
   parseSourceCSV, importSourceRows, buildQueueCandidates, fmtRatio,
   DEFAULT_RATIO_FLOOR, DEFAULT_QUEUE_COUNT,
 } from '@/lib/trial-reels';
-import { UrlCell, MiniSelect, InlineText, MaybeUrlCell } from '../studio/cells';
+import { UrlCell, MiniSelect, InlineText, MaybeUrlCell, isHttpUrl } from '../studio/cells';
 import { UserPicker, slackMentionByAssignee, resolveAssignee } from '../studio/UserPicker';
 
 interface Props {
@@ -44,6 +44,28 @@ function NumCell({ value, onCommit, width = 78 }: { value: number | null | undef
   );
 }
 
+// Labeled block in the expanded queue-row detail. `inline` lays label + value on
+// one line (for short scalars); otherwise the value stacks under the label.
+function DetailField({ label, children, inline = false }: { label: string; children: React.ReactNode; inline?: boolean }) {
+  const lbl = <span style={{ fontSize: 9, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>{label}</span>;
+  if (inline) return <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>{lbl}{children}</div>;
+  return <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>{lbl}{children}</div>;
+}
+
+// Labeled reference: a clickable link when the value is an http(s) URL, plain text
+// when it's a bare filename (e.g. Full version file), and an em-dash when empty.
+function DetailLink({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <DetailField label={label} inline>
+      {value
+        ? (isHttpUrl(value)
+            ? <a href={value} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'var(--accent)', textDecoration: 'none', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={value}>{label} ↗</a>
+            : <span style={{ fontSize: 12, color: 'var(--text-dim)', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={value}>{value}</span>)
+        : <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>—</span>}
+    </DetailField>
+  );
+}
+
 export default function SourceLibrary({ sources, profiles, onReload, showToast, onQueued }: Props) {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = usePersistedState<SortKey>('trialreel_sortkey', 'follows_per_1k');
@@ -61,6 +83,12 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
   const [proposedIds, setProposedIds] = useState<string[]>([]);
   const [addQuery, setAddQuery] = useState('');
   const [generating, setGenerating] = useState(false);
+  // Which proposed row is expanded (accordion — one at a time), and a local buffer
+  // of clip-brief edits keyed by source id. The buffer is the source of truth while
+  // the modal is open so collapsing/expanding never drops an edit; it also survives
+  // a Regenerate. Persisted to trial_reel_source.clip_brief on blur.
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [briefs, setBriefs] = useState<Record<string, string>>({});
 
   async function patch(id: string, p: Partial<TrialReelSource>) {
     await supabase.from('trial_reel_source').update(p).eq('id', id);
@@ -135,7 +163,27 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
     setProposedIds(initial);
     setEditorId('');
     setAddQuery('');
+    setExpandedId(null);
+    setBriefs({});
     setGenOpen(true);
+  }
+
+  // Clip-brief buffer: read from the local edit if present, else the stored value.
+  function briefValue(s: TrialReelSource): string {
+    return s.id in briefs ? briefs[s.id] : (s.clip_brief || '');
+  }
+  function onBriefChange(id: string, v: string) {
+    setBriefs(b => ({ ...b, [id]: v }));
+  }
+  // Persist a single row's brief (no onReload — avoids re-rendering the modal and
+  // collapsing the accordion mid-edit; the local buffer keeps the UI correct).
+  async function saveBrief(id: string) {
+    if (!(id in briefs)) return;
+    const v = briefs[id];
+    const src = sources.find(s => s.id === id);
+    if ((src?.clip_brief || '') === v) return; // unchanged
+    const { error } = await supabase.from('trial_reel_source').update({ clip_brief: v || null }).eq('id', id);
+    if (error) console.warn('[SourceLibrary] failed to save clip brief', error);
   }
 
   function regenerate() {
@@ -173,6 +221,9 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
     if (proposed.length === 0) { alert('Add at least one reel to the queue.'); return; }
     if (!editorId) { alert('Choose an editor to assign the batch to.'); return; }
     setGenerating(true);
+    // Flush any clip-brief edits still buffered (e.g. Confirm clicked before a
+    // textarea blur fired) so the brief is on the source before rows are created.
+    await Promise.all(proposed.map(s => saveBrief(s.id)));
     const today = todayISO();
     const nowIso = new Date().toISOString();
     const rows = proposed.map(s => ({ source_id: s.id, assigned_to_user_id: editorId, status: 'Assigned', queued_date: today }));
@@ -268,6 +319,7 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
                 <th>Full Version</th>
                 <th>Timestamp</th>
                 <th>Snippet</th>
+                <th>Final Product</th>
                 <th>Eligible</th>
                 {th('times_recreated', 'Recreated')}
                 {th('last_assigned_at', 'Last Assigned')}
@@ -295,6 +347,7 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
                   <td><MaybeUrlCell value={s.full_version_file ?? undefined} onCommit={v => patch(s.id, { full_version_file: v || null })} /></td>
                   <td><InlineText value={s.timestamp ?? undefined} onCommit={v => patch(s.id, { timestamp: v || null })} placeholder="—" style={{ width: 110 }} /></td>
                   <td><UrlCell value={s.snippet_download_link ?? undefined} onCommit={u => patch(s.id, { snippet_download_link: u || null })} /></td>
+                  <td><MaybeUrlCell value={s.final_product ?? undefined} onCommit={v => patch(s.id, { final_product: v || null })} /></td>
                   <td style={{ textAlign: 'center' }}>
                     <button
                       className="btn-ghost"
@@ -354,18 +407,67 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
             <div style={{ overflowY: 'auto', border: '0.5px solid var(--border)', borderRadius: 8, marginBottom: 10 }}>
               {proposed.length === 0 ? (
                 <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-faint)', fontSize: 12 }}>No eligible reels clear the floor. Lower the ratio or import more.</div>
-              ) : proposed.map((s, i) => (
-                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderTop: i === 0 ? undefined : '0.5px solid var(--border)' }}>
-                  <span style={{ fontSize: 11, color: 'var(--text-faint)', width: 18, textAlign: 'right' }}>{i + 1}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.description || ''}>{s.description || s.posted_url || '(untitled)'}</div>
-                    <div style={{ fontSize: 10, color: 'var(--text-faint)' }}>
-                      {fmtRatio(s.follows_per_1k)} f/1k · {s.views != null ? fn(s.views) : '—'} views · last {s.last_assigned_at ? formatActivityTime(s.last_assigned_at) : 'never'}
+              ) : proposed.map((s, i) => {
+                const open = expandedId === s.id;
+                return (
+                  <div key={s.id} style={{ borderTop: i === 0 ? undefined : '0.5px solid var(--border)', background: open ? 'var(--surface-2)' : undefined }}>
+                    {/* Summary row — click anywhere to expand/collapse (accordion) */}
+                    <div
+                      onClick={() => setExpandedId(open ? null : s.id)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', cursor: 'pointer' }}
+                      title={open ? 'Collapse' : 'Expand for details & clip brief'}
+                    >
+                      <span style={{ fontSize: 10, color: 'var(--text-faint)', width: 10, transition: 'transform 0.15s', transform: open ? 'rotate(90deg)' : 'none' }}>▶</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-faint)', width: 18, textAlign: 'right' }}>{i + 1}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.description || ''}>
+                          {s.description || s.posted_url || '(untitled)'}
+                          {briefValue(s).trim() && <span style={{ marginLeft: 6, color: 'var(--accent)', fontSize: 10 }} title="Has a clip brief">✎</span>}
+                        </div>
+                        <div style={{ fontSize: 10, color: 'var(--text-faint)' }}>
+                          {fmtRatio(s.follows_per_1k)} f/1k · {s.views != null ? fn(s.views) : '—'} views · last {s.last_assigned_at ? formatActivityTime(s.last_assigned_at) : 'never'}
+                        </div>
+                      </div>
+                      <button className="btn-ghost" style={{ fontSize: 11, padding: '3px 8px', color: '#ef4444' }} onClick={e => { e.stopPropagation(); removeProposed(s.id); }} title="Remove from queue">Remove</button>
                     </div>
+
+                    {/* Expanded detail — full reference + editable clip brief */}
+                    {open && (
+                      <div onClick={e => e.stopPropagation()} style={{ padding: '2px 12px 14px 40px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        <DetailField label="Description">
+                          <span style={{ fontSize: 12, color: 'var(--text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{s.description || '—'}</span>
+                        </DetailField>
+
+                        <DetailField label="Clip Brief">
+                          <textarea
+                            className="form-input"
+                            value={briefValue(s)}
+                            onChange={e => onBriefChange(s.id, e.target.value)}
+                            onBlur={() => saveBrief(s.id)}
+                            placeholder="Instructions for the editor — how to recreate/adapt this reel…"
+                            rows={4}
+                            style={{ width: '100%', fontSize: 12, padding: '8px 10px', resize: 'vertical', lineHeight: 1.5 }}
+                          />
+                        </DetailField>
+
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 24px' }}>
+                          <DetailLink label="Original posted reel" value={s.posted_url} />
+                          <DetailLink label="Final product" value={s.final_product} />
+                          <DetailLink label="Snippet download" value={s.snippet_download_link} />
+                          <DetailLink label="Full version file" value={s.full_version_file} />
+                          <DetailField label="Timestamp" inline><span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{s.timestamp || '—'}</span></DetailField>
+                        </div>
+
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 24px' }}>
+                          <DetailField label="Views" inline><span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{s.views != null ? fn(s.views) : '—'}</span></DetailField>
+                          <DetailField label="Follows" inline><span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{s.follows != null ? fn(s.follows) : '—'}</span></DetailField>
+                          <DetailField label="Follows/1k" inline><span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{fmtRatio(s.follows_per_1k)}</span></DetailField>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <button className="btn-ghost" style={{ fontSize: 11, padding: '3px 8px', color: '#ef4444' }} onClick={() => removeProposed(s.id)} title="Remove from queue">Remove</button>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Swap-in / add from the bench */}

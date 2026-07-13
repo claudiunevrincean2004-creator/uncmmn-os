@@ -27,6 +27,8 @@ create table if not exists public.trial_reel_source (
   full_version_file text,            -- name of the full source video
   "timestamp" text,                  -- exact moment, e.g. "00:05 - 05:21"
   snippet_download_link text,
+  clip_brief text,                   -- app-authored editor instructions (NOT from CSV; never overwritten on re-import)
+  final_product text,                -- link to the finished original video (CSV column "Final product")
   eligible boolean default true,     -- admin can exclude a video from ever being queued
   times_recreated int default 0,
   last_assigned_at timestamptz,      -- null = never assigned; drives round-robin
@@ -38,6 +40,12 @@ create table if not exists public.trial_reel_source (
 alter table public.trial_reel_source add column if not exists full_version_file text;
 alter table public.trial_reel_source add column if not exists "timestamp" text;
 alter table public.trial_reel_source add column if not exists snippet_download_link text;
+
+-- Editor brief + finished-original link (idempotent backfill). clip_brief is
+-- authored inside the queue modal (never comes from CSV, so the importer never
+-- clears it); final_product maps from the CSV column "Final product".
+alter table public.trial_reel_source add column if not exists clip_brief text;
+alter table public.trial_reel_source add column if not exists final_product text;
 
 -- Ensure the UNIQUE constraint on posted_url exists even if the table predates it
 -- (needed as the ON CONFLICT target for the CSV upsert).
