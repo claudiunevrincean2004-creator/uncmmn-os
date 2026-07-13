@@ -4,14 +4,14 @@ import { supabase } from '@/lib/supabase';
 import { StudioComment, StudioActivity, Profile } from '@/lib/types';
 import { formatActivityTime } from '@/lib/studio';
 import { useDismiss } from '@/lib/use-dismiss';
-import { InlineText, MiniSelect, PillSelect, EditSelect, EditPillSelect, InlineDate, InlineNumber, MaybeUrl, isHttpUrl, shortUrl } from './cells';
+import { InlineText, MiniSelect, PillSelect, EditSelect, EditPillSelect, InlineDate, InlineNumber, MaybeUrl, MaybeUrlCell, isHttpUrl, shortUrl } from './cells';
 import { UserPicker, profileName } from './UserPicker';
 import Avatar from '@/components/Avatar';
 
 export interface FieldDef {
   key: string;
   label: string;
-  type: 'text' | 'textarea' | 'select' | 'pill' | 'url' | 'date' | 'number' | 'readonly' | 'readonly-multiline' | 'readonly-url' | 'readonly-url-short' | 'readonly-maybe-url' | 'user';
+  type: 'text' | 'textarea' | 'select' | 'pill' | 'url' | 'maybe-url' | 'date' | 'number' | 'readonly' | 'readonly-multiline' | 'readonly-url' | 'readonly-url-short' | 'readonly-maybe-url' | 'user';
   options?: string[];
   colors?: Record<string, string>;
   placeholder?: string;
@@ -77,6 +77,10 @@ function FieldControl({ field, values, onChangeField, onAddOption, profiles }: {
             ? <a href={value} target="_blank" rel="noopener noreferrer" title={value} style={{ display: 'inline-block', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'bottom', color: 'var(--accent)', textDecoration: 'none', fontSize: 12 }}>{shortUrl(value, 46)}</a>
             : <span style={{ color: 'var(--text-dim)', fontSize: 12, wordBreak: 'break-word' }} title={value}>{value}</span>)
         : <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>—</span>;
+    case 'maybe-url':
+      // Editable value that may be a URL or a bare filename (e.g. Full version file):
+      // renders a clickable link when it's a URL, plain text otherwise, edit behind a ✎.
+      return <MaybeUrlCell value={value || undefined} onCommit={v => onChangeField(field.key, v)} />;
     case 'readonly-maybe-url':
       // Link when the value is an http(s) URL, otherwise plain text (e.g. a filename).
       return <MaybeUrl value={value} />;

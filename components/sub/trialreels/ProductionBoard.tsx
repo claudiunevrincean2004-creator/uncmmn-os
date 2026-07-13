@@ -4,9 +4,8 @@ import { supabase } from '@/lib/supabase';
 import { TrialReelSource, TrialReelProduction, StudioComment, StudioActivity, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { logActivity } from '@/lib/studio';
-import { TRIAL_REEL_STATUSES, TRIAL_REEL_STATUS_COLORS, TRIAL_REEL_NOTIFY_STATUSES, TRIAL_REEL_REVISIONS_STATUS, fmtRatio } from '@/lib/trial-reels';
-import { fn } from '@/lib/utils';
-import { EditPillSelect, UrlCell, MiniSelect, isHttpUrl, shortUrl } from '../studio/cells';
+import { TRIAL_REEL_STATUSES, TRIAL_REEL_STATUS_COLORS, TRIAL_REEL_NOTIFY_STATUSES, TRIAL_REEL_REVISIONS_STATUS } from '@/lib/trial-reels';
+import { EditPillSelect, UrlCell, MaybeUrlCell, InlineText, MiniSelect } from '../studio/cells';
 import { UserPicker, resolveAssignee, slackMentionByAssignee } from '../studio/UserPicker';
 import FilterField from '../studio/FilterField';
 import ItemPanel, { FieldDef } from '../studio/ItemPanel';
@@ -24,15 +23,8 @@ interface Props {
   onReload: () => void;
 }
 
-// Read-only truncated clickable URL for a table cell (reference links): shows the
-// actual URL shortened to domain + start of path, plain text for a bare filename.
-function TruncLink({ value }: { value?: string | null }) {
-  if (!value) return <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>—</span>;
-  const common: React.CSSProperties = { fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block', maxWidth: 190 };
-  return isHttpUrl(value)
-    ? <a href={value} target="_blank" rel="noopener noreferrer" title={value} style={{ ...common, color: 'var(--accent)', textDecoration: 'none' }}>{shortUrl(value)}</a>
-    : <span title={value} style={{ ...common, color: 'var(--text-dim)' }}>{value}</span>;
-}
+// Placeholder for a table cell whose source record was removed (nothing to edit).
+const dash = <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>—</span>;
 
 export default function ProductionBoard({ productions, sources, comments, activity, profiles, isAdmin, currentUserId, openItemId, onOpened, onReload }: Props) {
   const [fStatus, setFStatus] = usePersistedState<string>('trialreel_p_status', 'All');
@@ -91,6 +83,35 @@ export default function ProductionBoard({ productions, sources, comments, activi
     onReload();
   }
 
+  // Panel field key → the SOURCE column it writes back to. Fixing a link/stat here
+  // corrects it in the library, not just on this one production row.
+  const SOURCE_FIELD_COLUMN: Record<string, keyof TrialReelSource> = {
+    posted_url: 'posted_url',
+    final_product: 'final_product',
+    full_version_file: 'full_version_file',
+    source_timestamp: 'timestamp',
+    snippet_download_link: 'snippet_download_link',
+    views: 'views',
+    follows: 'follows',
+    follows_per_1k: 'follows_per_1k',
+  };
+  const NUMERIC_SOURCE_FIELDS = new Set(['views', 'follows', 'follows_per_1k']);
+
+  // Route a panel edit to the right table: production fields on the row, source
+  // fields (reference + stats) back to trial_reel_source.
+  function saveField(row: TrialReelProduction, key: string, value: any) {
+    if (key === 'status') { changeStatus(row, value); return; }
+    if (key === 'assigned_to_user_id') { patch(row.id, { assigned_to_user_id: value || null }); return; }
+    if (key === 'final_url') { patch(row.id, { final_url: value || null }); return; }
+    if (key === 'clip_brief') { patch(row.id, { clip_brief: value || null }); return; }
+    const col = SOURCE_FIELD_COLUMN[key];
+    if (!col || !row.source_id) return;
+    const v = NUMERIC_SOURCE_FIELDS.has(key)
+      ? (value === '' || value == null ? null : Number(value))
+      : (value || null);
+    patchSource(row.source_id, { [col]: v } as Partial<TrialReelSource>);
+  }
+
   async function changeStatus(row: TrialReelProduction, status: string) {
     if (status === row.status) return;
     await logActivity('trialreel', row.id, 'Status changed', row.status, status);
@@ -137,17 +158,20 @@ export default function ProductionBoard({ productions, sources, comments, activi
   // Panel fields — REFERENCE (read-only, from source) then EDITABLE. All links use
   // the truncated-URL renderer. Clip brief is editable here (writes to the source).
   const fields: FieldDef[] = useMemo(() => {
+    // REFERENCE — from the linked source, editable here and saved back to the source
+    // (see onChangeField routing). Description stays read-only (it's the row's title).
     const ref: FieldDef[] = [
       { key: 'source_description', label: 'Description', type: 'readonly' },
-      { key: 'full_version_file', label: 'Full version file', type: 'readonly-url-short' },
-      { key: 'source_timestamp', label: 'Timestamp', type: 'readonly' },
-      { key: 'snippet_download_link', label: 'Snippet download', type: 'readonly-url-short' },
-      { key: 'posted_url', label: 'Original posted reel', type: 'readonly-url-short' },
-      { key: 'final_product', label: 'Original edit', type: 'readonly-url-short' },
-      { key: 'views', label: 'Views', type: 'readonly' },
-      { key: 'follows', label: 'Follows', type: 'readonly' },
-      { key: 'follows_per_1k', label: 'Follows/1k', type: 'readonly' },
+      { key: 'posted_url', label: 'Original posted reel', type: 'url' },
+      { key: 'final_product', label: 'Original edit', type: 'url' },
+      { key: 'full_version_file', label: 'Full version file', type: 'maybe-url' },
+      { key: 'source_timestamp', label: 'Timestamp', type: 'text', placeholder: '00:05 - 05:21' },
+      { key: 'snippet_download_link', label: 'Snippet download', type: 'url' },
+      { key: 'views', label: 'Views', type: 'number' },
+      { key: 'follows', label: 'Follows', type: 'number' },
+      { key: 'follows_per_1k', label: 'Follows/1k', type: 'number' },
     ];
+    // EDITABLE on the production row.
     const editable: FieldDef[] = [
       { key: 'clip_brief', label: 'Clip brief · Google Doc', type: 'url' },
     ];
@@ -165,15 +189,17 @@ export default function ProductionBoard({ productions, sources, comments, activi
   const panelValues = selected ? {
     ...selected,
     source_description: selectedSource?.description || '',
-    clip_brief: selectedSource?.clip_brief || '',
+    // Per-assignment brief, falling back to the source brief for legacy rows.
+    clip_brief: selected.clip_brief ?? selectedSource?.clip_brief ?? '',
     full_version_file: selectedSource?.full_version_file || '',
     source_timestamp: selectedSource?.timestamp || '',
     snippet_download_link: selectedSource?.snippet_download_link || '',
     posted_url: selectedSource?.posted_url || '',
     final_product: selectedSource?.final_product || '',
-    views: selectedSource?.views != null ? fn(selectedSource.views) : '',
-    follows: selectedSource?.follows != null ? fn(selectedSource.follows) : '',
-    follows_per_1k: selectedSource?.follows_per_1k != null ? fmtRatio(selectedSource.follows_per_1k) : '',
+    // Raw numbers so the editable number fields round-trip cleanly.
+    views: selectedSource?.views ?? '',
+    follows: selectedSource?.follows ?? '',
+    follows_per_1k: selectedSource?.follows_per_1k ?? '',
     assigned_name: resolveAssignee(selected.assigned_to_user_id, profiles) || 'Unassigned',
   } : {};
 
@@ -224,12 +250,15 @@ export default function ProductionBoard({ productions, sources, comments, activi
                           : <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{resolveAssignee(p.assigned_to_user_id, profiles) || 'Unassigned'}</span>}
                       </td>
                       <td><EditPillSelect field="trialreel_status" value={p.status} options={TRIAL_REEL_STATUSES} colors={TRIAL_REEL_STATUS_COLORS} onChange={s => changeStatus(p, s)} allowAdd={false} /></td>
-                      <td>{src ? <UrlCell value={src.clip_brief ?? undefined} onCommit={u => patchSource(src.id, { clip_brief: u || null })} /> : <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>—</span>}</td>
-                      <td><TruncLink value={src?.posted_url} /></td>
-                      <td><TruncLink value={src?.final_product} /></td>
-                      <td><TruncLink value={src?.full_version_file} /></td>
-                      <td><span style={{ fontSize: 11, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{src?.timestamp || '—'}</span></td>
-                      <td><TruncLink value={src?.snippet_download_link} /></td>
+                      {/* Clip brief → PRODUCTION (per-assignment); shows the source brief as a fallback for legacy rows. */}
+                      <td><UrlCell value={(p.clip_brief ?? src?.clip_brief) ?? undefined} onCommit={u => patch(p.id, { clip_brief: u || null })} /></td>
+                      {/* Reference fields → SOURCE (fixing a link here corrects the library too). */}
+                      <td>{src ? <UrlCell value={src.posted_url ?? undefined} onCommit={u => patchSource(src.id, { posted_url: u || null })} /> : dash}</td>
+                      <td>{src ? <UrlCell value={src.final_product ?? undefined} onCommit={u => patchSource(src.id, { final_product: u || null })} /> : dash}</td>
+                      <td>{src ? <MaybeUrlCell value={src.full_version_file ?? undefined} onCommit={v => patchSource(src.id, { full_version_file: v || null })} /> : dash}</td>
+                      <td>{src ? <InlineText value={src.timestamp ?? undefined} onCommit={v => patchSource(src.id, { timestamp: v || null })} placeholder="—" style={{ width: 110 }} /> : dash}</td>
+                      <td>{src ? <UrlCell value={src.snippet_download_link ?? undefined} onCommit={u => patchSource(src.id, { snippet_download_link: u || null })} /> : dash}</td>
+                      {/* Recreated reel final → PRODUCTION (the editor's deliverable). */}
                       <td><UrlCell value={p.final_url ?? undefined} onCommit={u => patch(p.id, { final_url: u || null })} /></td>
                       {isAdmin && <td><button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteRow(p.id)}>✕</button></td>}
                     </tr>
@@ -248,12 +277,7 @@ export default function ProductionBoard({ productions, sources, comments, activi
           title={selectedSource?.description || 'Trial Reel'}
           fields={fields}
           values={panelValues}
-          onChangeField={(key, value) => {
-            if (key === 'status') changeStatus(selected, value);
-            else if (key === 'assigned_to_user_id') patch(selected.id, { assigned_to_user_id: value || null });
-            else if (key === 'final_url') patch(selected.id, { final_url: value || null });
-            else if (key === 'clip_brief') { if (selected.source_id) patchSource(selected.source_id, { clip_brief: value || null }); }
-          }}
+          onChangeField={(key, value) => saveField(selected, key, value)}
           onAddOption={() => {}}
           comments={comments}
           activity={activity}

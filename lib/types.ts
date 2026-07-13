@@ -108,6 +108,7 @@ export interface TrialReelProduction {
   source_id?: string | null;
   assigned_to_user_id?: string | null;
   status: string;
+  clip_brief?: string | null;      // per-assignment editor brief (seeded from source, editable on the board)
   final_url?: string | null;       // the new recreated reel, filled by the editor
   queued_date?: string | null;
   created_at?: string;

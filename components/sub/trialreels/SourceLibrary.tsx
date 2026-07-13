@@ -205,7 +205,10 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
     await Promise.all(proposed.map(s => saveBrief(s.id)));
     const today = todayISO();
     const nowIso = new Date().toISOString();
-    const rows = proposed.map(s => ({ source_id: s.id, assigned_to_user_id: editorId, status: 'Assigned', queued_date: today }));
+    // Seed each production row's clip_brief from the source brief authored here, so
+    // the per-assignment brief starts from what the admin wrote (then diverges as it
+    // is edited on the board).
+    const rows = proposed.map(s => ({ source_id: s.id, assigned_to_user_id: editorId, status: 'Assigned', queued_date: today, clip_brief: briefValue(s) || null }));
     const { error } = await supabase.from('trial_reel_production').insert(rows);
     if (error) {
       setGenerating(false);

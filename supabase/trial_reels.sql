@@ -64,10 +64,16 @@ create table if not exists public.trial_reel_production (
   source_id uuid references public.trial_reel_source(id) on delete set null,
   assigned_to_user_id uuid references public.profiles(id) on delete set null,
   status text default 'Assigned',
+  clip_brief text,                   -- editor brief for THIS assignment (seeded from the source at queue time, editable on the board)
   final_url text,                    -- the new recreated reel, filled by the editor
   queued_date date,
   created_at timestamptz default now()
 );
+
+-- Per-assignment clip brief (idempotent backfill). Seeded from trial_reel_source.clip_brief
+-- when the queue is confirmed, then editable on the production board independent of the source.
+alter table public.trial_reel_production add column if not exists clip_brief text;
+
 alter table public.trial_reel_production enable row level security;
 drop policy if exists "Allow all for anon" on public.trial_reel_production;
 create policy "Allow all for anon" on public.trial_reel_production for all using (true) with check (true);
