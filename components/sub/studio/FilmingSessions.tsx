@@ -8,6 +8,8 @@ import LoadMore from './LoadMore';
 import { SESSION_STATUSES, SESSION_STATUS_COLORS, SESSION_TYPES, SESSION_TYPE_COLORS, todayISO, logActivity, inDateRange, getFieldOptions, colorMap, buildAddOptionRows } from '@/lib/studio';
 import { EditPillSelect, MiniSelect, UrlCell, InlineDate, InlineNumber } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
+import SortControl from './SortControl';
+import { SortOption, SortDir, sortRows } from '@/lib/sort';
 import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal, AddPropertyButton } from './CustomColumns';
 import FieldOptionsManager from './FieldOptionsManager';
 import FilterField from './FilterField';
@@ -62,7 +64,8 @@ interface Props {
 export default function FilmingSessions({ sessions, comments, activity, dropdownOptions, properties, customOptions, profiles, isAdmin, openItemId, onOpened, onReload }: Props) {
   const [fStatus, setFStatus] = usePersistedState<string>('studio_f_status', 'All');
   const [fType, setFType] = usePersistedState<string>('studio_f_type', 'All');
-  const [sortDir, setSortDir] = usePersistedState<'asc' | 'desc'>('studio_f_sortdir', 'asc');
+  const [sortKey, setSortKey] = usePersistedState<string>('studio_f_sortkey', 'date');
+  const [sortDir, setSortDir] = usePersistedState<SortDir>('studio_f_sortdir', 'asc');
   const [dateFrom, setDateFrom] = usePersistedState<string>('studio_f_from', '');
   const [dateTo, setDateTo] = usePersistedState<string>('studio_f_to', '');
   const [custFilters, setCustFilters] = usePersistedState<Record<string, string>>('studio_f_custfilters', {});
@@ -195,27 +198,29 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
   // statuses present on rows. A no-match selection falls through to the empty state.
   const statusPresent = ['All', ...Array.from(new Set([...statusValues, ...sessions.map(s => s.status).filter(Boolean) as string[]]))];
 
+  // Status sorts by pipeline position (Planned → Ready to Film → Filmed → Cancelled);
+  // Type by its admin-ordered option list.
+  const sortOptions: SortOption<StudioSession>[] = useMemo(() => [
+    { key: 'date', label: 'Date', kind: 'date', value: s => s.date },
+    { key: 'status', label: 'Status', kind: 'order', order: statusValues, value: s => s.status },
+    { key: 'type', label: 'Type', kind: 'order', order: typeValues, value: s => s.type },
+    { key: 'name', label: 'Name', kind: 'text', value: s => s.name },
+  ], [statusValues, typeValues]);
+
   const filtered = useMemo(() => {
     let r = sessions;
     if (fStatus !== 'All') r = r.filter(s => s.status === fStatus);
     if (fType !== 'All') r = r.filter(s => s.type === fType);
     if (dateFrom || dateTo) r = r.filter(s => inDateRange(s.date, dateFrom, dateTo));
-    return [...r].sort((a, b) => {
-      const ad = a.date ? a.date.slice(0, 10) : '';
-      const bd = b.date ? b.date.slice(0, 10) : '';
-      if (!ad && !bd) return 0;
-      if (!ad) return 1;
-      if (!bd) return -1;
-      return sortDir === 'asc' ? ad.localeCompare(bd) : bd.localeCompare(ad);
-    });
-  }, [sessions, fStatus, fType, sortDir, dateFrom, dateTo]);
+    return sortRows(r, sortOptions, sortKey, sortDir);
+  }, [sessions, fStatus, fType, sortKey, sortDir, dateFrom, dateTo, sortOptions]);
 
   const rows = useMemo(() => applyCustomFilters(filtered, cprops, custFilters), [filtered, cprops, custFilters]);
 
   // "Load more" pagination — resets to the first page on filter/sort change only.
   const { visible, hasMore, remaining, loadMore } = usePagedRows(
     rows,
-    [fStatus, fType, sortDir, dateFrom, dateTo, JSON.stringify(custFilters)].join('|'),
+    [fStatus, fType, sortKey, sortDir, dateFrom, dateTo, JSON.stringify(custFilters)].join('|'),
   );
 
   const fields: FieldDef[] = useMemo(() => [
@@ -238,11 +243,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
             <FilterField label="Status"><MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} /></FilterField>
             <FilterField label="Type"><MiniSelect value={fType} options={['All', ...typeValues]} onChange={setFType} /></FilterField>
-            <FilterField label="Sort">
-              <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))} title="Sort by date">
-                Date {sortDir === 'asc' ? '↑ Oldest' : '↓ Newest'}
-              </button>
-            </FilterField>
+            <SortControl options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
             <FilterField label="Date"><DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
             <CustomFilterControls props={cprops} optionsByProp={optsByProp} filters={custFilters} setFilters={setCustFilters} />
           </div>

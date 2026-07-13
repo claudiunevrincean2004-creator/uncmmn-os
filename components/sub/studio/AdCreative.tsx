@@ -9,13 +9,14 @@ import { AD_FORMATS, AD_STATUSES, AD_STATUS_COLORS, todayISO, logActivity, merge
 import { EditPillSelect, MiniSelect, InlineDate, UrlCell } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import QuickLinks from './QuickLinks';
-import { UserPicker, buildPipelineMentions } from './UserPicker';
+import { UserPicker, buildPipelineMentions, resolveAssignee } from './UserPicker';
+import SortControl from './SortControl';
+import { SortOption, SortDir, sortRows } from '@/lib/sort';
 import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal, AddPropertyButton } from './CustomColumns';
 import FieldOptionsManager from './FieldOptionsManager';
 import FilterField from './FilterField';
 import DateRangePicker from './DateRangePicker';
 
-type SortKey = 'date_added' | 'angle';
 const TABLE_KEY = 'ad';
 
 // Status transitions whose entry fires a Slack ping to #ad-creative-pipeline (see
@@ -74,8 +75,8 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   const [fStatus, setFStatus] = usePersistedState<string>('studio_ad_status', 'All');
   const [fFormat, setFFormat] = usePersistedState<string>('studio_ad_format', 'All');
   const [fAngle, setFAngle] = usePersistedState<string>('studio_ad_angle', 'All');
-  const [sortKey, setSortKey] = usePersistedState<SortKey>('studio_ad_sortkey', 'date_added');
-  const [sortDir, setSortDir] = usePersistedState<'asc' | 'desc'>('studio_ad_sortdir', 'desc');
+  const [sortKey, setSortKey] = usePersistedState<string>('studio_ad_sortkey', 'date_added');
+  const [sortDir, setSortDir] = usePersistedState<SortDir>('studio_ad_sortdir', 'desc');
   const [dateFrom, setDateFrom] = usePersistedState<string>('studio_ad_from', '');
   const [dateTo, setDateTo] = usePersistedState<string>('studio_ad_to', '');
   const [custFilters, setCustFilters] = usePersistedState<Record<string, string>>('studio_ad_custfilters', {});
@@ -270,6 +271,16 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   const formatPresent = present(adCreatives.map(a => a.ad_format));
   const anglePresent = present(adCreatives.map(a => a.angle));
 
+  // Status sorts by pipeline position (Ad Creative Needed → … → Winner/Killed),
+  // using the same admin-ordered option list the status pills render from.
+  const sortOptions: SortOption<StudioAdCreative>[] = useMemo(() => [
+    { key: 'status', label: 'Status', kind: 'order', order: statusValues, value: a => a.status },
+    { key: 'assigned', label: 'Assigned To', kind: 'text', value: a => resolveAssignee(a.assigned_to_user_id, profiles) },
+    { key: 'date_added', label: 'Date Added', kind: 'date', value: a => a.date_added },
+    { key: 'creative_id', label: 'Creative ID', kind: 'text', value: a => a.creative_id },
+    { key: 'angle', label: 'Angle', kind: 'text', value: a => a.angle },
+  ], [statusValues, profiles]);
+
   const filtered = useMemo(() => {
     let r = adCreatives;
     const q = search.trim().toLowerCase();
@@ -278,17 +289,8 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
     if (fFormat !== 'All') r = r.filter(a => (a.ad_format || '') === fFormat);
     if (fAngle !== 'All') r = r.filter(a => (a.angle || '') === fAngle);
     if (dateFrom || dateTo) r = r.filter(a => inDateRange(a.date_added, dateFrom, dateTo));
-    return [...r].sort((a, b) => {
-      let av = '';
-      let bv = '';
-      if (sortKey === 'angle') { av = a.angle || ''; bv = b.angle || ''; }
-      else { av = a.date_added ? a.date_added.slice(0, 10) : ''; bv = b.date_added ? b.date_added.slice(0, 10) : ''; }
-      if (!av && !bv) return 0;
-      if (!av) return 1;
-      if (!bv) return -1;
-      return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
-    });
-  }, [adCreatives, search, fStatus, fFormat, fAngle, sortKey, sortDir, dateFrom, dateTo]);
+    return sortRows(r, sortOptions, sortKey, sortDir);
+  }, [adCreatives, search, fStatus, fFormat, fAngle, sortKey, sortDir, dateFrom, dateTo, sortOptions]);
 
   const rows = useMemo(() => applyCustomFilters(filtered, cprops, custFilters), [filtered, cprops, custFilters]);
 
@@ -336,15 +338,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
           <FilterField label="Status"><MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} /></FilterField>
 
           {/* Sort by + direction */}
-          <FilterField label="Sort">
-            <select className="form-input" style={{ width: 'auto', padding: '4px 7px', fontSize: 11 }} value={sortKey} onChange={e => setSortKey(e.target.value as SortKey)}>
-              <option value="date_added">Date Added</option>
-              <option value="angle">Angle</option>
-            </select>
-            <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))} title="Toggle sort direction">
-              {sortDir === 'asc' ? '↑ Ascending' : '↓ Descending'}
-            </button>
-          </FilterField>
+          <SortControl options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
 
           {/* Date range (kept) */}
           <FilterField label="Date"><DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>

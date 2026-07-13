@@ -13,6 +13,8 @@ import {
   getFieldOptions, colorMap, buildAddOptionRows,
 } from '@/lib/studio';
 import { EditPillSelect, MiniSelect, UrlCell, InlineDate } from './cells';
+import SortControl from './SortControl';
+import { SortOption, SortDir, sortRows } from '@/lib/sort';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import DateRangePicker from './DateRangePicker';
 import QuickLinks from './QuickLinks';
@@ -77,7 +79,8 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   const [fAssigned, setFAssigned] = usePersistedState<string>('studio_v_assigned', 'All');
   const [fFormat, setFFormat] = usePersistedState<string>('studio_v_format', 'All');
   const [fPriority, setFPriority] = usePersistedState<string>('studio_v_priority', 'All');
-  const [sortDir, setSortDir] = usePersistedState<'asc' | 'desc'>('studio_v_sortdir', 'asc');
+  const [sortKey, setSortKey] = usePersistedState<string>('studio_v_sortkey', 'deadline');
+  const [sortDir, setSortDir] = usePersistedState<SortDir>('studio_v_sortdir', 'asc');
   const [dateFrom, setDateFrom] = usePersistedState<string>('studio_v_from', '');
   const [dateTo, setDateTo] = usePersistedState<string>('studio_v_to', '');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -259,6 +262,17 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   const formatPresent = present(videos.map(v => v.format));
   const priorityPresent = present(videos.map(v => v.priority || 'Normal'));
 
+  // Status/Priority sort by pipeline position (Briefing → … → Posted), taken from
+  // the same admin-ordered option lists the pills render from.
+  const sortOptions: SortOption<StudioVideo>[] = useMemo(() => [
+    { key: 'deadline', label: 'Deadline', kind: 'date', value: v => v.deadline },
+    { key: 'status', label: 'Status', kind: 'order', order: statusValues, value: v => v.status },
+    { key: 'assigned', label: 'Assigned To', kind: 'text', value: v => resolveAssignee(v.assigned_to_user_id, profiles) },
+    { key: 'title', label: 'Title / Description', kind: 'text', value: v => v.title },
+    { key: 'created_at', label: 'Date Added', kind: 'date', value: v => v.created_at },
+    { key: 'priority', label: 'Priority', kind: 'order', order: priorityOpts, value: v => v.priority || 'Normal' },
+  ], [statusValues, priorityOpts, profiles]);
+
   const filtered = useMemo(() => {
     let r = videos;
     if (fStatus !== 'All') r = r.filter(v => v.status === fStatus);
@@ -266,21 +280,14 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
     if (fFormat !== 'All') r = r.filter(v => (v.format || '') === fFormat);
     if (fPriority !== 'All') r = r.filter(v => (v.priority || 'Normal') === fPriority);
     if (dateFrom || dateTo) r = r.filter(v => inDateRange(v.deadline, dateFrom, dateTo));
-    return [...r].sort((a, b) => {
-      const ad = a.deadline ? a.deadline.slice(0, 10) : '';
-      const bd = b.deadline ? b.deadline.slice(0, 10) : '';
-      if (!ad && !bd) return 0;
-      if (!ad) return 1;
-      if (!bd) return -1;
-      return sortDir === 'asc' ? ad.localeCompare(bd) : bd.localeCompare(ad);
-    });
-  }, [videos, fStatus, fAssigned, fFormat, fPriority, sortDir, dateFrom, dateTo, profiles]);
+    return sortRows(r, sortOptions, sortKey, sortDir);
+  }, [videos, fStatus, fAssigned, fFormat, fPriority, sortKey, sortDir, dateFrom, dateTo, profiles, sortOptions]);
 
   // "Load more" pagination — resets to the first page when filters/sort change,
   // not on data refresh (so editing a cell doesn't collapse the list).
   const { visible, hasMore, remaining, loadMore } = usePagedRows(
     filtered,
-    [fStatus, fAssigned, fFormat, fPriority, sortDir, dateFrom, dateTo].join('|'),
+    [fStatus, fAssigned, fFormat, fPriority, sortKey, sortDir, dateFrom, dateTo].join('|'),
   );
 
   const fields: FieldDef[] = useMemo(() => [
@@ -309,11 +316,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
             <FilterField label="Assigned to"><MiniSelect value={fAssigned} options={assignedPresent} onChange={setFAssigned} /></FilterField>
             <FilterField label="Format"><MiniSelect value={fFormat} options={formatPresent} onChange={setFFormat} /></FilterField>
             <FilterField label="Priority"><MiniSelect value={fPriority} options={priorityPresent} onChange={setFPriority} /></FilterField>
-            <FilterField label="Sort">
-              <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))} title="Sort by deadline">
-                Deadline {sortDir === 'asc' ? '↑ Oldest' : '↓ Newest'}
-              </button>
-            </FilterField>
+            <SortControl options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
             <FilterField label="Date"><DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
           </div>
           <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', flexShrink: 0 }} onClick={() => { setDraft(EMPTY_DRAFT); setAddOpen(true); }}>+ Add Video</button>

@@ -11,6 +11,8 @@ import {
 } from '@/lib/studio';
 import { EditPillSelect, MiniSelect, UrlCell, InlineDate } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
+import SortControl from './SortControl';
+import { SortOption, SortDir, sortRows } from '@/lib/sort';
 import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal, AddPropertyButton } from './CustomColumns';
 import FieldOptionsManager from './FieldOptionsManager';
 import FilterField from './FilterField';
@@ -59,7 +61,8 @@ interface Props {
 
 export default function StorySequences({ sequences, comments, activity, dropdownOptions, properties, customOptions, profiles, isAdmin, openItemId, onOpened, onReload }: Props) {
   const [fStatus, setFStatus] = usePersistedState<string>('studio_s_status', 'All');
-  const [sortDir, setSortDir] = usePersistedState<'asc' | 'desc'>('studio_s_sortdir', 'asc');
+  const [sortKey, setSortKey] = usePersistedState<string>('studio_s_sortkey', 'scheduled_date');
+  const [sortDir, setSortDir] = usePersistedState<SortDir>('studio_s_sortdir', 'asc');
   const [dateFrom, setDateFrom] = usePersistedState<string>('studio_s_from', '');
   const [dateTo, setDateTo] = usePersistedState<string>('studio_s_to', '');
   const [custFilters, setCustFilters] = usePersistedState<Record<string, string>>('studio_s_custfilters', {});
@@ -168,26 +171,28 @@ export default function StorySequences({ sequences, comments, activity, dropdown
   // statuses present on rows. A no-match selection falls through to the empty state.
   const statusPresent = ['All', ...Array.from(new Set([...statusValues, ...sequences.map(s => s.status).filter(Boolean) as string[]]))];
 
+  // Status sorts by pipeline position (Draft → … → Posted). Sequences have no
+  // assignee column, so there is no Assigned To option here.
+  const sortOptions: SortOption<StudioSequence>[] = useMemo(() => [
+    { key: 'scheduled_date', label: 'Scheduled Date', kind: 'date', value: s => s.scheduled_date },
+    { key: 'status', label: 'Status', kind: 'order', order: statusValues, value: s => s.status },
+    { key: 'title', label: 'Name', kind: 'text', value: s => s.title },
+    { key: 'created_at', label: 'Date Added', kind: 'date', value: s => s.created_at },
+  ], [statusValues]);
+
   const filtered = useMemo(() => {
     let r = sequences;
     if (fStatus !== 'All') r = r.filter(s => s.status === fStatus);
     if (dateFrom || dateTo) r = r.filter(s => inDateRange(s.scheduled_date, dateFrom, dateTo));
-    return [...r].sort((a, b) => {
-      const ad = a.scheduled_date ? a.scheduled_date.slice(0, 10) : '';
-      const bd = b.scheduled_date ? b.scheduled_date.slice(0, 10) : '';
-      if (!ad && !bd) return 0;
-      if (!ad) return 1;
-      if (!bd) return -1;
-      return sortDir === 'asc' ? ad.localeCompare(bd) : bd.localeCompare(ad);
-    });
-  }, [sequences, fStatus, sortDir, dateFrom, dateTo]);
+    return sortRows(r, sortOptions, sortKey, sortDir);
+  }, [sequences, fStatus, sortKey, sortDir, dateFrom, dateTo, sortOptions]);
 
   const rows = useMemo(() => applyCustomFilters(filtered, cprops, custFilters), [filtered, cprops, custFilters]);
 
   // "Load more" pagination — resets to the first page on filter/sort change only.
   const { visible, hasMore, remaining, loadMore } = usePagedRows(
     rows,
-    [fStatus, sortDir, dateFrom, dateTo, JSON.stringify(custFilters)].join('|'),
+    [fStatus, sortKey, sortDir, dateFrom, dateTo, JSON.stringify(custFilters)].join('|'),
   );
 
   const fields: FieldDef[] = useMemo(() => [
@@ -205,11 +210,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
             <FilterField label="Status"><MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} /></FilterField>
-            <FilterField label="Sort">
-              <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))} title="Sort by scheduled date">
-                Scheduled {sortDir === 'asc' ? '↑ Oldest' : '↓ Newest'}
-              </button>
-            </FilterField>
+            <SortControl options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
             <FilterField label="Date"><DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
             <CustomFilterControls props={cprops} optionsByProp={optsByProp} filters={custFilters} setFilters={setCustFilters} />
           </div>

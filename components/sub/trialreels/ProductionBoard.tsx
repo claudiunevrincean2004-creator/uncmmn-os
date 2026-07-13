@@ -9,6 +9,8 @@ import { EditPillSelect, UrlCell, MaybeUrlCell, InlineText, MiniSelect } from '.
 import { UserPicker, AssigneeTag, resolveAssignee, slackMentionByAssignee } from '../studio/UserPicker';
 import FilterField from '../studio/FilterField';
 import ItemPanel, { FieldDef } from '../studio/ItemPanel';
+import SortControl from '../studio/SortControl';
+import { SortOption, SortDir, sortRows } from '@/lib/sort';
 
 interface Props {
   productions: TrialReelProduction[];
@@ -29,6 +31,8 @@ const dash = <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>—</spa
 export default function ProductionBoard({ productions, sources, comments, activity, profiles, isAdmin, currentUserId, openItemId, onOpened, onReload }: Props) {
   const [fStatus, setFStatus] = usePersistedState<string>('trialreel_p_status', 'All');
   const [fAssigned, setFAssigned] = usePersistedState<string>('trialreel_p_assigned', 'All');
+  const [sortKey, setSortKey] = usePersistedState<string>('trialreel_p_sortkey', 'queued_date');
+  const [sortDir, setSortDir] = usePersistedState<SortDir>('trialreel_p_sortdir', 'desc');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // Open a row's side panel when arriving via a deep link (Slack "Open in OS").
@@ -143,12 +147,24 @@ export default function ProductionBoard({ productions, sources, comments, activi
   const statusPresent = ['All', ...Array.from(new Set([...TRIAL_REEL_STATUSES, ...scoped.map(p => p.status).filter(Boolean) as string[]]))];
   const assignedPresent = present(scoped.map(p => resolveAssignee(p.assigned_to_user_id, profiles) || undefined));
 
+  // Status sorts by the reel flow (Assigned → Editing → In Review → Revisions
+  // Needed → Posted). A production row's description belongs to the source reel it
+  // recreates, which is also what the Description column shows.
+  const sortOptions: SortOption<TrialReelProduction>[] = useMemo(() => [
+    // Queued date falls back to created_at — the same value the board sorted by
+    // before this control existed.
+    { key: 'queued_date', label: 'Queued Date', kind: 'date', value: p => p.queued_date || p.created_at },
+    { key: 'status', label: 'Status', kind: 'order', order: TRIAL_REEL_STATUSES, value: p => p.status },
+    { key: 'assigned', label: 'Assigned To', kind: 'text', value: p => resolveAssignee(p.assigned_to_user_id, profiles) },
+    { key: 'description', label: 'Description', kind: 'text', value: p => (p.source_id ? sourceById.get(p.source_id)?.description : '') },
+  ], [profiles, sourceById]);
+
   const filtered = useMemo(() => {
     let r = scoped;
     if (fStatus !== 'All') r = r.filter(p => p.status === fStatus);
     if (isAdmin && fAssigned !== 'All') r = r.filter(p => (resolveAssignee(p.assigned_to_user_id, profiles) || '') === fAssigned);
-    return [...r].sort((a, b) => (b.queued_date || b.created_at || '').localeCompare(a.queued_date || a.created_at || ''));
-  }, [scoped, fStatus, fAssigned, isAdmin, profiles]);
+    return sortRows(r, sortOptions, sortKey, sortDir);
+  }, [scoped, fStatus, fAssigned, isAdmin, profiles, sortKey, sortDir, sortOptions]);
 
   const selected = selectedId ? scoped.find(p => p.id === selectedId) : null;
   const selectedSource = selected?.source_id ? sourceById.get(selected.source_id) : undefined;
@@ -203,6 +219,7 @@ export default function ProductionBoard({ productions, sources, comments, activi
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
           <FilterField label="Status"><MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} /></FilterField>
+          <SortControl options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
           {isAdmin && <FilterField label="Assigned to"><MiniSelect value={fAssigned} options={assignedPresent} onChange={setFAssigned} /></FilterField>}
         </div>
 

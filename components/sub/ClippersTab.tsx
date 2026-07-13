@@ -5,6 +5,8 @@ import { Profile, ClipperAccount, ClipperContent } from '@/lib/types';
 import { profileName } from '@/lib/profile-name';
 import { fn, avg } from '@/lib/utils';
 import Avatar from '@/components/Avatar';
+import SortControl from '@/components/sub/studio/SortControl';
+import { SortOption, SortDir, sortRows } from '@/lib/sort';
 import PlatformIcon from '@/components/PlatformIcon';
 import ViewsOverTime from '@/components/ViewsOverTime';
 
@@ -45,6 +47,16 @@ interface Props {
 export default function ClippersTab({ profiles, accounts, content, onReload }: Props) {
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<string>('name');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+  // Status is Active → Inactive (the clipper lifecycle), not alphabetical — same
+  // 'order' rule the pipeline statuses use elsewhere.
+  const sortOptions: SortOption<Profile>[] = useMemo(() => [
+    { key: 'name', label: 'Name', kind: 'text', value: c => profileName(c) },
+    { key: 'joined', label: 'Joined Date', kind: 'date', value: c => c.joined_at || c.created_at },
+    { key: 'status', label: 'Status', kind: 'order', order: ['active', 'inactive'], value: c => (isActive(c.clipper_status) ? 'active' : 'inactive') },
+  ], []);
 
   const clippers = useMemo(() => profiles.filter(p => p.role === 'clipper'), [profiles]);
   const accountsByClipper = useMemo(() => {
@@ -90,13 +102,13 @@ export default function ClippersTab({ profiles, accounts, content, onReload }: P
 
   const filtered = (() => {
     const q = search.trim().toLowerCase();
-    if (!q) return clippers;
-    return clippers.filter(c => {
+    const matched = !q ? clippers : clippers.filter(c => {
       const name = profileName(c).toLowerCase();
       const email = (c.email || '').toLowerCase();
       const handles = (accountsByClipper[c.id] || []).map(a => (a.handle || '').toLowerCase());
       return name.includes(q) || email.includes(q) || handles.some(h => h.includes(q));
     });
+    return sortRows(matched, sortOptions, sortKey, sortDir);
   })();
 
   return (
@@ -118,6 +130,7 @@ export default function ClippersTab({ profiles, accounts, content, onReload }: P
           placeholder="Search clippers by name, email, or handle…"
           style={{ width: 320, padding: '6px 10px', fontSize: 12 }}
         />
+        <SortControl options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
         <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{filtered.length} clipper{filtered.length === 1 ? '' : 's'}</div>
       </div>
 

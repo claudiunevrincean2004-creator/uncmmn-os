@@ -1,10 +1,11 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { ClipSnippet, ClipSource } from '@/lib/types';
-import { byDateAddedDesc } from '@/lib/clip-library';
 import { inDateRange } from '@/lib/studio';
+import { SortOption, SortDir, sortRows } from '@/lib/sort';
 import { MaybeUrl } from '../studio/cells';
 import DateRangePicker from '../studio/DateRangePicker';
+import SortControl from '../studio/SortControl';
 import { FormatFilter, distinctFormats } from './ClipFilters';
 
 interface Props {
@@ -22,6 +23,16 @@ export default function SnippetBrowser({ snippets, sources, focusSource, onClear
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [formatFilter, setFormatFilter] = useState('');
+  const [sortKey, setSortKey] = useState<string>('date_added');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  // Clips have no pipeline status, so every option here is a plain date/text sort.
+  const sortOptions: SortOption<ClipSnippet>[] = useMemo(() => [
+    { key: 'date_added', label: 'Date Added', kind: 'date', value: c => c.date_added },
+    { key: 'source', label: 'Source', kind: 'text', value: c => c.source_name },
+    { key: 'description', label: 'Description', kind: 'text', value: c => c.description },
+    { key: 'format', label: 'Format', kind: 'text', value: c => c.format },
+  ], []);
 
   const q = search.trim().toLowerCase();
   const searching = q.length > 0;
@@ -40,15 +51,16 @@ export default function SnippetBrowser({ snippets, sources, focusSource, onClear
   // Flat search across ALL filtered clips, regardless of source.
   const flat = useMemo(() => {
     if (!searching) return [];
-    return base
+    const matches = base
       .filter(s =>
         (s.description || '').toLowerCase().includes(q) ||
         (s.source_name || '').toLowerCase().includes(q) ||
         (s.full_version_file || '').toLowerCase().includes(q) ||
         (s.snippet_download_link || '').toLowerCase().includes(q),
       )
-      .sort((a, b) => byDateAddedDesc(a.date_added, b.date_added));
-  }, [base, q, searching]);
+      .slice();
+    return sortRows(matches, sortOptions, sortKey, sortDir);
+  }, [base, q, searching, sortOptions, sortKey, sortDir]);
 
   // Grouped-by-source view (default browsing), clips newest-first within each group.
   const groups = useMemo(() => {
@@ -58,7 +70,8 @@ export default function SnippetBrowser({ snippets, sources, focusSource, onClear
       const arr = byName.get(key);
       if (arr) arr.push(s); else byName.set(key, [s]);
     }
-    byName.forEach(arr => arr.sort((a, b) => byDateAddedDesc(a.date_added, b.date_added)));
+    // Clips are sorted inside each source group by the chosen property.
+    byName.forEach((arr, k) => byName.set(k, sortRows(arr, sortOptions, sortKey, sortDir)));
     const ordered: { name: string; clips: ClipSnippet[] }[] = [];
     const seen = new Set<string>();
     for (const src of sources) {
@@ -70,8 +83,13 @@ export default function SnippetBrowser({ snippets, sources, focusSource, onClear
       .sort((a, b) => a.localeCompare(b))
       .forEach(k => ordered.push({ name: k, clips: byName.get(k)! }));
     if (byName.has(NO_SOURCE)) ordered.push({ name: NO_SOURCE, clips: byName.get(NO_SOURCE)! });
-    return focusSource ? ordered.filter(g => g.name === focusSource) : ordered;
-  }, [base, sources, focusSource]);
+    // Sorting by Source reorders the groups themselves (that IS the sort the user
+    // asked for); any other key leaves the source order alone and sorts within.
+    const grouped = sortKey === 'source'
+      ? [...ordered].sort((a, b) => (sortDir === 'asc' ? 1 : -1) * a.name.localeCompare(b.name))
+      : ordered;
+    return focusSource ? grouped.filter(g => g.name === focusSource) : grouped;
+  }, [base, sources, focusSource, sortOptions, sortKey, sortDir]);
 
   function toggle(name: string) {
     setExpanded(prev => {
@@ -124,6 +142,7 @@ export default function SnippetBrowser({ snippets, sources, focusSource, onClear
         />
         <DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} />
         <FormatFilter value={formatFilter} options={formats} onChange={setFormatFilter} />
+        <SortControl options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
         {focusSource && !searching && (
           <button className="btn-ghost" style={{ fontSize: 11, padding: '6px 12px' }} onClick={onClearFocus}>← All sources</button>
         )}
