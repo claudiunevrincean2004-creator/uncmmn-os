@@ -27,6 +27,7 @@ export async function POST(request: Request) {
   let rawFilesLink = '';
   let finalLink = '';
   let editorMention = '';
+  let deadline = '';
   try {
     const b = await request.json();
     status = str(b?.status);
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
     rawFilesLink = str(b?.rawFilesLink);
     finalLink = str(b?.finalLink);
     editorMention = str(b?.editorMention);
+    deadline = str(b?.deadline);
   } catch {
     // ignore malformed body; the guard below handles the empty status
   }
@@ -46,6 +48,15 @@ export async function POST(request: Request) {
   // Item identified only by a clickable deep link to its page; omit the line when
   // there's no URL (rather than showing plain text).
   const openLine = itemUrl ? `<${itemUrl}|🔗 Open in OS>` : null;
+  // Deadline is a `date` column ("2026-07-18"). Fixed to UTC so the day never
+  // shifts with the server's timezone. Unset/unparseable → null, so the line is
+  // dropped entirely rather than showing an empty or invalid deadline.
+  const deadlineDay = deadline.slice(0, 10);
+  const deadlineLine = /^\d{4}-\d{2}-\d{2}$/.test(deadlineDay)
+    ? `Deadline: ${new Date(`${deadlineDay}T00:00:00Z`).toLocaleDateString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC',
+      })}`
+    : null;
   // Helper: collapse a list of lines (dropping empties) into one block joined by
   // single newlines, or null if nothing remains.
   const block = (lines: (string | null)[]): string | null => {
@@ -60,6 +71,7 @@ export async function POST(request: Request) {
         `🔵 New video ready to edit, ${editor}!`,
         openLine,
         block([
+          deadlineLine,
           briefLink ? `Clip brief: ${briefLink}` : null,
           rawFilesLink ? `Raw files: ${rawFilesLink}` : null,
         ]),
@@ -77,6 +89,7 @@ export async function POST(request: Request) {
         `🔴 Revisions needed, ${editor}.`,
         openLine,
         block([
+          deadlineLine,
           'Check the comments for what to fix.',
           finalLink ? `Find the final product here: ${finalLink}` : null,
         ]),

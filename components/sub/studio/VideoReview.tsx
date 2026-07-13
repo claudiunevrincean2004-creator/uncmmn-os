@@ -130,6 +130,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
         briefLink: v.brief_url || '',
         rawFilesLink: v.raw_files_url || '',
         finalLink: v.final_url || '',
+        deadline: v.deadline || '',
         ...buildPipelineMentions(v.assigned_to_user_id, profiles),
       });
     }
@@ -144,7 +145,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
 
   // Fire-and-forget POST to the #main-ig-updates notify route (server holds the
   // Slack webhook URL, skips silently if unset). Never blocks the UI or throws.
-  function notifyVideo(payload: { status: string; title: string; itemUrl: string; briefLink: string; rawFilesLink: string; finalLink: string; editorMention: string }) {
+  function notifyVideo(payload: { status: string; title: string; itemUrl: string; briefLink: string; rawFilesLink: string; finalLink: string; deadline: string; editorMention: string }) {
     fetch('/api/video-notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -227,6 +228,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
         briefLink: row.brief_url ?? '',
         rawFilesLink: row.raw_files_url ?? '',
         finalLink: row.final_url ?? '',
+        deadline: row.deadline ?? '',
         ...buildPipelineMentions(row.assigned_to_user_id, profiles),
       });
     }
