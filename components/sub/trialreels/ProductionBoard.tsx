@@ -206,10 +206,6 @@ export default function ProductionBoard({ productions, sources, comments, activi
                   <th>Timestamp</th>
                   <th>Snippet</th>
                   <th>Recreated Reel Final</th>
-                  <th style={{ textAlign: 'right' }}>Views</th>
-                  <th style={{ textAlign: 'right' }}>Follows</th>
-                  <th style={{ textAlign: 'right' }}>Follows/1k</th>
-                  <th>Open</th>
                   {isAdmin && <th></th>}
                 </tr>
               </thead>
@@ -235,12 +231,6 @@ export default function ProductionBoard({ productions, sources, comments, activi
                       <td><span style={{ fontSize: 11, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{src?.timestamp || '—'}</span></td>
                       <td><TruncLink value={src?.snippet_download_link} /></td>
                       <td><UrlCell value={p.final_url ?? undefined} onCommit={u => patch(p.id, { final_url: u || null })} /></td>
-                      <td style={{ textAlign: 'right' }}><span style={{ fontSize: 11, color: 'var(--text-dim)' }} title={String(src?.views ?? '')}>{src?.views != null ? fn(src.views) : '—'}</span></td>
-                      <td style={{ textAlign: 'right' }}><span style={{ fontSize: 11, color: 'var(--text-dim)' }} title={String(src?.follows ?? '')}>{src?.follows != null ? fn(src.follows) : '—'}</span></td>
-                      <td style={{ textAlign: 'right' }}><span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{fmtRatio(src?.follows_per_1k)}</span></td>
-                      <td>
-                        <a href={reelUrl(p.id)} style={{ color: 'var(--text-faint)', fontSize: 12, textDecoration: 'none' }} title="Open this reel's detail (deep link)">↗ OS</a>
-                      </td>
                       {isAdmin && <td><button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteRow(p.id)}>✕</button></td>}
                     </tr>
                   );
