@@ -9,7 +9,7 @@ import {
   parseSourceCSV, importSourceRows, buildQueueCandidates, fmtRatio,
   DEFAULT_RATIO_FLOOR, DEFAULT_QUEUE_COUNT,
 } from '@/lib/trial-reels';
-import { UrlCell, MiniSelect, InlineText, MaybeUrlCell, isHttpUrl } from '../studio/cells';
+import { UrlCell, MiniSelect, InlineText, MaybeUrlCell, isHttpUrl, shortUrl } from '../studio/cells';
 import { UserPicker, slackMentionByAssignee, resolveAssignee } from '../studio/UserPicker';
 
 interface Props {
@@ -44,25 +44,33 @@ function NumCell({ value, onCommit, width = 78 }: { value: number | null | undef
   );
 }
 
+// Shared uppercase caption for every field/section label in the expanded panel.
+const DETAIL_LABEL_STYLE: React.CSSProperties = {
+  fontSize: 9, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600,
+};
+
 // Labeled block in the expanded queue-row detail. `inline` lays label + value on
 // one line (for short scalars); otherwise the value stacks under the label.
 function DetailField({ label, children, inline = false }: { label: string; children: React.ReactNode; inline?: boolean }) {
-  const lbl = <span style={{ fontSize: 9, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>{label}</span>;
+  const lbl = <span style={DETAIL_LABEL_STYLE}>{label}</span>;
   if (inline) return <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>{lbl}{children}</div>;
   return <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>{lbl}{children}</div>;
 }
 
-// Labeled reference: a clickable link when the value is an http(s) URL, plain text
-// when it's a bare filename (e.g. Full version file), and an em-dash when empty.
+// One reference-link row (label above, value below, each on its own line): shows
+// the actual URL — truncated to domain + start of path (e.g. "drive.google.com/
+// file/d/1rhPEx…") — as the clickable link. Plain text when the value is a bare
+// filename (Full version file), and an em-dash when empty.
 function DetailLink({ label, value }: { label: string; value?: string | null }) {
   return (
-    <DetailField label={label} inline>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <span style={DETAIL_LABEL_STYLE}>{label}</span>
       {value
         ? (isHttpUrl(value)
-            ? <a href={value} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'var(--accent)', textDecoration: 'none', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={value}>{label} ↗</a>
-            : <span style={{ fontSize: 12, color: 'var(--text-dim)', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={value}>{value}</span>)
+            ? <a href={value} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'var(--accent)', textDecoration: 'none', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={value}>{shortUrl(value, 48)}</a>
+            : <span style={{ fontSize: 12, color: 'var(--text-dim)', wordBreak: 'break-word' }} title={value}>{value}</span>)
         : <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>—</span>}
-    </DetailField>
+    </div>
   );
 }
 
@@ -431,34 +439,46 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
                       <button className="btn-ghost" style={{ fontSize: 11, padding: '3px 8px', color: '#ef4444' }} onClick={e => { e.stopPropagation(); removeProposed(s.id); }} title="Remove from queue">Remove</button>
                     </div>
 
-                    {/* Expanded detail — full reference + editable clip brief */}
+                    {/* Expanded detail — organized into groups with breathing room:
+                        Description → Clip Brief (link) → Reference links → Timestamp → Stats */}
                     {open && (
-                      <div onClick={e => e.stopPropagation()} style={{ padding: '2px 12px 14px 40px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div onClick={e => e.stopPropagation()} style={{ padding: '6px 16px 20px 40px', display: 'flex', flexDirection: 'column', gap: 22 }}>
                         <DetailField label="Description">
-                          <span style={{ fontSize: 12, color: 'var(--text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{s.description || '—'}</span>
+                          <span style={{ fontSize: 12, color: 'var(--text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.5 }}>{s.description || '—'}</span>
                         </DetailField>
 
-                        <DetailField label="Clip Brief">
-                          <textarea
+                        {/* Clip Brief — a link to the Google Doc. Editable inline; renders as a
+                            clickable truncated link once a URL is saved. */}
+                        <DetailField label="Clip Brief · Google Doc">
+                          <input
                             className="form-input"
                             value={briefValue(s)}
                             onChange={e => onBriefChange(s.id, e.target.value)}
                             onBlur={() => saveBrief(s.id)}
-                            placeholder="Instructions for the editor — how to recreate/adapt this reel…"
-                            rows={4}
-                            style={{ width: '100%', fontSize: 12, padding: '8px 10px', resize: 'vertical', lineHeight: 1.5 }}
+                            onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                            placeholder="Paste the Google Doc URL with the editor instructions…"
+                            style={{ width: '100%', fontSize: 12, padding: '8px 10px' }}
                           />
+                          {isHttpUrl(briefValue(s)) && (
+                            <a href={briefValue(s)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'var(--accent)', textDecoration: 'none', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }} title={briefValue(s)}>↗ {shortUrl(briefValue(s), 48)}</a>
+                          )}
                         </DetailField>
 
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 24px' }}>
-                          <DetailLink label="Original posted reel" value={s.posted_url} />
-                          <DetailLink label="Final product" value={s.final_product} />
-                          <DetailLink label="Snippet download" value={s.snippet_download_link} />
-                          <DetailLink label="Full version file" value={s.full_version_file} />
-                          <DetailField label="Timestamp" inline><span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{s.timestamp || '—'}</span></DetailField>
+                        {/* Reference links — each on its own line, generous spacing. */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <span style={{ ...DETAIL_LABEL_STYLE, color: 'var(--text-dim)', marginBottom: 4 }}>Reference links</span>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                            <DetailLink label="Original posted reel" value={s.posted_url} />
+                            <DetailLink label="Final product" value={s.final_product} />
+                            <DetailLink label="Snippet download" value={s.snippet_download_link} />
+                            <DetailLink label="Full version file" value={s.full_version_file} />
+                          </div>
                         </div>
 
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 24px' }}>
+                        <DetailField label="Timestamp" inline><span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{s.timestamp || '—'}</span></DetailField>
+
+                        {/* Stats row */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 32px' }}>
                           <DetailField label="Views" inline><span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{s.views != null ? fn(s.views) : '—'}</span></DetailField>
                           <DetailField label="Follows" inline><span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{s.follows != null ? fn(s.follows) : '—'}</span></DetailField>
                           <DetailField label="Follows/1k" inline><span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{fmtRatio(s.follows_per_1k)}</span></DetailField>

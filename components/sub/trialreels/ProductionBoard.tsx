@@ -117,7 +117,7 @@ export default function ProductionBoard({ productions, sources, comments, activi
   const fields: FieldDef[] = useMemo(() => {
     const base: FieldDef[] = [
       { key: 'source_description', label: 'Description', type: 'readonly' },
-      { key: 'clip_brief', label: 'Clip Brief', type: 'readonly-multiline' },
+      { key: 'clip_brief', label: 'Clip Brief · Google Doc', type: 'readonly-url' },
       { key: 'full_version_file', label: 'Full Version File', type: 'readonly-maybe-url' },
       { key: 'source_timestamp', label: 'Timestamp', type: 'readonly' },
       { key: 'snippet_download_link', label: 'Snippet Download', type: 'readonly-url' },
