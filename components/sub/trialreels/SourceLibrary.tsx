@@ -11,6 +11,7 @@ import {
 } from '@/lib/trial-reels';
 import { UrlCell, MiniSelect, InlineText, MaybeUrlCell, isHttpUrl, shortUrl } from '../studio/cells';
 import { UserPicker, slackMentionByAssignee, resolveAssignee } from '../studio/UserPicker';
+import { DETAIL_LABEL_STYLE, DetailField, DetailLink } from './detail';
 
 interface Props {
   sources: TrialReelSource[];
@@ -41,36 +42,6 @@ function NumCell({ value, onCommit, width = 78 }: { value: number | null | undef
         if (next !== (value ?? null)) onCommit(next);
       }}
     />
-  );
-}
-
-// Shared uppercase caption for every field/section label in the expanded panel.
-const DETAIL_LABEL_STYLE: React.CSSProperties = {
-  fontSize: 9, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600,
-};
-
-// Labeled block in the expanded queue-row detail. `inline` lays label + value on
-// one line (for short scalars); otherwise the value stacks under the label.
-function DetailField({ label, children, inline = false }: { label: string; children: React.ReactNode; inline?: boolean }) {
-  const lbl = <span style={DETAIL_LABEL_STYLE}>{label}</span>;
-  if (inline) return <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>{lbl}{children}</div>;
-  return <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>{lbl}{children}</div>;
-}
-
-// One reference-link row (label above, value below, each on its own line): shows
-// the actual URL — truncated to domain + start of path (e.g. "drive.google.com/
-// file/d/1rhPEx…") — as the clickable link. Plain text when the value is a bare
-// filename (Full version file), and an em-dash when empty.
-function DetailLink({ label, value }: { label: string; value?: string | null }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-      <span style={DETAIL_LABEL_STYLE}>{label}</span>
-      {value
-        ? (isHttpUrl(value)
-            ? <a href={value} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'var(--accent)', textDecoration: 'none', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={value}>{shortUrl(value, 48)}</a>
-            : <span style={{ fontSize: 12, color: 'var(--text-dim)', wordBreak: 'break-word' }} title={value}>{value}</span>)
-        : <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>—</span>}
-    </div>
   );
 }
 
@@ -327,7 +298,7 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
                 <th>Full Version</th>
                 <th>Timestamp</th>
                 <th>Snippet</th>
-                <th>Final Product</th>
+                <th>Original edit</th>
                 <th>Eligible</th>
                 {th('times_recreated', 'Recreated')}
                 {th('last_assigned_at', 'Last Assigned')}
@@ -469,7 +440,7 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
                           <span style={{ ...DETAIL_LABEL_STYLE, color: 'var(--text-dim)', marginBottom: 4 }}>Reference links</span>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                             <DetailLink label="Original posted reel" value={s.posted_url} />
-                            <DetailLink label="Final product" value={s.final_product} />
+                            <DetailLink label="Original edit" value={s.final_product} />
                             <DetailLink label="Snippet download" value={s.snippet_download_link} />
                             <DetailLink label="Full version file" value={s.full_version_file} />
                           </div>
