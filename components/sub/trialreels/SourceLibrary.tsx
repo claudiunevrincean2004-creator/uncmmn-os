@@ -9,7 +9,7 @@ import {
   parseSourceCSV, importSourceRows, buildQueueCandidates, fmtRatio,
   DEFAULT_RATIO_FLOOR, DEFAULT_QUEUE_COUNT,
 } from '@/lib/trial-reels';
-import { UrlCell, MiniSelect, InlineText, MaybeUrlCell, isHttpUrl, shortUrl } from '../studio/cells';
+import { UrlCell, InlineText, MaybeUrlCell, isHttpUrl, shortUrl } from '../studio/cells';
 import { UserPicker, slackMentionByAssignee, resolveAssignee } from '../studio/UserPicker';
 import { DETAIL_LABEL_STYLE, DetailField, DetailLink } from './detail';
 
@@ -297,7 +297,6 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
                 {th('views', 'Views')}
                 {th('follows', 'Follows')}
                 {th('follows_per_1k', 'Follows/1k')}
-                <th>Talking</th>
                 <th>Full Version</th>
                 <th>Timestamp</th>
                 <th>Snippet</th>
@@ -318,14 +317,6 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
                   <td style={{ textAlign: 'right' }}><span style={{ fontSize: 12 }} title={String(s.views ?? '')}>{s.views != null ? fn(s.views) : '—'}</span></td>
                   <td style={{ textAlign: 'right' }}><span style={{ fontSize: 12 }} title={String(s.follows ?? '')}>{s.follows != null ? fn(s.follows) : '—'}</span></td>
                   <td style={{ textAlign: 'right' }}><NumCell value={s.follows_per_1k} onCommit={v => patch(s.id, { follows_per_1k: v })} width={72} /></td>
-                  <td>
-                    <MiniSelect
-                      value={s.contains_talking == null ? '' : s.contains_talking ? 'Yes' : 'No'}
-                      options={['Yes', 'No']}
-                      placeholder="—"
-                      onChange={v => patch(s.id, { contains_talking: v === '' ? null : v === 'Yes' })}
-                    />
-                  </td>
                   <td><MaybeUrlCell value={s.full_version_file ?? undefined} onCommit={v => patch(s.id, { full_version_file: v || null })} /></td>
                   <td><InlineText value={s.timestamp ?? undefined} onCommit={v => patch(s.id, { timestamp: v || null })} placeholder="—" style={{ width: 110 }} /></td>
                   <td><UrlCell value={s.snippet_download_link ?? undefined} onCommit={u => patch(s.id, { snippet_download_link: u || null })} /></td>
