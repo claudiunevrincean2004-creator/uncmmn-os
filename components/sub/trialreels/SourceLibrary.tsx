@@ -9,7 +9,7 @@ import {
   parseSourceCSV, importSourceRows, buildQueueCandidates, fmtRatio,
   DEFAULT_RATIO_FLOOR, DEFAULT_QUEUE_COUNT,
 } from '@/lib/trial-reels';
-import { UrlCell, InlineText, MaybeUrlCell, isHttpUrl, shortUrl } from '../studio/cells';
+import { UrlCell, InlineText, MaybeUrlCell } from '../studio/cells';
 import DateRangePicker from '../studio/DateRangePicker';
 import FilterField from '../studio/FilterField';
 import { UserPicker, slackMentionByAssignee, resolveAssignee } from '../studio/UserPicker';
@@ -66,12 +66,8 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
   const [proposedIds, setProposedIds] = useState<string[]>([]);
   const [addQuery, setAddQuery] = useState('');
   const [generating, setGenerating] = useState(false);
-  // Which proposed row is expanded (accordion — one at a time), and a local buffer
-  // of clip-brief edits keyed by source id. The buffer is the source of truth while
-  // the modal is open so collapsing/expanding never drops an edit; it also survives
-  // a Regenerate. Persisted to trial_reel_source.clip_brief on blur.
+  // Which proposed row is expanded (accordion — one at a time).
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [briefs, setBriefs] = useState<Record<string, string>>({});
 
   async function patch(id: string, p: Partial<TrialReelSource>) {
     await supabase.from('trial_reel_source').update(p).eq('id', id);
@@ -147,26 +143,7 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
     setEditorId('');
     setAddQuery('');
     setExpandedId(null);
-    setBriefs({});
     setGenOpen(true);
-  }
-
-  // Clip-brief buffer: read from the local edit if present, else the stored value.
-  function briefValue(s: TrialReelSource): string {
-    return s.id in briefs ? briefs[s.id] : (s.clip_brief || '');
-  }
-  function onBriefChange(id: string, v: string) {
-    setBriefs(b => ({ ...b, [id]: v }));
-  }
-  // Persist a single row's brief (no onReload — avoids re-rendering the modal and
-  // collapsing the accordion mid-edit; the local buffer keeps the UI correct).
-  async function saveBrief(id: string) {
-    if (!(id in briefs)) return;
-    const v = briefs[id];
-    const src = sources.find(s => s.id === id);
-    if ((src?.clip_brief || '') === v) return; // unchanged
-    const { error } = await supabase.from('trial_reel_source').update({ clip_brief: v || null }).eq('id', id);
-    if (error) console.warn('[SourceLibrary] failed to save clip brief', error);
   }
 
   function regenerate() {
@@ -204,15 +181,9 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
     if (proposed.length === 0) { alert('Add at least one reel to the queue.'); return; }
     if (!editorId) { alert('Choose an editor to assign the batch to.'); return; }
     setGenerating(true);
-    // Flush any clip-brief edits still buffered (e.g. Confirm clicked before a
-    // textarea blur fired) so the brief is on the source before rows are created.
-    await Promise.all(proposed.map(s => saveBrief(s.id)));
     const today = todayISO();
     const nowIso = new Date().toISOString();
-    // Seed each production row's clip_brief from the source brief authored here, so
-    // the per-assignment brief starts from what the admin wrote (then diverges as it
-    // is edited on the board).
-    const rows = proposed.map(s => ({ source_id: s.id, assigned_to_user_id: editorId, status: 'Assigned', queued_date: today, clip_brief: briefValue(s) || null }));
+    const rows = proposed.map(s => ({ source_id: s.id, assigned_to_user_id: editorId, status: 'Assigned', queued_date: today }));
     const { error } = await supabase.from('trial_reel_production').insert(rows);
     if (error) {
       setGenerating(false);
@@ -394,14 +365,13 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
                     <div
                       onClick={() => setExpandedId(open ? null : s.id)}
                       style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', cursor: 'pointer' }}
-                      title={open ? 'Collapse' : 'Expand for details & clip brief'}
+                      title={open ? 'Collapse' : 'Expand for details'}
                     >
                       <span style={{ fontSize: 10, color: 'var(--text-faint)', width: 10, transition: 'transform 0.15s', transform: open ? 'rotate(90deg)' : 'none' }}>▶</span>
                       <span style={{ fontSize: 11, color: 'var(--text-faint)', width: 18, textAlign: 'right' }}>{i + 1}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.description || ''}>
                           {s.description || s.posted_url || '(untitled)'}
-                          {briefValue(s).trim() && <span style={{ marginLeft: 6, color: 'var(--accent)', fontSize: 10 }} title="Has a clip brief">✎</span>}
                         </div>
                         <div style={{ fontSize: 10, color: 'var(--text-faint)' }}>
                           {fmtRatio(s.follows_per_1k)} f/1k · {s.views != null ? fn(s.views) : '—'} views · last {s.last_assigned_at ? formatActivityTime(s.last_assigned_at) : 'never'}
@@ -411,28 +381,11 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
                     </div>
 
                     {/* Expanded detail — organized into groups with breathing room:
-                        Description → Clip Brief (link) → Reference links → Timestamp → Stats */}
+                        Description → Reference links → Timestamp → Stats */}
                     {open && (
                       <div onClick={e => e.stopPropagation()} style={{ padding: '6px 16px 20px 40px', display: 'flex', flexDirection: 'column', gap: 22 }}>
                         <DetailField label="Description">
                           <span style={{ fontSize: 12, color: 'var(--text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.5 }}>{s.description || '—'}</span>
-                        </DetailField>
-
-                        {/* Clip Brief — a link to the Google Doc. Editable inline; renders as a
-                            clickable truncated link once a URL is saved. */}
-                        <DetailField label="Clip Brief · Google Doc">
-                          <input
-                            className="form-input"
-                            value={briefValue(s)}
-                            onChange={e => onBriefChange(s.id, e.target.value)}
-                            onBlur={() => saveBrief(s.id)}
-                            onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                            placeholder="Paste the Google Doc URL with the editor instructions…"
-                            style={{ width: '100%', fontSize: 12, padding: '8px 10px' }}
-                          />
-                          {isHttpUrl(briefValue(s)) && (
-                            <a href={briefValue(s)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'var(--accent)', textDecoration: 'none', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }} title={briefValue(s)}>↗ {shortUrl(briefValue(s), 48)}</a>
-                          )}
                         </DetailField>
 
                         {/* Reference links — each on its own line, generous spacing. */}

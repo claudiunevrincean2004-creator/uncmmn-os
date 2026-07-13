@@ -75,9 +75,8 @@ export default function ProductionBoard({ productions, sources, comments, activi
     onReload();
   }
 
-  // Reference fields (the clip brief) live on the linked SOURCE, so edits from the
-  // production panel write back to trial_reel_source — this is what persists the
-  // brief and keeps it visible to the assigned editor.
+  // Reference fields live on the linked SOURCE, so edits from the production panel/
+  // table write back to trial_reel_source — fixing a link corrects the library too.
   async function patchSource(id: string, p: Partial<TrialReelSource>) {
     await supabase.from('trial_reel_source').update(p).eq('id', id);
     onReload();
@@ -103,7 +102,6 @@ export default function ProductionBoard({ productions, sources, comments, activi
     if (key === 'status') { changeStatus(row, value); return; }
     if (key === 'assigned_to_user_id') { patch(row.id, { assigned_to_user_id: value || null }); return; }
     if (key === 'final_url') { patch(row.id, { final_url: value || null }); return; }
-    if (key === 'clip_brief') { patch(row.id, { clip_brief: value || null }); return; }
     const col = SOURCE_FIELD_COLUMN[key];
     if (!col || !row.source_id) return;
     const v = NUMERIC_SOURCE_FIELDS.has(key)
@@ -155,8 +153,9 @@ export default function ProductionBoard({ productions, sources, comments, activi
   const selected = selectedId ? scoped.find(p => p.id === selectedId) : null;
   const selectedSource = selected?.source_id ? sourceById.get(selected.source_id) : undefined;
 
-  // Panel fields — REFERENCE (read-only, from source) then EDITABLE. All links use
-  // the truncated-URL renderer. Clip brief is editable here (writes to the source).
+  // Panel fields — REFERENCE (from source, saved back to it) then EDITABLE on the
+  // production row. All links use the truncated-URL renderer. Editor instructions
+  // now live in the panel's Comments section rather than a clip-brief field.
   const fields: FieldDef[] = useMemo(() => {
     // REFERENCE — from the linked source, editable here and saved back to the source
     // (see onChangeField routing). Description stays read-only (it's the row's title).
@@ -172,9 +171,7 @@ export default function ProductionBoard({ productions, sources, comments, activi
       { key: 'follows_per_1k', label: 'Follows/1k', type: 'number' },
     ];
     // EDITABLE on the production row.
-    const editable: FieldDef[] = [
-      { key: 'clip_brief', label: 'Clip brief · Google Doc', type: 'url' },
-    ];
+    const editable: FieldDef[] = [];
     editable.push(isAdmin
       ? { key: 'assigned_to_user_id', label: 'Assigned to', type: 'user' }
       : { key: 'assigned_name', label: 'Assigned to', type: 'readonly' });
@@ -189,8 +186,6 @@ export default function ProductionBoard({ productions, sources, comments, activi
   const panelValues = selected ? {
     ...selected,
     source_description: selectedSource?.description || '',
-    // Per-assignment brief, falling back to the source brief for legacy rows.
-    clip_brief: selected.clip_brief ?? selectedSource?.clip_brief ?? '',
     full_version_file: selectedSource?.full_version_file || '',
     source_timestamp: selectedSource?.timestamp || '',
     snippet_download_link: selectedSource?.snippet_download_link || '',
@@ -225,7 +220,6 @@ export default function ProductionBoard({ productions, sources, comments, activi
                   <th style={{ minWidth: 200 }}>Description</th>
                   <th>Assigned To</th>
                   <th>Status</th>
-                  <th>Clip Brief</th>
                   <th>Original Reel</th>
                   <th>Original Edit</th>
                   <th>Full Version File</th>
@@ -250,8 +244,6 @@ export default function ProductionBoard({ productions, sources, comments, activi
                           : <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{resolveAssignee(p.assigned_to_user_id, profiles) || 'Unassigned'}</span>}
                       </td>
                       <td><EditPillSelect field="trialreel_status" value={p.status} options={TRIAL_REEL_STATUSES} colors={TRIAL_REEL_STATUS_COLORS} onChange={s => changeStatus(p, s)} allowAdd={false} /></td>
-                      {/* Clip brief → PRODUCTION (per-assignment); shows the source brief as a fallback for legacy rows. */}
-                      <td><UrlCell value={(p.clip_brief ?? src?.clip_brief) ?? undefined} onCommit={u => patch(p.id, { clip_brief: u || null })} /></td>
                       {/* Reference fields → SOURCE (fixing a link here corrects the library too). */}
                       <td>{src ? <UrlCell value={src.posted_url ?? undefined} onCommit={u => patchSource(src.id, { posted_url: u || null })} /> : dash}</td>
                       <td>{src ? <UrlCell value={src.final_product ?? undefined} onCommit={u => patchSource(src.id, { final_product: u || null })} /> : dash}</td>

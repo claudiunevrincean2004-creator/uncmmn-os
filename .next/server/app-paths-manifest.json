@@ -1,16 +1,16 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
-  "/api/ads-iterate-notify/route": "app/api/ads-iterate-notify/route.js",
   "/api/ads-notify/route": "app/api/ads-notify/route.js",
+  "/api/ads-iterate-notify/route": "app/api/ads-iterate-notify/route.js",
   "/api/filming-notify/route": "app/api/filming-notify/route.js",
   "/api/story-notify/route": "app/api/story-notify/route.js",
   "/api/trialreels-notify/route": "app/api/trialreels-notify/route.js",
   "/api/video-notify/route": "app/api/video-notify/route.js",
   "/login/page": "app/login/page.js",
-  "/page": "app/page.js",
   "/studio/ad-creative/[id]/page": "app/studio/ad-creative/[id]/page.js",
-  "/studio/story/[id]/page": "app/studio/story/[id]/page.js",
   "/studio/filming/[id]/page": "app/studio/filming/[id]/page.js",
+  "/studio/story/[id]/page": "app/studio/story/[id]/page.js",
+  "/page": "app/page.js",
   "/studio/video/[id]/page": "app/studio/video/[id]/page.js",
   "/trialreel/[id]/page": "app/trialreel/[id]/page.js"
 }
