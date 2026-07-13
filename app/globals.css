@@ -392,6 +392,16 @@ html, body {
   }
 }
 
+/* Mirror of slideInRight for panels anchored to the left edge (sidebar Inbox) */
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
 /* Backdrop scrim behind the Studio detail slide-over */
 @keyframes fadeIn {
   from {

@@ -26,13 +26,38 @@ interface Props {
   collapsed: boolean;
   role: Role;
   userName: string;
+  // Comments this user hasn't seen yet (0 → no badge).
+  unreadCount: number;
   onToggleCollapse: () => void;
   onSelectMain: (page: MainPage) => void;
+  onOpenInbox: () => void;
   onOpenAccount: () => void;
   onLogout: () => void;
 }
 
-export default function Sidebar({ activeMP, collapsed, role, userName, onToggleCollapse, onSelectMain, onOpenAccount, onLogout }: Props) {
+// Blue unread pill. Collapsed, it shrinks to a bare dot pinned to the icon —
+// there's no room for a number at 56px.
+function UnreadBadge({ count, dot }: { count: number; dot?: boolean }) {
+  if (count < 1) return null;
+  const base = {
+    background: 'var(--accent)',
+    color: '#fff',
+    borderRadius: 999,
+    fontWeight: 700,
+    lineHeight: 1,
+    flexShrink: 0,
+  } as const;
+  if (dot) {
+    return <span aria-label={`${count} unread`} style={{ ...base, position: 'absolute', top: 4, right: 8, width: 8, height: 8 }} />;
+  }
+  return (
+    <span aria-label={`${count} unread`} style={{ ...base, fontSize: 10, padding: '2px 6px', minWidth: 18, textAlign: 'center' }}>
+      {count > 99 ? '99+' : count}
+    </span>
+  );
+}
+
+export default function Sidebar({ activeMP, collapsed, role, userName, unreadCount, onToggleCollapse, onSelectMain, onOpenInbox, onOpenAccount, onLogout }: Props) {
   const w = collapsed ? 56 : 210;
   // Layer 3 — only render the tabs this role is allowed to see
   const nav = NAV.filter(item => canAccess(role, item.key));
@@ -99,6 +124,19 @@ export default function Sidebar({ activeMP, collapsed, role, userName, onToggleC
       </div>
 
       <div style={{ padding: collapsed ? '10px 4px' : '10px 8px', borderTop: '0.5px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {/* Inbox — comment activity across every tab. Sits directly above the
+            profile, the way Notion anchors it to the bottom of the sidebar. */}
+        <div
+          className="nav-item"
+          onClick={onOpenInbox}
+          title={unreadCount > 0 ? `Inbox — ${unreadCount} unread` : 'Inbox'}
+          style={collapsed ? { justifyContent: 'center', padding: '8px 0', position: 'relative' } : { position: 'relative' }}
+        >
+          <span style={{ fontSize: 13 }}>✉</span>
+          {!collapsed && <span>Inbox</span>}
+          {!collapsed && <div style={{ flex: 1 }} />}
+          <UnreadBadge count={unreadCount} dot={collapsed} />
+        </div>
         <div
           className="nav-item"
           onClick={onOpenAccount}

@@ -7,6 +7,9 @@ import { useDismiss } from '@/lib/use-dismiss';
 import { InlineText, MiniSelect, PillSelect, EditSelect, EditPillSelect, InlineDate, InlineNumber, MaybeUrl, MaybeUrlCell, isHttpUrl, shortUrl } from './cells';
 import { UserPicker, profileName } from './UserPicker';
 import Avatar from '@/components/Avatar';
+import MentionTextarea from '@/components/MentionTextarea';
+import CommentText from '@/components/CommentText';
+import { parseMentions } from '@/lib/mentions';
 
 export interface FieldDef {
   key: string;
@@ -134,13 +137,16 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
     const text = newComment.trim();
     if (!text || saving) return;
     setSaving(true);
+    // Mentions are re-derived from the body rather than tracked as the user types,
+    // so a mention deleted from the text is also gone from the array.
     const { error } = await supabase
       .from('studio_comments')
-      .insert([{ item_type: itemType, item_id: itemId, text, author_id: currentUserId }]);
+      .insert([{ item_type: itemType, item_id: itemId, text, author_id: currentUserId, mentions: parseMentions(text, profiles) }]);
     setSaving(false);
     if (error) {
       // Surface the failure instead of dropping the comment silently — e.g. a
-      // missing author_id column (run studio_comments_author.sql) or an RLS denial.
+      // missing author_id/mentions column (run studio_comments_author.sql and
+      // comment_inbox.sql) or an RLS denial.
       console.error('[ItemPanel] failed to add comment', error);
       alert(`Couldn't add comment: ${error.message}`);
       return;
@@ -162,7 +168,7 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
   async function saveEdit(id: string) {
     const text = editText.trim();
     if (!text) return;
-    const { error } = await supabase.from('studio_comments').update({ text }).eq('id', id);
+    const { error } = await supabase.from('studio_comments').update({ text, mentions: parseMentions(text, profiles) }).eq('id', id);
     if (error) {
       console.error('[ItemPanel] failed to edit comment', error);
       alert(`Couldn't save comment: ${error.message}`);
@@ -248,14 +254,12 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
           Comments {itemComments.length > 0 && <span style={{ color: 'var(--text-faint)' }}>· {itemComments.length}</span>}
         </div>
         <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-          <textarea
-            className="form-input"
+          <MentionTextarea
             value={newComment}
-            onChange={e => setNewComment(e.target.value)}
-            placeholder="Leave a comment… (Enter to send, Shift+Enter for a new line)"
-            rows={2}
-            style={{ resize: 'vertical', fontSize: 12, lineHeight: 1.4 }}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addComment(); } }}
+            onChange={setNewComment}
+            profiles={profiles}
+            onSubmit={addComment}
+            placeholder="Leave a comment… (@ to mention, Enter to send, Shift+Enter for a new line)"
           />
           <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', alignSelf: 'flex-end' }} onClick={addComment} disabled={saving || !newComment.trim()}>
             {saving ? '…' : 'Add'}
@@ -277,14 +281,11 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
                   </div>
                   {editing ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 5 }}>
-                      <textarea
-                        className="form-input"
+                      <MentionTextarea
                         value={editText}
-                        onChange={e => setEditText(e.target.value)}
-                        rows={2}
+                        onChange={setEditText}
+                        profiles={profiles}
                         autoFocus
-                        style={{ resize: 'vertical', fontSize: 12, lineHeight: 1.4 }}
-                        onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) saveEdit(c.id); }}
                       />
                       <div style={{ display: 'flex', gap: 6 }}>
                         <button className="btn-primary" style={{ fontSize: 10, padding: '4px 10px' }} onClick={() => saveEdit(c.id)} disabled={!editText.trim()}>Save</button>
@@ -292,7 +293,9 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
                       </div>
                     </div>
                   ) : (
-                    <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.4, whiteSpace: 'pre-wrap', marginBottom: 5 }}>{c.text}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.4, whiteSpace: 'pre-wrap', marginBottom: 5 }}>
+                      <CommentText text={c.text} profiles={profiles} currentUserId={currentUserId} />
+                    </div>
                   )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{formatActivityTime(c.created_at)}</span>

@@ -10,11 +10,16 @@ export async function checkSchema(): Promise<{ missing: string[]; postColumnsMis
     'custom_properties',
     'trial_reel_source', 'trial_reel_production',
     'clip_source', 'clip_snippet',
+    'comment_reads',
   ];
+
+  // Existence probe column, per table. Everything is keyed by `id` except
+  // comment_reads, whose key is the (user_id, comment_id) pair.
+  const probeColumn: Record<string, string> = { comment_reads: 'user_id' };
 
   const missing: string[] = [];
   for (const table of requiredTables) {
-    const { error } = await supabase.from(table).select('id').limit(0);
+    const { error } = await supabase.from(table).select(probeColumn[table] ?? 'id').limit(0);
     if (error && error.code === 'PGRST205') {
       missing.push(table);
     }
@@ -312,6 +317,26 @@ create policy "Allow all for anon" on studio_quick_links for all using (true) wi
 alter table studio_dropdown_options enable row level security;
 drop policy if exists "Allow all for anon" on studio_dropdown_options;
 create policy "Allow all for anon" on studio_dropdown_options for all using (true) with check (true);`);
+  }
+
+  // Comment Inbox: mentions on comments + per-user read state.
+  // Full annotated version lives in supabase/comment_inbox.sql.
+  if (missing.includes('comment_reads')) {
+    parts.push(`alter table studio_comments add column if not exists mentions uuid[] not null default '{}';
+create index if not exists studio_comments_mentions_idx on studio_comments using gin (mentions);
+create index if not exists studio_comments_created_at_idx on studio_comments (created_at desc);
+
+create table if not exists comment_reads (
+  user_id    uuid not null,
+  comment_id uuid not null references studio_comments(id) on delete cascade,
+  read_at    timestamptz not null default now(),
+  primary key (user_id, comment_id)
+);
+create index if not exists comment_reads_user_idx on comment_reads (user_id);
+alter table comment_reads enable row level security;
+drop policy if exists "all_comment_reads" on comment_reads;
+create policy "all_comment_reads" on comment_reads for all using (true) with check (true);
+notify pgrst, 'reload schema';`);
   }
 
   // New columns on the existing studio_ad_creatives table

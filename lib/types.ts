@@ -242,7 +242,18 @@ export interface StudioComment {
   item_id: string;
   text: string;
   author_id?: string | null;
+  // Profile ids @-mentioned in `text`, re-derived from the body on every save
+  // (lib/mentions.ts). Drives the Inbox's "Mentions" filter.
+  mentions?: string[] | null;
   created_at?: string;
+}
+
+// Per-user comment read state — one row per comment the user has seen. Presence
+// of a row means read; unread is the absence of one. Powers the Inbox badge.
+export interface CommentRead {
+  user_id: string;
+  comment_id: string;
+  read_at?: string;
 }
 
 export interface StudioActivity {

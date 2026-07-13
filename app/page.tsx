@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Role, canAccess } from '@/lib/auth-config';
@@ -20,7 +20,9 @@ import ClippersTab from '@/components/sub/ClippersTab';
 import TrialReelsTab from '@/components/sub/TrialReelsTab';
 import ClipLibraryTab from '@/components/sub/ClipLibraryTab';
 import StarLogo from '@/components/StarLogo';
+import InboxPanel from '@/components/InboxPanel';
 import { profileName } from '@/lib/profile-name';
+import { INBOX_SOURCES, unreadCount } from '@/lib/inbox';
 
 async function safeSelect(table: string, orderCol: string, ascending = true) {
   const { data, error } = await supabase.from(table).select('*').order(orderCol, { ascending });
@@ -93,6 +95,10 @@ export default function Home() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [adminUsersOpen, setAdminUsersOpen] = useState(false);
+  const [inboxOpen, setInboxOpen] = useState(false);
+  // Comment ids the signed-in user has already seen (one comment_reads row each).
+  // Unread is the absence of an id here — see lib/inbox.ts.
+  const [readIds, setReadIds] = useState<Set<string>>(new Set());
   // Deep link from a Slack ping ("/studio/video/<id>" → "/?item=video:<id>"):
   // jump to Studio and open that row's side panel. Read from window (not
   // useSearchParams) to keep the root statically prerendered.
@@ -256,6 +262,75 @@ export default function Home() {
     setLoading(false);
   }, []);
 
+  // Read state is per-user, so it loads on its own once the auth id is known
+  // (loadData runs before that and is shared by everyone). Missing table (the
+  // comment_inbox.sql migration hasn't been run) → no reads, so everything reads
+  // as unread rather than crashing.
+  const loadReads = useCallback(async (uid: string) => {
+    const { data, error } = await supabase.from('comment_reads').select('comment_id').eq('user_id', uid);
+    if (error) {
+      console.warn('[inbox] could not load comment_reads (run supabase/comment_inbox.sql):', error.message);
+      return;
+    }
+    setReadIds(new Set((data || []).map(r => r.comment_id as string)));
+  }, []);
+
+  useEffect(() => {
+    if (currentUserId) loadReads(currentUserId);
+  }, [currentUserId, loadReads]);
+
+  // Mark comments read for this user. Optimistic: the badge clears immediately and
+  // the rows are upserted behind it (ignoreDuplicates keeps re-marking a no-op).
+  const markRead = useCallback(async (commentIds: string[]) => {
+    if (!currentUserId || commentIds.length === 0) return;
+    setReadIds(prev => {
+      const next = new Set(prev);
+      commentIds.forEach(id => next.add(id));
+      return next;
+    });
+    const { error } = await supabase
+      .from('comment_reads')
+      .upsert(commentIds.map(id => ({ user_id: currentUserId, comment_id: id })), {
+        onConflict: 'user_id,comment_id',
+        ignoreDuplicates: true,
+      });
+    if (error) console.warn('[inbox] could not save read state (run supabase/comment_inbox.sql):', error.message);
+  }, [currentUserId]);
+
+  // "<item_type>:<item_id>" → display name, so an inbox entry can say which item
+  // (and which tab) a comment was left on. Trial Reel productions take their name
+  // from the source reel they recreate, exactly as the board shows them.
+  const itemTitles = useMemo(() => {
+    const m = new Map<string, string>();
+    studioVideos.forEach(v => m.set(`video:${v.id}`, v.title || 'Untitled'));
+    studioAdCreatives.forEach(a => m.set(`ad:${a.id}`, a.creative_id || 'Untitled'));
+    studioSequences.forEach(s => m.set(`sequence:${s.id}`, s.title || 'Untitled'));
+    studioSessions.forEach(s => m.set(`session:${s.id}`, s.name || 'Untitled'));
+    const sourceById = new Map(trialReelSources.map(s => [s.id, s]));
+    trialReelProductions.forEach(p => {
+      const src = p.source_id ? sourceById.get(p.source_id) : undefined;
+      m.set(`trialreel:${p.id}`, src?.description || 'Trial Reel');
+    });
+    return m;
+  }, [studioVideos, studioAdCreatives, studioSequences, studioSessions, trialReelProductions, trialReelSources]);
+
+  const inboxUnread = unreadCount(studioComments, currentUserId, readIds);
+
+  // Clicking an inbox entry routes into the SAME deep-link plumbing the Slack
+  // pings use, so the item's existing side panel opens on the right tab.
+  function openFromInbox(itemType: string, itemId: string) {
+    const target = INBOX_SOURCES[itemType]?.target;
+    if (!target) return;
+    if (target.page === 'trialreels') {
+      setMainPage('trialreels');
+      setTrialReelOpenId(itemId);
+    } else {
+      setMainPage('studio');
+      setDeepLink({ type: target.type, id: itemId });
+    }
+    setInboxOpen(false);
+  }
+
   useEffect(() => {
     checkSchema().then(result => {
       if (result.missing.length > 0 || result.postColumnsMissing.length > 0 || result.researchColumnsMissing.length > 0 || result.adColumnsMissing.length > 0 || result.sessionColumnsMissing.length > 0 || result.dropdownColsMissing) {
@@ -306,8 +381,10 @@ export default function Home() {
         collapsed={sidebarCollapsed}
         role={role}
         userName={currentName}
+        unreadCount={inboxUnread}
         onToggleCollapse={() => setSidebarCollapsed(v => !v)}
         onSelectMain={setMainPage}
+        onOpenInbox={() => setInboxOpen(true)}
         onOpenAccount={() => setAccountOpen(true)}
         onLogout={signOut}
       />
@@ -490,6 +567,20 @@ export default function Home() {
           )}
         </div>
       </div>
+
+      {/* Comment inbox (sidebar → Inbox) */}
+      {inboxOpen && (
+        <InboxPanel
+          comments={studioComments}
+          profiles={studioProfiles}
+          currentUserId={currentUserId}
+          readIds={readIds}
+          itemTitles={itemTitles}
+          onOpenItem={openFromInbox}
+          onMarkRead={markRead}
+          onClose={() => setInboxOpen(false)}
+        />
+      )}
 
       {/* First-login: force a display name before anything else is usable */}
       {needsDisplayName && <DisplayNamePrompt onSaved={loadData} />}
