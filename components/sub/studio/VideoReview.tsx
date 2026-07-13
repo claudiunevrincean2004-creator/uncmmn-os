@@ -14,6 +14,7 @@ import {
 } from '@/lib/studio';
 import { EditPillSelect, MiniSelect, UrlCell, InlineDate } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
+import DateRangePicker from './DateRangePicker';
 import QuickLinks from './QuickLinks';
 import { UserPicker, resolveAssignee, buildPipelineMentions } from './UserPicker';
 import FieldOptionsManager from './FieldOptionsManager';
@@ -311,13 +312,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                 Deadline {sortDir === 'asc' ? '↑ Oldest' : '↓ Newest'}
               </button>
             </FilterField>
-            <FilterField label="From">
-              <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-            </FilterField>
-            <FilterField label="To">
-              <input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
-            </FilterField>
-            {(dateFrom || dateTo) && <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>Clear dates</button>}
+            <FilterField label="Date"><DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
           </div>
           <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', flexShrink: 0 }} onClick={() => { setDraft(EMPTY_DRAFT); setAddOpen(true); }}>+ Add Video</button>
         </div>

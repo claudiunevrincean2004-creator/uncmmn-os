@@ -13,6 +13,7 @@ import { UserPicker, buildPipelineMentions } from './UserPicker';
 import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomRowCells, CustomFilterControls, PropertyManagerModal, AddPropertyButton } from './CustomColumns';
 import FieldOptionsManager from './FieldOptionsManager';
 import FilterField from './FilterField';
+import DateRangePicker from './DateRangePicker';
 
 type SortKey = 'date_added' | 'angle';
 const TABLE_KEY = 'ad';
@@ -346,9 +347,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
           </FilterField>
 
           {/* Date range (kept) */}
-          <FilterField label="From"><input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} /></FilterField>
-          <FilterField label="To"><input className="form-input" type="date" style={{ width: 130, padding: '4px 7px', fontSize: 11 }} value={dateTo} onChange={e => setDateTo(e.target.value)} /></FilterField>
-          {(dateFrom || dateTo) && <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>Clear dates</button>}
+          <FilterField label="Date"><DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
 
           <CustomFilterControls props={cprops} optionsByProp={optsByProp} filters={custFilters} setFilters={setCustFilters} />
         </div>

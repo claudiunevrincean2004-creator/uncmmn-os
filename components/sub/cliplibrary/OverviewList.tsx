@@ -1,9 +1,11 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { ClipSource, ClipSnippet } from '@/lib/types';
-import { DateFilter, matchesDateFilter, byDateAddedDesc } from '@/lib/clip-library';
+import { byDateAddedDesc } from '@/lib/clip-library';
+import { inDateRange } from '@/lib/studio';
 import { MaybeUrl } from '../studio/cells';
-import { DateQuickFilter, FormatFilter, distinctFormats } from './ClipFilters';
+import DateRangePicker from '../studio/DateRangePicker';
+import { FormatFilter, distinctFormats } from './ClipFilters';
 
 interface Props {
   sources: ClipSource[];
@@ -13,7 +15,8 @@ interface Props {
 
 export default function OverviewList({ sources, snippets, onDrill }: Props) {
   const [search, setSearch] = useState('');
-  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [formatFilter, setFormatFilter] = useState('');
 
   // Clip counts per source, matched by name (robust regardless of source_id links).
@@ -32,12 +35,12 @@ export default function OverviewList({ sources, snippets, onDrill }: Props) {
     const q = search.trim().toLowerCase();
     const r = sources.filter(s =>
       (!q || (s.name || '').toLowerCase().includes(q)) &&
-      matchesDateFilter(s.date_added, dateFilter) &&
+      inDateRange(s.date_added ?? undefined, dateFrom, dateTo) &&
       (!formatFilter || (s.format || '') === formatFilter),
     );
     // Newest first by date_added (undated last), then name for stable ties.
     return [...r].sort((a, b) => byDateAddedDesc(a.date_added, b.date_added) || (a.name || '').localeCompare(b.name || ''));
-  }, [sources, search, dateFilter, formatFilter]);
+  }, [sources, search, dateFrom, dateTo, formatFilter]);
 
   return (
     <div>
@@ -49,7 +52,7 @@ export default function OverviewList({ sources, snippets, onDrill }: Props) {
           placeholder="Search long-form pieces…"
           style={{ fontSize: 12, padding: '6px 10px', width: 260 }}
         />
-        <DateQuickFilter value={dateFilter} onChange={setDateFilter} />
+        <DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} />
         <FormatFilter value={formatFilter} options={formats} onChange={setFormatFilter} />
         <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{rows.length} of {sources.length} pieces</div>
       </div>

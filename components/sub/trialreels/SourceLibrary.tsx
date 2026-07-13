@@ -3,13 +3,15 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { TrialReelSource, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
-import { todayISO, formatActivityTime } from '@/lib/studio';
+import { todayISO, formatActivityTime, inDateRange } from '@/lib/studio';
 import { fn } from '@/lib/utils';
 import {
   parseSourceCSV, importSourceRows, buildQueueCandidates, fmtRatio,
   DEFAULT_RATIO_FLOOR, DEFAULT_QUEUE_COUNT,
 } from '@/lib/trial-reels';
 import { UrlCell, InlineText, MaybeUrlCell, isHttpUrl, shortUrl } from '../studio/cells';
+import DateRangePicker from '../studio/DateRangePicker';
+import FilterField from '../studio/FilterField';
 import { UserPicker, slackMentionByAssignee, resolveAssignee } from '../studio/UserPicker';
 import { DETAIL_LABEL_STYLE, DetailField, DetailLink } from './detail';
 
@@ -47,6 +49,8 @@ function NumCell({ value, onCommit, width = 78 }: { value: number | null | undef
 
 export default function SourceLibrary({ sources, profiles, onReload, showToast, onQueued }: Props) {
   const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = usePersistedState<string>('trialreel_src_from', '');
+  const [dateTo, setDateTo] = usePersistedState<string>('trialreel_src_to', '');
   const [sortKey, setSortKey] = usePersistedState<SortKey>('trialreel_sortkey', 'follows_per_1k');
   const [sortDir, setSortDir] = usePersistedState<'asc' | 'desc'>('trialreel_sortdir', 'desc');
   const [importing, setImporting] = useState(false);
@@ -241,6 +245,7 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
     const q = search.trim().toLowerCase();
     let r = sources;
     if (q) r = r.filter(s => (s.description || '').toLowerCase().includes(q) || (s.posted_url || '').toLowerCase().includes(q));
+    if (dateFrom || dateTo) r = r.filter(s => inDateRange(s.posted_date ?? undefined, dateFrom, dateTo));
     const dir = sortDir === 'asc' ? 1 : -1;
     return [...r].sort((a, b) => {
       if (sortKey === 'description') return dir * (a.description || '').localeCompare(b.description || '');
@@ -252,7 +257,7 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
       const bv = (b[sortKey] as number) ?? -Infinity;
       return dir * (av - bv);
     });
-  }, [sources, search, sortKey, sortDir]);
+  }, [sources, search, sortKey, sortDir, dateFrom, dateTo]);
 
   const arrow = (k: SortKey) => (k === sortKey ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '');
   const th = (k: SortKey, label: string, extra?: React.CSSProperties): React.ReactElement => (
@@ -271,6 +276,7 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
           placeholder="Search description or link…"
           style={{ fontSize: 12, padding: '6px 10px', width: 260 }}
         />
+        <FilterField label="Posted"><DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
         <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{sources.length} in library · {eligibleCount} eligible</div>
         <div style={{ flex: 1 }} />
         <input ref={fileRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={onFilePicked} />

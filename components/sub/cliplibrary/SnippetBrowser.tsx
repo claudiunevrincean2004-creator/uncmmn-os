@@ -1,9 +1,11 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { ClipSnippet, ClipSource } from '@/lib/types';
-import { DateFilter, matchesDateFilter, byDateAddedDesc } from '@/lib/clip-library';
+import { byDateAddedDesc } from '@/lib/clip-library';
+import { inDateRange } from '@/lib/studio';
 import { MaybeUrl } from '../studio/cells';
-import { DateQuickFilter, FormatFilter, distinctFormats } from './ClipFilters';
+import DateRangePicker from '../studio/DateRangePicker';
+import { FormatFilter, distinctFormats } from './ClipFilters';
 
 interface Props {
   snippets: ClipSnippet[];
@@ -17,7 +19,8 @@ const NO_SOURCE = '(no source)';
 export default function SnippetBrowser({ snippets, sources, focusSource, onClearFocus }: Props) {
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [formatFilter, setFormatFilter] = useState('');
 
   const q = search.trim().toLowerCase();
@@ -28,10 +31,10 @@ export default function SnippetBrowser({ snippets, sources, focusSource, onClear
   // compose with the search box (searching + "this month" narrows on both).
   const base = useMemo(
     () => snippets.filter(s =>
-      matchesDateFilter(s.date_added, dateFilter) &&
+      inDateRange(s.date_added ?? undefined, dateFrom, dateTo) &&
       (!formatFilter || (s.format || '') === formatFilter),
     ),
-    [snippets, dateFilter, formatFilter],
+    [snippets, dateFrom, dateTo, formatFilter],
   );
 
   // Flat search across ALL filtered clips, regardless of source.
@@ -119,7 +122,7 @@ export default function SnippetBrowser({ snippets, sources, focusSource, onClear
           placeholder="Search all clips — description, source, or link…"
           style={{ fontSize: 12, padding: '6px 10px', width: 300 }}
         />
-        <DateQuickFilter value={dateFilter} onChange={setDateFilter} />
+        <DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} />
         <FormatFilter value={formatFilter} options={formats} onChange={setFormatFilter} />
         {focusSource && !searching && (
           <button className="btn-ghost" style={{ fontSize: 11, padding: '6px 12px' }} onClick={onClearFocus}>← All sources</button>
@@ -131,7 +134,7 @@ export default function SnippetBrowser({ snippets, sources, focusSource, onClear
 
       {searching ? (
         flat.length === 0
-          ? <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>No clips match “{search}”{dateFilter !== 'all' || formatFilter ? ' with these filters' : ''}.</div>
+          ? <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>No clips match “{search}”{dateFrom || dateTo || formatFilter ? ' with these filters' : ''}.</div>
           : <ClipTable clips={flat} showSource />
       ) : groups.length === 0 ? (
         <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>
