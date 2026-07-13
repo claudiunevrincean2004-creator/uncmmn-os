@@ -3,6 +3,7 @@ import { useRef, useState, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Profile } from '@/lib/types';
 import { profileName } from '@/lib/profile-name';
+import Avatar from '@/components/Avatar';
 
 // Re-export so existing `./UserPicker` importers (AssigneeSettings, ItemPanel)
 // keep working off the shared helper.
@@ -55,6 +56,20 @@ export function buildPipelineMentions(assignedTo: string | undefined | null, pro
   return {
     editorMention: slackMentionByAssignee(assignedTo, profiles),
   };
+}
+
+// Avatar + name, the shared look for an assignee anywhere it's displayed (picker
+// trigger, picker rows, read-only cells). The avatar is seeded with the same
+// display name the sidebar uses, so a person keeps one color across the app.
+// No name → the neutral "Unassigned" placeholder (no colored circle).
+export function AssigneeTag({ name, size = 16 }: { name: string | null; size?: number }) {
+  if (!name) return <span style={{ color: 'var(--text-faint)' }}>Unassigned</span>;
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+      <Avatar name={name} size={size} />
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+    </span>
+  );
 }
 
 // Searchable picker backed by all real platform users. Everyone is assignable;
@@ -131,10 +146,10 @@ export function UserPicker({
         ref={btnRef}
         onClick={() => setOpen(o => !o)}
         className="btn-ghost"
-        style={{ fontSize: 11, padding: '4px 9px', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: display ? 'var(--text)' : 'var(--text-faint)' }}
+        style={{ fontSize: 11, padding: display ? '3px 9px 3px 4px' : '4px 9px', maxWidth: 150, overflow: 'hidden', whiteSpace: 'nowrap', color: display ? 'var(--text)' : 'var(--text-faint)' }}
         title={display || 'Assign a user'}
       >
-        {display || 'Unassigned'}
+        <AssigneeTag name={display} />
       </button>
 
       {open && pos && typeof document !== 'undefined' && createPortal(
@@ -166,9 +181,10 @@ export function UserPicker({
               <button
                 key={p.id}
                 className="nav-item"
-                style={{ fontWeight: 500, justifyContent: 'flex-start' }}
+                style={{ fontWeight: 500, justifyContent: 'flex-start', gap: 8 }}
                 onClick={() => pick(p.id)}
               >
+                <Avatar name={profileName(p)} size={18} />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {profileName(p)}
                   {p.email && p.display_name && <span style={{ color: 'var(--text-faint)', marginLeft: 6 }}>{p.email}</span>}

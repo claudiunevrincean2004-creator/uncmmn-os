@@ -6,7 +6,7 @@ import { usePersistedState } from '@/lib/use-persisted-state';
 import { logActivity } from '@/lib/studio';
 import { TRIAL_REEL_STATUSES, TRIAL_REEL_STATUS_COLORS, TRIAL_REEL_NOTIFY_STATUSES, TRIAL_REEL_REVISIONS_STATUS } from '@/lib/trial-reels';
 import { EditPillSelect, UrlCell, MaybeUrlCell, InlineText, MiniSelect } from '../studio/cells';
-import { UserPicker, resolveAssignee, slackMentionByAssignee } from '../studio/UserPicker';
+import { UserPicker, AssigneeTag, resolveAssignee, slackMentionByAssignee } from '../studio/UserPicker';
 import FilterField from '../studio/FilterField';
 import ItemPanel, { FieldDef } from '../studio/ItemPanel';
 
@@ -241,7 +241,7 @@ export default function ProductionBoard({ productions, sources, comments, activi
                       <td>
                         {isAdmin
                           ? <UserPicker value={p.assigned_to_user_id ?? undefined} profiles={profiles} onChange={uid => patch(p.id, { assigned_to_user_id: uid || null })} />
-                          : <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{resolveAssignee(p.assigned_to_user_id, profiles) || 'Unassigned'}</span>}
+                          : <span style={{ fontSize: 11, color: 'var(--text-dim)' }}><AssigneeTag name={resolveAssignee(p.assigned_to_user_id, profiles)} /></span>}
                       </td>
                       <td><EditPillSelect field="trialreel_status" value={p.status} options={TRIAL_REEL_STATUSES} colors={TRIAL_REEL_STATUS_COLORS} onChange={s => changeStatus(p, s)} allowAdd={false} /></td>
                       {/* Reference fields → SOURCE (fixing a link here corrects the library too). */}
