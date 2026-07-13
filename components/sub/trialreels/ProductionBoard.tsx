@@ -196,13 +196,19 @@ export default function ProductionBoard({ productions, sources, comments, activi
             <table className="data-table">
               <thead>
                 <tr>
-                  <th style={{ minWidth: 220 }}>Description</th>
+                  <th style={{ minWidth: 200 }}>Description</th>
                   <th>Assigned To</th>
                   <th>Status</th>
                   <th>Clip Brief</th>
-                  <th>Snippet</th>
                   <th>Original Reel</th>
+                  <th>Original Edit</th>
+                  <th>Full Version File</th>
+                  <th>Timestamp</th>
+                  <th>Snippet</th>
                   <th>Recreated Reel Final</th>
+                  <th style={{ textAlign: 'right' }}>Views</th>
+                  <th style={{ textAlign: 'right' }}>Follows</th>
+                  <th style={{ textAlign: 'right' }}>Follows/1k</th>
                   <th>Open</th>
                   {isAdmin && <th></th>}
                 </tr>
@@ -213,7 +219,7 @@ export default function ProductionBoard({ productions, sources, comments, activi
                   const desc = src?.description || '(source removed)';
                   return (
                     <tr key={p.id} style={selectedId === p.id ? { background: 'var(--surface-2)' } : undefined}>
-                      <td style={{ minWidth: 220 }}>
+                      <td style={{ minWidth: 200 }}>
                         <button onClick={() => setSelectedId(p.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{desc}</button>
                       </td>
                       <td>
@@ -223,9 +229,15 @@ export default function ProductionBoard({ productions, sources, comments, activi
                       </td>
                       <td><EditPillSelect field="trialreel_status" value={p.status} options={TRIAL_REEL_STATUSES} colors={TRIAL_REEL_STATUS_COLORS} onChange={s => changeStatus(p, s)} allowAdd={false} /></td>
                       <td>{src ? <UrlCell value={src.clip_brief ?? undefined} onCommit={u => patchSource(src.id, { clip_brief: u || null })} /> : <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>—</span>}</td>
-                      <td><TruncLink value={src?.snippet_download_link} /></td>
                       <td><TruncLink value={src?.posted_url} /></td>
+                      <td><TruncLink value={src?.final_product} /></td>
+                      <td><TruncLink value={src?.full_version_file} /></td>
+                      <td><span style={{ fontSize: 11, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{src?.timestamp || '—'}</span></td>
+                      <td><TruncLink value={src?.snippet_download_link} /></td>
                       <td><UrlCell value={p.final_url ?? undefined} onCommit={u => patch(p.id, { final_url: u || null })} /></td>
+                      <td style={{ textAlign: 'right' }}><span style={{ fontSize: 11, color: 'var(--text-dim)' }} title={String(src?.views ?? '')}>{src?.views != null ? fn(src.views) : '—'}</span></td>
+                      <td style={{ textAlign: 'right' }}><span style={{ fontSize: 11, color: 'var(--text-dim)' }} title={String(src?.follows ?? '')}>{src?.follows != null ? fn(src.follows) : '—'}</span></td>
+                      <td style={{ textAlign: 'right' }}><span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{fmtRatio(src?.follows_per_1k)}</span></td>
                       <td>
                         <a href={reelUrl(p.id)} style={{ color: 'var(--text-faint)', fontSize: 12, textDecoration: 'none' }} title="Open this reel's detail (deep link)">↗ OS</a>
                       </td>
