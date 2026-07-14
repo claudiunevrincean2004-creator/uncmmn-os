@@ -15,10 +15,12 @@ type SubTab = 'overview' | 'snippets';
 interface Props {
   sources: ClipSource[];
   snippets: ClipSnippet[];
+  openItemId?: string;
+  onDeepLinkConsumed?: () => void;
   onReload: () => void;
 }
 
-export default function ClipLibraryTab({ sources, snippets, onReload }: Props) {
+export default function ClipLibraryTab({ sources, snippets, openItemId, onDeepLinkConsumed, onReload }: Props) {
   const [sub, setSub] = usePersistedState<SubTab>('cliplib_subtab', 'overview');
   const [focusSource, setFocusSource] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -45,6 +47,15 @@ export default function ClipLibraryTab({ sources, snippets, onReload }: Props) {
       { label: 'Linked to a source', value: String(linked), color: 'var(--text)' },
     ];
   }, [sources, snippets]);
+
+  // A clip deep link ("/clip/<id>") lands on the Clips sub-tab with no source
+  // drilled in, so the linked clip is reachable whichever view was last used;
+  // SnippetBrowser then expands its group and highlights the row.
+  useEffect(() => {
+    if (!openItemId) return;
+    setSub('snippets');
+    setFocusSource(null);
+  }, [openItemId, setSub]);
 
   function drill(sourceName: string) {
     setFocusSource(sourceName);
@@ -155,7 +166,16 @@ export default function ClipLibraryTab({ sources, snippets, onReload }: Props) {
       </div>
 
       {sub === 'overview' && <OverviewList sources={sources} snippets={snippets} onDrill={drill} />}
-      {sub === 'snippets' && <SnippetBrowser snippets={snippets} sources={sources} focusSource={focusSource} onClearFocus={() => setFocusSource(null)} />}
+      {sub === 'snippets' && (
+        <SnippetBrowser
+          snippets={snippets}
+          sources={sources}
+          focusSource={focusSource}
+          onClearFocus={() => setFocusSource(null)}
+          openItemId={openItemId}
+          onOpened={onDeepLinkConsumed}
+        />
+      )}
 
       {clearOpen && (
         <div className="modal-overlay" onClick={() => !clearing && setClearOpen(false)}>

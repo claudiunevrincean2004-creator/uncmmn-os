@@ -14,6 +14,8 @@ import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomR
 import FieldOptionsManager from './FieldOptionsManager';
 import FilterField from './FilterField';
 import DateRangePicker from './DateRangePicker';
+import CopyLinkButton from '@/components/CopyLinkButton';
+import { itemUrl } from '@/lib/item-link';
 
 const TABLE_KEY = 'session';
 
@@ -116,13 +118,13 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
     }
     onReload();
 
-    const itemUrl = typeof window !== 'undefined' ? `${window.location.origin}/studio/filming/${id}` : '';
+    const link = itemUrl('filming', id);
     // Prefer a value included in this same patch, else the current row value.
     if (!error && becomingReadyToFilm) {
       notifyFilming({
         status: 'Ready to Film',
         id,
-        itemUrl,
+        itemUrl: link,
         scriptUrl: (p.script_url ?? prev?.script_url) ?? '',
       });
     }
@@ -131,7 +133,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
         status: 'Filmed',
         id,
         name: prev?.name ?? '',
-        itemUrl,
+        itemUrl: link,
         type: (p.type ?? prev?.type) ?? '',
         footageLink: (p.footage_link ?? prev?.footage_link) ?? '',
       });
@@ -281,7 +283,10 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                     <Fragment key={s.id}>
                       <tr style={{ ...(isPast ? { opacity: 0.6 } : undefined), ...(selectedId === s.id ? { background: 'var(--surface-2)' } : undefined) }}>
                         <td style={{ minWidth: 180 }}>
-                          <button onClick={() => setSelectedId(s.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{s.name}</button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <button onClick={() => setSelectedId(s.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{s.name}</button>
+                            <CopyLinkButton type="filming" id={s.id} />
+                          </div>
                         </td>
                         <td><EditPillSelect field="session_type" value={s.type || ''} options={typeValues} colors={typeColors} onChange={t => patch(s.id, { type: t })} onAddOption={addOption} allowAdd={isAdmin} /></td>
                         <td><UrlCell value={s.script_url} onCommit={u => patch(s.id, { script_url: u })} /></td>
@@ -315,6 +320,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
       {selected && (
         <ItemPanel
           itemType="session"
+          linkType="filming"
           itemId={selected.id}
           title={selected.name}
           fields={fields}

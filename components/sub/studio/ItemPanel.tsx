@@ -10,6 +10,8 @@ import Avatar from '@/components/Avatar';
 import MentionTextarea from '@/components/MentionTextarea';
 import CommentText from '@/components/CommentText';
 import { parseMentions } from '@/lib/mentions';
+import CopyLinkButton from '@/components/CopyLinkButton';
+import { ItemType } from '@/lib/item-link';
 
 export interface FieldDef {
   key: string;
@@ -25,7 +27,11 @@ export interface FieldDef {
 }
 
 interface Props {
+  // The comments/activity key for this row (studio_comments.item_type) — note
+  // this is NOT the deep-link route type: Filming Sessions file their comments
+  // under "session" but link at /studio/filming/<id>. Hence linkType, separately.
   itemType: string;
+  linkType: ItemType;
   itemId: string;
   title: string;
   fields: FieldDef[];
@@ -98,7 +104,7 @@ function FieldControl({ field, values, onChangeField, onAddOption, profiles }: {
   }
 }
 
-export default function ItemPanel({ itemType, itemId, title, fields, values, onChangeField, onAddOption, comments, activity, profiles = [], isAdmin = false, onReload, onClose }: Props) {
+export default function ItemPanel({ itemType, linkType, itemId, title, fields, values, onChangeField, onAddOption, comments, activity, profiles = [], isAdmin = false, onReload, onClose }: Props) {
   const [newComment, setNewComment] = useState('');
   const [saving, setSaving] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -229,13 +235,16 @@ export default function ItemPanel({ itemType, itemId, title, fields, values, onC
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 18 }}>
         <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.3, wordBreak: 'break-word' }}>{title || 'Untitled'}</div>
-        <button
-          onClick={onClose}
-          style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0, flexShrink: 0 }}
-          onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)'; }}
-          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; }}
-          title="Close"
-        >✕</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, paddingTop: 1 }}>
+          <CopyLinkButton type={linkType} id={itemId} variant="panel" />
+          <button
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0, flexShrink: 0 }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; }}
+            title="Close"
+          >✕</button>
+        </div>
       </div>
 
       {/* Properties */}

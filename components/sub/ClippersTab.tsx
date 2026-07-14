@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Profile, ClipperAccount, ClipperContent } from '@/lib/types';
 import { profileName } from '@/lib/profile-name';
@@ -9,6 +9,7 @@ import SortControl from '@/components/sub/studio/SortControl';
 import { SortOption, SortDir, sortRows } from '@/lib/sort';
 import PlatformIcon from '@/components/PlatformIcon';
 import ViewsOverTime from '@/components/ViewsOverTime';
+import CopyLinkButton from '@/components/CopyLinkButton';
 
 const PLATFORMS = ['tiktok', 'instagram', 'youtube'];
 const PLATFORM_LABELS: Record<string, string> = { tiktok: 'TikTok', instagram: 'Instagram', youtube: 'YouTube' };
@@ -41,14 +42,25 @@ interface Props {
   profiles: Profile[];
   accounts: ClipperAccount[];
   content: ClipperContent[];
+  openItemId?: string;
+  onDeepLinkConsumed?: () => void;
   onReload: () => void;
 }
 
-export default function ClippersTab({ profiles, accounts, content, onReload }: Props) {
+export default function ClippersTab({ profiles, accounts, content, openItemId, onDeepLinkConsumed, onReload }: Props) {
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<string>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+  // A clipper deep link ("/clipper/<id>") opens that clipper's dashboard — the
+  // detail view this tab has in place of a side panel. onDeepLinkConsumed spends
+  // the one-shot link so navigating back to the grid later stays on the grid.
+  useEffect(() => {
+    if (!openItemId) return;
+    setSelectedId(openItemId);
+    onDeepLinkConsumed?.();
+  }, [openItemId, onDeepLinkConsumed]);
 
   // Status is Active → Inactive (the clipper lifecycle), not alphabetical — same
   // 'order' rule the pipeline statuses use elsewhere.
@@ -148,10 +160,21 @@ export default function ClippersTab({ profiles, accounts, content, onReload }: P
             const cardPlatforms = Array.from(new Set(accs.map(a => (a.platform || '').toLowerCase()).filter(Boolean))).map(capPlatform);
             const active = isActive(c.clipper_status);
             return (
-              <button
+              // A div, not a button: the card carries its own "Copy link" button and
+              // a button can't nest inside a button. Keyboard behaviour is kept by
+              // hand (Enter/Space open the clipper, same as a click).
+              <div
                 key={c.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => setSelectedId(c.id)}
-                className="metric-chip"
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSelectedId(c.id);
+                  }
+                }}
+                className="metric-chip hover-card"
                 style={{ textAlign: 'left', cursor: 'pointer', border: '0.5px solid var(--border)', background: 'var(--surface)', display: 'flex', flexDirection: 'column', gap: 10, padding: 14 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -160,6 +183,7 @@ export default function ClippersTab({ profiles, accounts, content, onReload }: P
                     <div style={{ fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profileName(c)}</div>
                     {c.email && <div style={{ fontSize: 10, color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.email}</div>}
                   </div>
+                  <CopyLinkButton type="clipper" id={c.id} />
                   <span className="badge" style={{ fontSize: 9, ...(active ? { background: 'rgba(16,185,129,0.15)', color: '#10b981' } : { background: 'rgba(107,114,128,0.18)', color: 'var(--text-faint)' }) }}>
                     {active ? 'Active' : 'Inactive'}
                   </span>
@@ -173,7 +197,7 @@ export default function ClippersTab({ profiles, accounts, content, onReload }: P
                     Joined {fmtDate(c.joined_at || c.created_at)}
                   </div>
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>

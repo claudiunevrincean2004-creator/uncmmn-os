@@ -11,6 +11,8 @@ import FilterField from '../studio/FilterField';
 import ItemPanel, { FieldDef } from '../studio/ItemPanel';
 import SortControl from '../studio/SortControl';
 import { SortOption, SortDir, sortRows } from '@/lib/sort';
+import CopyLinkButton from '@/components/CopyLinkButton';
+import { itemUrl } from '@/lib/item-link';
 
 interface Props {
   productions: TrialReelProduction[];
@@ -50,11 +52,6 @@ export default function ProductionBoard({ productions, sources, comments, activi
     () => (isAdmin ? productions : productions.filter(p => p.assigned_to_user_id && p.assigned_to_user_id === currentUserId)),
     [productions, isAdmin, currentUserId],
   );
-
-  // Absolute deep link to a reel's detail — same shape the Slack pings use.
-  function reelUrl(id: string): string {
-    return typeof window !== 'undefined' ? `${window.location.origin}/trialreel/${id}` : '';
-  }
 
   function notifyInReview(payload: { itemUrl: string; description: string; sourceUrl: string }) {
     fetch('/api/trialreels-notify', {
@@ -120,13 +117,13 @@ export default function ProductionBoard({ productions, sources, comments, activi
     const src = row.source_id ? sourceById.get(row.source_id) : undefined;
     // Fire the reviewer ping only on the In Review transition (single status path).
     if (TRIAL_REEL_NOTIFY_STATUSES.includes(status)) {
-      notifyInReview({ itemUrl: reelUrl(row.id), description: src?.description || '', sourceUrl: src?.posted_url || '' });
+      notifyInReview({ itemUrl: itemUrl('trialreel', row.id), description: src?.description || '', sourceUrl: src?.posted_url || '' });
     }
     // Revisions Needed → ping the assigned editor for this reel.
     if (status === TRIAL_REEL_REVISIONS_STATUS) {
       notifyRevisions({
         editorMention: slackMentionByAssignee(row.assigned_to_user_id, profiles),
-        itemUrl: reelUrl(row.id),
+        itemUrl: itemUrl('trialreel', row.id),
         description: src?.description || '',
         sourceUrl: src?.posted_url || '',
       });
@@ -253,7 +250,10 @@ export default function ProductionBoard({ productions, sources, comments, activi
                   return (
                     <tr key={p.id} style={selectedId === p.id ? { background: 'var(--surface-2)' } : undefined}>
                       <td style={{ minWidth: 200 }}>
-                        <button onClick={() => setSelectedId(p.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{desc}</button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <button onClick={() => setSelectedId(p.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{desc}</button>
+                            <CopyLinkButton type="trialreel" id={p.id} />
+                          </div>
                       </td>
                       <td>
                         {isAdmin
@@ -282,6 +282,7 @@ export default function ProductionBoard({ productions, sources, comments, activi
       {selected && (
         <ItemPanel
           itemType="trialreel"
+          linkType="trialreel"
           itemId={selected.id}
           title={selectedSource?.description || 'Trial Reel'}
           fields={fields}

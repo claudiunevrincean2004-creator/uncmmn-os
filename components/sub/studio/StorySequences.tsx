@@ -17,6 +17,8 @@ import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomR
 import FieldOptionsManager from './FieldOptionsManager';
 import FilterField from './FilterField';
 import DateRangePicker from './DateRangePicker';
+import CopyLinkButton from '@/components/CopyLinkButton';
+import { itemUrl } from '@/lib/item-link';
 
 const DONE = ['Posted'];
 const TABLE_KEY = 'sequence';
@@ -110,7 +112,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
       notifyStatus({
         status: becoming,
         name: prev?.title ?? '',
-        itemUrl: typeof window !== 'undefined' ? `${window.location.origin}/studio/story/${id}` : '',
+        itemUrl: itemUrl('story', id),
         // Prefer a value included in this same patch, else the current row value.
         finalUrl: (p.final_url ?? prev?.final_url) ?? '',
       });
@@ -240,7 +242,10 @@ export default function StorySequences({ sequences, comments, activity, dropdown
                     <Fragment key={s.id}>
                       <tr style={overdue ? { background: 'rgba(239,68,68,0.06)', boxShadow: 'inset 3px 0 0 #ef4444' } : (selectedId === s.id ? { background: 'var(--surface-2)' } : undefined)}>
                         <td style={{ minWidth: 200 }}>
-                          <button onClick={() => setSelectedId(s.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{s.title}</button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <button onClick={() => setSelectedId(s.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{s.title}</button>
+                            <CopyLinkButton type="story" id={s.id} />
+                          </div>
                         </td>
                         <td><EditPillSelect field="sequence_status" value={s.status} options={statusValues} colors={statusColors} onChange={st => changeStatus(s, st)} onAddOption={addOption} allowAdd={isAdmin} /></td>
                         <td><UrlCell value={s.final_url} onCommit={u => patch(s.id, { final_url: u })} /></td>
@@ -267,6 +272,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
       {selected && (
         <ItemPanel
           itemType="sequence"
+          linkType="story"
           itemId={selected.id}
           title={selected.title}
           fields={fields}

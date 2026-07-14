@@ -106,6 +106,11 @@ export default function Home() {
   // Trial Reels deep link: a production row id ("/?item=trialreel:<id>") opens the
   // Trial Reels tab → Production Board with that reel's detail panel.
   const [trialReelOpenId, setTrialReelOpenId] = useState<string | undefined>(undefined);
+  // Clip Library / Clippers deep links ("/?item=clip:<id>", "/?item=clipper:<id>").
+  // Neither tab has a side panel: a clip link expands its source group and
+  // highlights the row; a clipper link opens that clipper's dashboard.
+  const [clipOpenId, setClipOpenId] = useState<string | undefined>(undefined);
+  const [clipperOpenId, setClipperOpenId] = useState<string | undefined>(undefined);
 
   // Parse a deep-link item param once on mount, route to the right tab, then strip
   // it from the URL so a refresh doesn't re-trigger it. Also supports "?view=<tab>"
@@ -126,6 +131,14 @@ export default function Home() {
     if (type === 'trialreel' && id) {
       setMainPage('trialreels');
       setTrialReelOpenId(id);
+      window.history.replaceState(null, '', window.location.pathname);
+    } else if (type === 'clip' && id) {
+      setMainPage('cliplibrary');
+      setClipOpenId(id);
+      window.history.replaceState(null, '', window.location.pathname);
+    } else if (type === 'clipper' && id) {
+      setMainPage('clippers');
+      setClipperOpenId(id);
       window.history.replaceState(null, '', window.location.pathname);
     } else if ((type === 'video' || type === 'ad' || type === 'story' || type === 'filming') && id) {
       setMainPage('studio');
@@ -551,6 +564,8 @@ export default function Home() {
               <ClipLibraryTab
                 sources={clipSources}
                 snippets={clipSnippets}
+                openItemId={clipOpenId}
+                onDeepLinkConsumed={() => setClipOpenId(undefined)}
                 onReload={loadData}
               />
             </div>
@@ -561,6 +576,8 @@ export default function Home() {
                 profiles={studioProfiles}
                 accounts={clipperAccounts}
                 content={clipperContent}
+                openItemId={clipperOpenId}
+                onDeepLinkConsumed={() => setClipperOpenId(undefined)}
                 onReload={loadData}
               />
             </div>

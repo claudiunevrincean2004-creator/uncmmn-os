@@ -229,6 +229,19 @@ html, body {
   background: var(--surface-2);
 }
 
+/* Row-level "Copy link" affordance: out of the way until you hover the row (or
+   tab to it), so it never competes with the row's own content. Also used by the
+   Clippers card grid, which hovers via .hover-card. */
+.row-copy {
+  opacity: 0;
+}
+
+.data-table tr:hover .row-copy,
+.hover-card:hover .row-copy,
+.row-copy:focus-visible {
+  opacity: 1;
+}
+
 /* Modal overlay */
 .modal-overlay {
   position: fixed;

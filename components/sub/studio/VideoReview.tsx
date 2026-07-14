@@ -20,6 +20,8 @@ import DateRangePicker from './DateRangePicker';
 import QuickLinks from './QuickLinks';
 import { UserPicker, resolveAssignee, buildPipelineMentions } from './UserPicker';
 import FieldOptionsManager from './FieldOptionsManager';
+import CopyLinkButton from '@/components/CopyLinkButton';
+import { itemUrl } from '@/lib/item-link';
 
 const DONE = ['Posted'];
 
@@ -129,7 +131,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
       notifyVideo({
         status,
         title: v.title || '',
-        itemUrl: videoUrl(v.id),
+        itemUrl: itemUrl('video', v.id),
         briefLink: v.brief_url || '',
         rawFilesLink: v.raw_files_url || '',
         finalLink: v.final_url || '',
@@ -138,12 +140,6 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
       });
     }
     await patch(v.id, p);
-  }
-
-  // Absolute URL to a video's own page (deep link into the side panel). Empty when
-  // there's no window (SSR) — the server then falls back to a plain bold title.
-  function videoUrl(id: string): string {
-    return typeof window !== 'undefined' ? `${window.location.origin}/studio/video/${id}` : '';
   }
 
   // Fire-and-forget POST to the #main-ig-updates notify route (server holds the
@@ -193,7 +189,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
       alert(`Couldn't create ad creative: ${error.message}`);
       return;
     }
-    const adUrl = created?.id && typeof window !== 'undefined' ? `${window.location.origin}/studio/ad-creative/${created.id}` : '';
+    const adUrl = created?.id ? itemUrl('ad', created.id) : '';
     notifyAdPipeline({ status: 'Ad Creative Needed', creativeId, itemUrl: adUrl, sourceLink, finalLink: '', ...mentions });
     showToast(`Ad creative created for ${creativeId} → assigned to ${editorName || 'unassigned'}`);
     onReload();
@@ -227,7 +223,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
       notifyVideo({
         status: row.status,
         title: row.title,
-        itemUrl: created?.id ? videoUrl(created.id) : '',
+        itemUrl: created?.id ? itemUrl('video', created.id) : '',
         briefLink: row.brief_url ?? '',
         rawFilesLink: row.raw_files_url ?? '',
         finalLink: row.final_url ?? '',
@@ -351,7 +347,10 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                     <Fragment key={v.id}>
                       <tr style={overdue ? { background: 'rgba(239,68,68,0.06)', boxShadow: 'inset 3px 0 0 #ef4444' } : (selectedId === v.id ? { background: 'var(--surface-2)' } : undefined)}>
                         <td style={{ minWidth: 180 }}>
-                          <button onClick={() => setSelectedId(v.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{v.title}</button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <button onClick={() => setSelectedId(v.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{v.title}</button>
+                            <CopyLinkButton type="video" id={v.id} />
+                          </div>
                         </td>
                         <td><EditPillSelect field="video_format" value={v.format || ''} options={formatValues} colors={formatColors} onChange={f => patch(v.id, { format: f })} onAddOption={addOption} allowAdd={isAdmin} allowEmpty /></td>
                         <td><UserPicker value={v.assigned_to_user_id ?? undefined} profiles={profiles} onChange={uid => patch(v.id, { assigned_to_user_id: uid || null })} /></td>
@@ -398,6 +397,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
       {selected && (
         <ItemPanel
           itemType="video"
+          linkType="video"
           itemId={selected.id}
           title={selected.title}
           fields={fields}

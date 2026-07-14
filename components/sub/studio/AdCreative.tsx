@@ -16,6 +16,8 @@ import { sortProps, groupOptions, applyCustomFilters, CustomHeaderCells, CustomR
 import FieldOptionsManager from './FieldOptionsManager';
 import FilterField from './FilterField';
 import DateRangePicker from './DateRangePicker';
+import CopyLinkButton from '@/components/CopyLinkButton';
+import { itemUrl } from '@/lib/item-link';
 
 const TABLE_KEY = 'ad';
 
@@ -136,7 +138,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
       notifyAdPipeline({
         status: becoming,
         creativeId: prev?.creative_id ?? '',
-        itemUrl: adUrl(id),
+        itemUrl: itemUrl('ad', id),
         sourceLink: (p.source_video_url ?? prev?.source_video_url) ?? '',
         finalLink: (p.final_link ?? prev?.final_link) ?? '',
         ...buildPipelineMentions((p.assigned_to_user_id ?? prev?.assigned_to_user_id) ?? null, profiles),
@@ -149,12 +151,6 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
     await logActivity('ad', a.id, 'Status changed', a.status, status);
     // patch() detects the transition into a notify status and fires the Slack ping.
     await patch(a.id, { status });
-  }
-
-  // Absolute URL to an ad creative's own page (deep link into the side panel).
-  // Empty when there's no window (SSR) — the server falls back to a plain bold id.
-  function adUrl(id: string): string {
-    return typeof window !== 'undefined' ? `${window.location.origin}/studio/ad-creative/${id}` : '';
   }
 
   // Fire-and-forget POST to the #ad-creative-pipeline notify route, which holds
@@ -195,7 +191,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
       notifyAdPipeline({
         status,
         creativeId: row.creative_id,
-        itemUrl: created?.id ? adUrl(created.id) : '',
+        itemUrl: created?.id ? itemUrl('ad', created.id) : '',
         sourceLink: '',
         finalLink: row.final_link ?? '',
         ...buildPipelineMentions(row.assigned_to_user_id, profiles),
@@ -372,7 +368,10 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                   <Fragment key={a.id}>
                     <tr style={selectedId === a.id ? { background: 'var(--surface-2)' } : undefined}>
                       <td style={{ minWidth: 160 }}>
-                        <button onClick={() => setSelectedId(a.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{a.creative_id || 'Untitled'}</button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <button onClick={() => setSelectedId(a.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{a.creative_id || 'Untitled'}</button>
+                            <CopyLinkButton type="ad" id={a.id} />
+                          </div>
                       </td>
                       <td><InlineDate value={a.date_added} onCommit={d => patch(a.id, { date_added: d || undefined })} /></td>
                       <td><EditPillSelect field="ad_format" value={a.ad_format || ''} options={formatValues} colors={formatColors} onChange={f => patch(a.id, { ad_format: f })} onAddOption={addOption} allowAdd={isAdmin} allowEmpty /></td>
@@ -400,6 +399,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
       {selected && (
         <ItemPanel
           itemType="ad"
+          linkType="ad"
           itemId={selected.id}
           title={selected.creative_id || 'Ad Creative'}
           fields={fields}

@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ClipSnippet, ClipSource } from '@/lib/types';
 import { inDateRange } from '@/lib/studio';
 import { SortOption, SortDir, sortRows } from '@/lib/sort';
@@ -7,17 +7,20 @@ import { MaybeUrl } from '../studio/cells';
 import DateRangePicker from '../studio/DateRangePicker';
 import SortControl from '../studio/SortControl';
 import { FormatFilter, distinctFormats } from './ClipFilters';
+import CopyLinkButton from '@/components/CopyLinkButton';
 
 interface Props {
   snippets: ClipSnippet[];
   sources: ClipSource[];
   focusSource: string | null;      // drilled-in from the Overview view
   onClearFocus: () => void;
+  openItemId?: string;             // clip deep link ("/clip/<id>")
+  onOpened?: () => void;
 }
 
 const NO_SOURCE = '(no source)';
 
-export default function SnippetBrowser({ snippets, sources, focusSource, onClearFocus }: Props) {
+export default function SnippetBrowser({ snippets, sources, focusSource, onClearFocus, openItemId, onOpened }: Props) {
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [dateFrom, setDateFrom] = useState('');
@@ -25,6 +28,33 @@ export default function SnippetBrowser({ snippets, sources, focusSource, onClear
   const [formatFilter, setFormatFilter] = useState('');
   const [sortKey, setSortKey] = useState<string>('date_added');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  // Clips have no side panel, so a deep link "opens" one by revealing it: the
+  // row is highlighted until the next link, and scrolled into view below.
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const highlightRef = useRef<HTMLTableRowElement>(null);
+
+  // Arriving via a clip deep link: clear the filters (any of which could hide the
+  // clip), expand its source group, and mark it. onOpened tells the parent the
+  // one-shot link is spent, so returning to this tab later doesn't re-highlight.
+  useEffect(() => {
+    if (!openItemId) return;
+    const clip = snippets.find(s => s.id === openItemId);
+    if (clip) {
+      setSearch('');
+      setDateFrom('');
+      setDateTo('');
+      setFormatFilter('');
+      setExpanded(prev => new Set(prev).add(clip.source_name || NO_SOURCE));
+      setHighlightId(clip.id);
+    }
+    onOpened?.();
+  }, [openItemId, snippets, onOpened]);
+
+  // Scroll the linked row into view once it's actually rendered (it only exists
+  // after the group above expands).
+  useEffect(() => {
+    if (highlightId) highlightRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [highlightId, expanded]);
 
   // Clips have no pipeline status, so every option here is a plain date/text sort.
   const sortOptions: SortOption<ClipSnippet>[] = useMemo(() => [
@@ -115,9 +145,18 @@ export default function SnippetBrowser({ snippets, sources, focusSource, onClear
         </thead>
         <tbody>
           {clips.map(c => (
-            <tr key={c.id}>
+            <tr
+              key={c.id}
+              ref={c.id === highlightId ? highlightRef : undefined}
+              style={c.id === highlightId ? { background: 'var(--accent-soft)', boxShadow: 'inset 3px 0 0 var(--accent)' } : undefined}
+            >
               {showSource && <td style={{ minWidth: 180, fontSize: 11, color: 'var(--text-dim)' }}>{c.source_name || '—'}</td>}
-              <td style={{ minWidth: 240 }}><span style={{ fontSize: 12 }} title={c.description || ''}>{c.description || '—'}</span></td>
+              <td style={{ minWidth: 240 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontSize: 12, flex: 1, minWidth: 0 }} title={c.description || ''}>{c.description || '—'}</span>
+                  <CopyLinkButton type="clip" id={c.id} />
+                </div>
+              </td>
               <td><span style={{ fontSize: 11, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{c.date_added ? c.date_added.slice(0, 10) : '—'}</span></td>
               <td><span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{c.format || '—'}</span></td>
               <td><span style={{ fontSize: 11, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{c.timestamp || '—'}</span></td>
