@@ -10,6 +10,31 @@ interface Props {
   variant?: 'row' | 'panel';
 }
 
+// Thin-stroke chain link — the geometry of lucide's <Link2 /> (MIT), inlined
+// because this is the only icon we need and the project carries no icon library.
+// Strokes with currentColor so the button's hover colour drives it.
+function LinkIcon({ size }: { size: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable="false"
+      style={{ display: 'block' }}
+    >
+      <path d="M9 17H7A5 5 0 0 1 7 7h2" />
+      <path d="M15 7h2a5 5 0 1 1 0 10h-2" />
+      <line x1="8" x2="16" y1="12" y2="12" />
+    </svg>
+  );
+}
+
 // "Copy link" — puts the item's deep link (the same URL Slack's "Open in OS"
 // points at) on the clipboard and confirms with a toast.
 //
@@ -32,6 +57,7 @@ export default function CopyLinkButton({ type, id, variant = 'row' }: Props) {
   }
 
   const isPanel = variant === 'panel';
+  const size = isPanel ? 15 : 13;
   return (
     <>
       <button
@@ -44,17 +70,20 @@ export default function CopyLinkButton({ type, id, variant = 'row' }: Props) {
           border: 'none',
           padding: isPanel ? 2 : '2px 4px',
           cursor: 'pointer',
-          fontSize: isPanel ? 14 : 11,
+          display: 'flex',
+          alignItems: 'center',
           lineHeight: 1,
           flexShrink: 0,
+          // Muted by default, full-contrast on hover — the same treatment as the
+          // panel's ✕. The icon strokes with currentColor, so it follows along.
           color: 'var(--text-faint)',
-          filter: 'grayscale(1)',
-          opacity: isPanel ? 0.75 : undefined,
-          transition: 'opacity 0.12s ease, filter 0.12s ease',
+          transition: 'color 0.12s ease, opacity 0.12s ease',
         }}
-        onMouseEnter={e => { e.currentTarget.style.filter = 'none'; e.currentTarget.style.opacity = '1'; }}
-        onMouseLeave={e => { e.currentTarget.style.filter = 'grayscale(1)'; if (isPanel) e.currentTarget.style.opacity = '0.75'; }}
-      >🔗</button>
+        onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)'; }}
+        onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; }}
+      >
+        <LinkIcon size={size} />
+      </button>
 
       {toast && (
         <div style={{ position: 'fixed', bottom: 24, right: 24, background: 'var(--surface)', border: '0.5px solid #ec4899', borderRadius: 8, padding: '10px 16px', fontSize: 12, color: 'var(--text)', boxShadow: '0 8px 24px rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', gap: 8, animation: 'slideInRight 0.2s ease' }}>
