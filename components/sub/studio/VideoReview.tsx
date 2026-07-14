@@ -295,6 +295,10 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
     { key: 'brief_url', label: 'Brief', type: 'url' },
     { key: 'raw_files_url', label: 'Raw Files', type: 'url' },
     { key: 'final_url', label: 'Final Product', type: 'url' },
+    // The TikTok cut has a different CTA from the Instagram one above. Panel-only
+    // by design — the main table keeps a single "Final" column — and deliberately
+    // outside the status flow, so it never feeds a ping.
+    { key: 'tiktok_final_url', label: 'TikTok Final', type: 'url' },
     { key: 'deadline', label: 'Deadline', type: 'date' },
     { key: 'revision_count', label: 'Revisions', type: 'readonly' },
   ], [formatValues, formatColors, statusValues, statusColors, priorityOpts, isAdmin]);

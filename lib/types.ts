@@ -124,7 +124,8 @@ export interface StudioVideo {
   priority: string;
   brief_url?: string;
   raw_files_url?: string;
-  final_url?: string;
+  final_url?: string;                // the Instagram cut (also the main-table column)
+  tiktok_final_url?: string;         // the TikTok cut — different CTA; side panel only
   deadline?: string;
   notes?: string;
   revision_count: number;
