@@ -148,7 +148,10 @@ export default function InboxPanel({
                       <span style={{ fontSize: 10, color: 'var(--text-faint)', flexShrink: 0 }}>{formatActivityTime(c.created_at)}</span>
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.4, marginBottom: 6, wordBreak: 'break-word' }}>
-                      <CommentText text={c.text} profiles={profiles} currentUserId={currentUserId} clamp={140} />
+                      {/* links={false}: the whole row is a <button> that opens the item, so an
+                          anchor here would be invalid nesting and a rival click target. The URL
+                          is clickable in the panel this row opens. */}
+                      <CommentText text={c.text} profiles={profiles} currentUserId={currentUserId} clamp={140} links={false} />
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
                       <span style={{ fontSize: 10, color: 'var(--text-faint)', background: 'var(--surface-2)', border: '0.5px solid var(--border)', borderRadius: 5, padding: '1px 6px', flexShrink: 0 }}>
