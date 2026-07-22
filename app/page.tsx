@@ -497,6 +497,7 @@ export default function Home() {
               client={client}
               posts={posts}
               subscriberSnapshots={subscriberSnapshots}
+              clipperContent={clipperContent}
               userEmail={userEmail}
               userName={currentProfile ? currentName : null}
               onReload={loadData}
