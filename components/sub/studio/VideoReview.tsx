@@ -114,7 +114,18 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   }
 
   async function patch(id: string, p: Partial<StudioVideo>) {
-    await supabase.from('studio_videos').update(p).eq('id', id);
+    const { error } = await supabase.from('studio_videos').update(p).eq('id', id);
+    if (error) {
+      // Surface the failure instead of letting the field silently revert. When a
+      // write targets a column Postgres/PostgREST doesn't know about, the update
+      // errors, onReload() re-reads the old row, and the input snaps back to its
+      // previous value — which reads as "editing doesn't work" with no clue why.
+      // The usual culprit is a missing column or a stale PostgREST schema cache
+      // (e.g. tiktok_final_url before studio_videos_tiktok_final.sql has been run
+      // — run it, including `notify pgrst, 'reload schema';`).
+      console.error('[VideoReview] failed to update video', { id, patch: p, error });
+      alert(`Couldn't save changes: ${error.message}`);
+    }
     onReload();
   }
 
