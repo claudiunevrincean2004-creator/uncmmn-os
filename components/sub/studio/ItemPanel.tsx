@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { StudioComment, StudioActivity, Profile } from '@/lib/types';
+import { StudioComment, StudioActivity, Profile, CommentReaction } from '@/lib/types';
 import { formatActivityTime } from '@/lib/studio';
 import { useDismiss } from '@/lib/use-dismiss';
 import { InlineText, MiniSelect, PillSelect, EditSelect, EditPillSelect, InlineDate, InlineNumber, MaybeUrl, MaybeUrlCell, isHttpUrl, shortUrl } from './cells';
@@ -9,9 +9,27 @@ import { UserPicker, profileName } from './UserPicker';
 import Avatar from '@/components/Avatar';
 import MentionTextarea from '@/components/MentionTextarea';
 import CommentText from '@/components/CommentText';
+import EmojiPicker from '@/components/EmojiPicker';
 import { parseMentions } from '@/lib/mentions';
 import CopyLinkButton from '@/components/CopyLinkButton';
 import { ItemType } from '@/lib/item-link';
+
+// Collapse a comment's raw reaction rows into one pill per emoji: how many people
+// used it, whether the current user is one of them (drives the toggled-on styling),
+// and the list of names for the hover tooltip.
+interface ReactionGroup { emoji: string; count: number; mine: boolean; who: string[] }
+function groupReactions(rows: CommentReaction[], currentUserId: string | null, profiles: Profile[]): ReactionGroup[] {
+  const map = new Map<string, ReactionGroup>();
+  for (const r of rows) {
+    let g = map.get(r.emoji);
+    if (!g) { g = { emoji: r.emoji, count: 0, mine: false, who: [] }; map.set(r.emoji, g); }
+    g.count++;
+    if (r.user_id === currentUserId) g.mine = true;
+    const p = profiles.find(x => x.id === r.user_id);
+    g.who.push(r.user_id === currentUserId ? 'You' : (p ? profileName(p) : 'Someone'));
+  }
+  return Array.from(map.values());
+}
 
 export interface FieldDef {
   key: string;
@@ -110,6 +128,13 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
+  // Reactions for the comments shown in this panel. Loaded here (not threaded from
+  // the page) so toggling stays snappy without a full reload — mutations update
+  // this list optimistically. hoveredComment reveals the "react" affordance;
+  // pickerFor is the comment whose emoji picker is currently open.
+  const [reactions, setReactions] = useState<CommentReaction[]>([]);
+  const [hoveredComment, setHoveredComment] = useState<string | null>(null);
+  const [pickerFor, setPickerFor] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Close on click-outside / Escape, committing pending field edits like the ✕ does
@@ -138,6 +163,57 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
   const itemActivity = activity
     .filter(a => a.item_type === itemType && a.item_id === itemId)
     .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+
+  // Fetch reactions for exactly the comments shown here whenever that set changes
+  // (panel opened, comment added/removed). Keyed on the id list so it doesn't refire
+  // on unrelated re-renders. Missing table (migration not run) → no reactions, not a
+  // crash, mirroring how comment_reads degrades.
+  const itemCommentIdsKey = itemComments.map(c => c.id).join(',');
+  useEffect(() => {
+    const ids = itemCommentIdsKey ? itemCommentIdsKey.split(',') : [];
+    if (ids.length === 0) { setReactions([]); return; }
+    let cancelled = false;
+    supabase.from('comment_reactions').select('*').in('comment_id', ids).then(({ data, error }) => {
+      if (cancelled) return;
+      if (error) {
+        console.warn('[ItemPanel] could not load reactions (run supabase/comment_reactions.sql):', error.message);
+        return;
+      }
+      setReactions((data || []) as CommentReaction[]);
+    });
+    return () => { cancelled = true; };
+  }, [itemCommentIdsKey]);
+
+  // Add or remove the current user's `emoji` reaction on a comment. Optimistic: the
+  // pill updates immediately and the row is written behind it; the insert's real id
+  // replaces the temp one on success, and either op reverts on error.
+  async function toggleReaction(commentId: string, emoji: string) {
+    if (!currentUserId) return;
+    const existing = reactions.find(r => r.comment_id === commentId && r.emoji === emoji && r.user_id === currentUserId);
+    if (existing) {
+      setReactions(prev => prev.filter(r => r.id !== existing.id));
+      const { error } = await supabase.from('comment_reactions').delete()
+        .eq('comment_id', commentId).eq('user_id', currentUserId).eq('emoji', emoji);
+      if (error) {
+        console.error('[ItemPanel] failed to remove reaction', error);
+        setReactions(prev => [...prev, existing]);
+        alert(`Couldn't remove reaction: ${error.message}`);
+      }
+    } else {
+      const temp: CommentReaction = { id: `tmp-${commentId}-${emoji}`, comment_id: commentId, user_id: currentUserId, emoji };
+      setReactions(prev => [...prev, temp]);
+      const { data, error } = await supabase.from('comment_reactions')
+        .insert([{ comment_id: commentId, user_id: currentUserId, emoji }])
+        .select().single();
+      if (error) {
+        console.error('[ItemPanel] failed to add reaction', error);
+        setReactions(prev => prev.filter(r => r.id !== temp.id));
+        alert(`Couldn't add reaction: ${error.message}`);
+      } else if (data) {
+        setReactions(prev => prev.map(r => (r.id === temp.id ? (data as CommentReaction) : r)));
+      }
+    }
+  }
 
   async function addComment() {
     const text = newComment.trim();
@@ -282,8 +358,15 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
               const who = authorName(c.author_id);
               const isOwn = !!currentUserId && c.author_id === currentUserId;
               const editing = editingId === c.id;
+              const groups = groupReactions(reactions.filter(r => r.comment_id === c.id), currentUserId, profiles);
+              const showReact = hoveredComment === c.id || pickerFor === c.id;
               return (
-                <div key={c.id} style={{ background: 'var(--surface-2)', border: '0.5px solid var(--border)', borderRadius: 8, padding: '8px 10px' }}>
+                <div
+                  key={c.id}
+                  onMouseEnter={() => setHoveredComment(c.id)}
+                  onMouseLeave={() => setHoveredComment(prev => (prev === c.id ? null : prev))}
+                  style={{ background: 'var(--surface-2)', border: '0.5px solid var(--border)', borderRadius: 8, padding: '8px 10px' }}
+                >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
                     <Avatar name={who || 'Unknown'} size={18} />
                     <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)' }}>{who || 'Unknown'}</div>
@@ -304,6 +387,65 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
                   ) : (
                     <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.4, whiteSpace: 'pre-wrap', marginBottom: 5 }}>
                       <CommentText text={c.text} profiles={profiles} currentUserId={currentUserId} />
+                    </div>
+                  )}
+                  {!editing && (groups.length > 0 || showReact) && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, marginBottom: 5 }}>
+                      {groups.map(g => (
+                        <button
+                          key={g.emoji}
+                          type="button"
+                          onClick={() => toggleReaction(c.id, g.emoji)}
+                          title={g.who.join(', ')}
+                          disabled={!currentUserId}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                            fontSize: 11, lineHeight: 1.4, padding: '1px 7px', borderRadius: 999,
+                            cursor: currentUserId ? 'pointer' : 'default', fontFamily: 'inherit',
+                            background: g.mine ? 'var(--accent-soft)' : 'var(--surface)',
+                            border: g.mine ? '1px solid var(--accent)' : '0.5px solid var(--border)',
+                            color: g.mine ? 'var(--accent)' : 'var(--text-dim)',
+                          }}
+                        >
+                          <span style={{ fontSize: 12 }}>{g.emoji}</span>
+                          <span style={{ fontWeight: 600 }}>{g.count}</span>
+                        </button>
+                      ))}
+                      {/* React affordance — a smiley that opens the emoji picker. Anchored in
+                          a relative wrapper so the popover sits just above it. */}
+                      <span style={{ position: 'relative', display: 'inline-flex' }}>
+                        <button
+                          type="button"
+                          onClick={() => setPickerFor(prev => (prev === c.id ? null : c.id))}
+                          disabled={!currentUserId}
+                          title="Add reaction"
+                          aria-label="Add reaction"
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            width: 22, height: 22, borderRadius: 999, padding: 0,
+                            background: pickerFor === c.id ? 'var(--surface)' : 'none',
+                            border: pickerFor === c.id ? '0.5px solid var(--border)' : '0.5px solid transparent',
+                            color: pickerFor === c.id ? 'var(--accent)' : 'var(--text-faint)',
+                            cursor: currentUserId ? 'pointer' : 'default',
+                            opacity: showReact ? 1 : 0, transition: 'opacity 0.12s, color 0.12s',
+                          }}
+                          onMouseEnter={e => { if (currentUserId) e.currentTarget.style.color = 'var(--accent)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.color = pickerFor === c.id ? 'var(--accent)' : 'var(--text-faint)'; }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+                            <line x1="9" y1="9" x2="9.01" y2="9" />
+                            <line x1="15" y1="9" x2="15.01" y2="9" />
+                          </svg>
+                        </button>
+                        {pickerFor === c.id && (
+                          <EmojiPicker
+                            onPick={emoji => { setPickerFor(null); toggleReaction(c.id, emoji); }}
+                            onClose={() => setPickerFor(null)}
+                          />
+                        )}
+                      </span>
                     </div>
                   )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>

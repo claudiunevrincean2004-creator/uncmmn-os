@@ -22,7 +22,7 @@ import ClipLibraryTab from '@/components/sub/ClipLibraryTab';
 import StarLogo from '@/components/StarLogo';
 import InboxPanel from '@/components/InboxPanel';
 import { profileName } from '@/lib/profile-name';
-import { INBOX_SOURCES, unreadCount } from '@/lib/inbox';
+import { INBOX_SOURCES, isUnread } from '@/lib/inbox';
 
 async function safeSelect(table: string, orderCol: string, ascending = true) {
   const { data, error } = await supabase.from(table).select('*').order(orderCol, { ascending });
@@ -85,6 +85,12 @@ export default function Home() {
 
   const [mainPage, setMainPage] = usePersistedState<MainPage>('main_page', 'dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = usePersistedState<boolean>('sidebar_collapsed', false);
+  // Last-dismissed marker for the unread-comments banner: the created_at of the
+  // newest unread comment at the moment the user last dismissed (or clicked
+  // through) the banner. The banner only reappears once there's an unread comment
+  // NEWER than this — so a reload of the same seen-but-unread set won't nag, but
+  // genuinely new activity re-triggers it. Empty string = never dismissed.
+  const [unreadBannerDismissedAt, setUnreadBannerDismissedAt] = usePersistedState<string>('unread_banner_dismissed', '');
   const [theme, setTheme] = useState<'aurora' | 'midnight'>('aurora');
   const router = useRouter();
   const [role, setRole] = useState<Role | null>(null);
@@ -327,7 +333,19 @@ export default function Home() {
     return m;
   }, [studioVideos, studioAdCreatives, studioSequences, studioSessions, trialReelProductions, trialReelSources]);
 
-  const inboxUnread = unreadCount(studioComments, currentUserId, readIds);
+  // Single source of truth for "unread" — the Sidebar badge and the banner both
+  // read from this list, so they can never disagree.
+  const unreadComments = studioComments.filter(c => isUnread(c, currentUserId, readIds));
+  const inboxUnread = unreadComments.length;
+  // Newest unread comment's timestamp — the marker we compare against the last
+  // dismissal to decide whether there's genuinely NEW activity to surface.
+  const newestUnreadAt = unreadComments.reduce((m, c) => ((c.created_at || '') > m ? (c.created_at || '') : m), '');
+  const unreadBannerVisible = inboxUnread > 0 && newestUnreadAt > unreadBannerDismissedAt;
+
+  // Both the ✕ and the "Open Inbox" button advance the marker to the newest unread
+  // comment, so the banner won't reappear until something newer arrives.
+  function dismissUnreadBanner() { setUnreadBannerDismissedAt(newestUnreadAt); }
+  function openInboxFromBanner() { setUnreadBannerDismissedAt(newestUnreadAt); setInboxOpen(true); }
 
   // Clicking an inbox entry routes into the SAME deep-link plumbing the Slack
   // pings use, so the item's existing side panel opens on the right tab.
@@ -465,6 +483,30 @@ export default function Home() {
                 <div style={{ fontSize: 9, color: 'var(--text-faint)', marginTop: 4 }}>Click the SQL block to copy. After running it, click "Re-check" above.</div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Unread-comments banner — a passive notice (not a pop-up) that only shows
+            when there's new unread activity since it was last dismissed. Shares the
+            inbox badge's count so the two never disagree. */}
+        {unreadBannerVisible && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 24px', background: 'var(--accent-soft)', borderBottom: '0.5px solid var(--border)', borderLeft: '3px solid var(--accent)', flexShrink: 0, animation: 'fadeIn 0.2s ease' }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+              You have {inboxUnread} unread comment{inboxUnread === 1 ? '' : 's'}
+            </span>
+            <div style={{ flex: 1 }} />
+            <button className="btn-primary" style={{ fontSize: 11, padding: '5px 12px' }} onClick={openInboxFromBanner}>
+              Open Inbox
+            </button>
+            <button
+              onClick={dismissUnreadBanner}
+              title="Dismiss"
+              aria-label="Dismiss"
+              style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 2px' }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; }}
+            >✕</button>
           </div>
         )}
 

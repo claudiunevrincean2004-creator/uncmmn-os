@@ -257,6 +257,17 @@ export interface CommentRead {
   read_at?: string;
 }
 
+// One emoji reaction: a (comment, user, emoji) triple. The DB unique constraint
+// keeps a person from stacking the same emoji twice on one comment; the UI groups
+// these by emoji into count pills. See supabase/comment_reactions.sql.
+export interface CommentReaction {
+  id: string;
+  comment_id: string;
+  user_id: string;
+  emoji: string;
+  created_at?: string;
+}
+
 export interface StudioActivity {
   id: string;
   item_type: string;
