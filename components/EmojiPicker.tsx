@@ -21,7 +21,7 @@ export default function EmojiPicker({ onPick, onClose }: { onPick: (emoji: strin
         style={{
           position: 'absolute',
           bottom: '100%',
-          left: 0,
+          right: 0,
           marginBottom: 6,
           zIndex: 1403,
           background: 'var(--surface)',

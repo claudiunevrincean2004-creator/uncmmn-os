@@ -130,10 +130,8 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
   const [editText, setEditText] = useState('');
   // Reactions for the comments shown in this panel. Loaded here (not threaded from
   // the page) so toggling stays snappy without a full reload — mutations update
-  // this list optimistically. hoveredComment reveals the "react" affordance;
-  // pickerFor is the comment whose emoji picker is currently open.
+  // this list optimistically. pickerFor is the comment whose emoji picker is open.
   const [reactions, setReactions] = useState<CommentReaction[]>([]);
-  const [hoveredComment, setHoveredComment] = useState<string | null>(null);
   const [pickerFor, setPickerFor] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -359,12 +357,9 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
               const isOwn = !!currentUserId && c.author_id === currentUserId;
               const editing = editingId === c.id;
               const groups = groupReactions(reactions.filter(r => r.comment_id === c.id), currentUserId, profiles);
-              const showReact = hoveredComment === c.id || pickerFor === c.id;
               return (
                 <div
                   key={c.id}
-                  onMouseEnter={() => setHoveredComment(c.id)}
-                  onMouseLeave={() => setHoveredComment(prev => (prev === c.id ? null : prev))}
                   style={{ background: 'var(--surface-2)', border: '0.5px solid var(--border)', borderRadius: 8, padding: '8px 10px' }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
@@ -389,7 +384,7 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
                       <CommentText text={c.text} profiles={profiles} currentUserId={currentUserId} />
                     </div>
                   )}
-                  {!editing && (groups.length > 0 || showReact) && (
+                  {!editing && groups.length > 0 && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, marginBottom: 5 }}>
                       {groups.map(g => (
                         <button
@@ -411,54 +406,39 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
                           <span style={{ fontWeight: 600 }}>{g.count}</span>
                         </button>
                       ))}
-                      {/* React affordance — a smiley that opens the emoji picker. Anchored in
-                          a relative wrapper so the popover sits just above it. */}
-                      <span style={{ position: 'relative', display: 'inline-flex' }}>
-                        <button
-                          type="button"
-                          onClick={() => setPickerFor(prev => (prev === c.id ? null : c.id))}
-                          disabled={!currentUserId}
-                          title="Add reaction"
-                          aria-label="Add reaction"
-                          style={{
-                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                            width: 22, height: 22, borderRadius: 999, padding: 0,
-                            background: pickerFor === c.id ? 'var(--surface)' : 'none',
-                            border: pickerFor === c.id ? '0.5px solid var(--border)' : '0.5px solid transparent',
-                            color: pickerFor === c.id ? 'var(--accent)' : 'var(--text-faint)',
-                            cursor: currentUserId ? 'pointer' : 'default',
-                            opacity: showReact ? 1 : 0, transition: 'opacity 0.12s, color 0.12s',
-                          }}
-                          onMouseEnter={e => { if (currentUserId) e.currentTarget.style.color = 'var(--accent)'; }}
-                          onMouseLeave={e => { e.currentTarget.style.color = pickerFor === c.id ? 'var(--accent)' : 'var(--text-faint)'; }}
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10" />
-                            <path d="M8 14s1.5 2 4 2 4-2 4-2" />
-                            <line x1="9" y1="9" x2="9.01" y2="9" />
-                            <line x1="15" y1="9" x2="15.01" y2="9" />
-                          </svg>
-                        </button>
-                        {pickerFor === c.id && (
-                          <EmojiPicker
-                            onPick={emoji => { setPickerFor(null); toggleReaction(c.id, emoji); }}
-                            onClose={() => setPickerFor(null)}
-                          />
-                        )}
-                      </span>
                     </div>
                   )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{formatActivityTime(c.created_at)}</span>
                     {!editing && (
-                      <div style={{ display: 'flex', gap: 10 }}>
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                        {/* React lives inline with Edit/Delete — always visible, same
+                            text-button style, so the card never reflows. The picker
+                            anchors to this button (opens upward/leftward). */}
+                        {currentUserId && (
+                          <span style={{ position: 'relative', display: 'inline-flex' }}>
+                            <button
+                              onClick={() => setPickerFor(prev => (prev === c.id ? null : c.id))}
+                              title="Add reaction"
+                              style={{ background: 'none', border: 'none', color: pickerFor === c.id ? 'var(--accent)' : 'var(--text-faint)', cursor: 'pointer', fontSize: 10, padding: 0 }}
+                              onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; }}
+                              onMouseLeave={e => { e.currentTarget.style.color = pickerFor === c.id ? 'var(--accent)' : 'var(--text-faint)'; }}
+                            >React</button>
+                            {pickerFor === c.id && (
+                              <EmojiPicker
+                                onPick={emoji => { setPickerFor(null); toggleReaction(c.id, emoji); }}
+                                onClose={() => setPickerFor(null)}
+                              />
+                            )}
+                          </span>
+                        )}
                         {isOwn && (
                           <button
                             onClick={() => startEdit(c)}
                             style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 10, padding: 0 }}
                             onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; }}
                             onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; }}
-                          >edit</button>
+                          >Edit</button>
                         )}
                         {(isAdmin || isOwn) && (
                           <button
@@ -466,7 +446,7 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
                             style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 10, padding: 0 }}
                             onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; }}
                             onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; }}
-                          >delete</button>
+                          >Delete</button>
                         )}
                       </div>
                     )}
