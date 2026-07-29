@@ -44,6 +44,11 @@ export default function InboxPanel({
     () => new Set(comments.filter(c => isUnread(c, currentUserId, readIds)).map(c => c.id))
   );
 
+  // Replies are ordinary comments (same item, same unread rules), so they land in
+  // the inbox on their own. This resolves who a reply was answering so the row can
+  // say so — a bare reply body out of context reads as a non-sequitur.
+  const byId = useMemo(() => new Map(comments.map(c => [c.id, c])), [comments]);
+
   const entries = useMemo(() => {
     const mine = (c: StudioComment) => !!currentUserId && (c.mentions || []).includes(currentUserId);
     return comments
@@ -124,6 +129,15 @@ export default function InboxPanel({
                 const who = author ? profileName(author) : 'Unknown';
                 const title = itemTitles.get(`${c.item_type}:${c.item_id}`) || 'Untitled';
                 const unread = wasUnread.has(c.id);
+                // "Replying to …" line, shown only on replies. Someone answering
+                // YOUR comment is the case worth spotting, so that one says "you".
+                const parent = c.parent_comment_id ? byId.get(c.parent_comment_id) : undefined;
+                const parentAuthor = parent ? profiles.find(p => p.id === parent.author_id) : undefined;
+                const replyingTo = !c.parent_comment_id
+                  ? null
+                  : parent && parent.author_id && parent.author_id === currentUserId
+                    ? 'your comment'
+                    : parentAuthor ? `${profileName(parentAuthor)}’s comment` : 'a comment';
                 return (
                   <button
                     key={c.id}
@@ -147,6 +161,12 @@ export default function InboxPanel({
                       <div style={{ flex: 1 }} />
                       <span style={{ fontSize: 10, color: 'var(--text-faint)', flexShrink: 0 }}>{formatActivityTime(c.created_at)}</span>
                     </div>
+                    {replyingTo && (
+                      <div style={{ fontSize: 10, color: 'var(--text-faint)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ color: 'var(--accent)' }}>↳</span>
+                        <span>Replying to {replyingTo}</span>
+                      </div>
+                    )}
                     <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.4, marginBottom: 6, wordBreak: 'break-word' }}>
                       {/* links={false}: the whole row is a <button> that opens the item, so an
                           anchor here would be invalid nesting and a rival click target. The URL

@@ -80,7 +80,7 @@ export default function Home() {
   const [clipSources, setClipSources] = useState<ClipSource[]>([]);
   const [clipSnippets, setClipSnippets] = useState<ClipSnippet[]>([]);
   const [loading, setLoading] = useState(true);
-  const [schemaMissing, setSchemaMissing] = useState<{ missing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[]; adColumnsMissing: string[]; sessionColumnsMissing: string[]; dropdownColsMissing: boolean } | null>(null);
+  const [schemaMissing, setSchemaMissing] = useState<{ missing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[]; adColumnsMissing: string[]; sessionColumnsMissing: string[]; commentColumnsMissing: string[]; dropdownColsMissing: boolean } | null>(null);
   const [showMigrationSQL, setShowMigrationSQL] = useState(false);
 
   const [mainPage, setMainPage] = usePersistedState<MainPage>('main_page', 'dashboard');
@@ -364,7 +364,7 @@ export default function Home() {
 
   useEffect(() => {
     checkSchema().then(result => {
-      if (result.missing.length > 0 || result.postColumnsMissing.length > 0 || result.researchColumnsMissing.length > 0 || result.adColumnsMissing.length > 0 || result.sessionColumnsMissing.length > 0 || result.dropdownColsMissing) {
+      if (result.missing.length > 0 || result.postColumnsMissing.length > 0 || result.researchColumnsMissing.length > 0 || result.adColumnsMissing.length > 0 || result.sessionColumnsMissing.length > 0 || result.commentColumnsMissing.length > 0 || result.dropdownColsMissing) {
         setSchemaMissing(result);
       }
     });
@@ -421,13 +421,13 @@ export default function Home() {
       />
 
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {schemaMissing && (schemaMissing.missing.length > 0 || schemaMissing.postColumnsMissing.length > 0 || schemaMissing.researchColumnsMissing.length > 0 || schemaMissing.adColumnsMissing.length > 0 || schemaMissing.sessionColumnsMissing.length > 0 || schemaMissing.dropdownColsMissing) && (
+        {schemaMissing && (schemaMissing.missing.length > 0 || schemaMissing.postColumnsMissing.length > 0 || schemaMissing.researchColumnsMissing.length > 0 || schemaMissing.adColumnsMissing.length > 0 || schemaMissing.sessionColumnsMissing.length > 0 || schemaMissing.commentColumnsMissing.length > 0 || schemaMissing.dropdownColsMissing) && (
           <div style={{ background: '#1a1000', borderBottom: '1px solid #3a2a00', padding: '10px 24px', flexShrink: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <span style={{ color: '#f59e0b', fontWeight: 600, fontSize: 12 }}>Database setup required</span>
                 <span style={{ color: 'var(--text-dim)', fontSize: 11, marginLeft: 8 }}>
-                  Missing: {[...schemaMissing.missing, ...schemaMissing.postColumnsMissing.map(c => `posts.${c}`), ...schemaMissing.researchColumnsMissing.map(c => `research_items.${c}`), ...schemaMissing.adColumnsMissing.map(c => `studio_ad_creatives.${c}`), ...schemaMissing.sessionColumnsMissing.map(c => `studio_sessions.${c}`), ...(schemaMissing.dropdownColsMissing ? ['studio_dropdown_options.color'] : [])].join(', ')}
+                  Missing: {[...schemaMissing.missing, ...schemaMissing.postColumnsMissing.map(c => `posts.${c}`), ...schemaMissing.researchColumnsMissing.map(c => `research_items.${c}`), ...schemaMissing.adColumnsMissing.map(c => `studio_ad_creatives.${c}`), ...schemaMissing.sessionColumnsMissing.map(c => `studio_sessions.${c}`), ...schemaMissing.commentColumnsMissing.map(c => `studio_comments.${c}`), ...(schemaMissing.dropdownColsMissing ? ['studio_dropdown_options.color'] : [])].join(', ')}
                 </span>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
@@ -443,7 +443,7 @@ export default function Home() {
                   style={{ fontSize: 10, padding: '4px 10px' }}
                   onClick={() => {
                     checkSchema().then(result => {
-                      if (result.missing.length === 0 && result.postColumnsMissing.length === 0 && result.researchColumnsMissing.length === 0 && result.adColumnsMissing.length === 0 && result.sessionColumnsMissing.length === 0 && !result.dropdownColsMissing) {
+                      if (result.missing.length === 0 && result.postColumnsMissing.length === 0 && result.researchColumnsMissing.length === 0 && result.adColumnsMissing.length === 0 && result.sessionColumnsMissing.length === 0 && result.commentColumnsMissing.length === 0 && !result.dropdownColsMissing) {
                         setSchemaMissing(null);
                         setShowMigrationSQL(false);
                         loadData();
@@ -474,11 +474,11 @@ export default function Home() {
                     cursor: 'pointer',
                   }}
                   onClick={() => {
-                    navigator.clipboard.writeText(getMigrationSQL(schemaMissing.missing, schemaMissing.postColumnsMissing, schemaMissing.researchColumnsMissing, schemaMissing.adColumnsMissing, schemaMissing.sessionColumnsMissing, schemaMissing.dropdownColsMissing));
+                    navigator.clipboard.writeText(getMigrationSQL(schemaMissing.missing, schemaMissing.postColumnsMissing, schemaMissing.researchColumnsMissing, schemaMissing.adColumnsMissing, schemaMissing.sessionColumnsMissing, schemaMissing.dropdownColsMissing, schemaMissing.commentColumnsMissing));
                   }}
                   title="Click to copy"
                 >
-                  {getMigrationSQL(schemaMissing.missing, schemaMissing.postColumnsMissing, schemaMissing.researchColumnsMissing, schemaMissing.adColumnsMissing, schemaMissing.sessionColumnsMissing, schemaMissing.dropdownColsMissing)}
+                  {getMigrationSQL(schemaMissing.missing, schemaMissing.postColumnsMissing, schemaMissing.researchColumnsMissing, schemaMissing.adColumnsMissing, schemaMissing.sessionColumnsMissing, schemaMissing.dropdownColsMissing, schemaMissing.commentColumnsMissing)}
                 </pre>
                 <div style={{ fontSize: 9, color: 'var(--text-faint)', marginTop: 4 }}>Click the SQL block to copy. After running it, click "Re-check" above.</div>
               </div>

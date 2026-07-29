@@ -20,6 +20,10 @@ export const INBOX_SOURCES: Record<string, { tab: string; target: InboxTarget }>
 
 // Unread = a comment by SOMEONE ELSE that this user has no comment_reads row for.
 // Your own comments are never unread for you, so posting never lights your badge.
+//
+// Replies count exactly the same: a reply is a studio_comments row carrying its
+// parent's item_type/item_id (plus parent_comment_id), so someone answering your
+// comment lights the badge and lands in the Inbox with no special-casing here.
 export function isUnread(c: StudioComment, currentUserId: string | null, readIds: Set<string>): boolean {
   if (!currentUserId) return false;
   if (c.author_id === currentUserId) return false;

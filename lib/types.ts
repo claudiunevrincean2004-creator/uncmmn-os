@@ -243,6 +243,11 @@ export interface StudioComment {
   item_id: string;
   text: string;
   author_id?: string | null;
+  // Single-level threading: null on a top-level comment, the top-level comment's
+  // id on a reply. A reply to a reply carries the SAME parent (the thread never
+  // nests deeper than two rows) — enforced in the UI and by a DB trigger, see
+  // supabase/comment_threads.sql. Deleting a parent cascade-deletes its replies.
+  parent_comment_id?: string | null;
   // Profile ids @-mentioned in `text`, re-derived from the body on every save
   // (lib/mentions.ts). Drives the Inbox's "Mentions" filter.
   mentions?: string[] | null;

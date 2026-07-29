@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 
-export async function checkSchema(): Promise<{ missing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[]; adColumnsMissing: string[]; sessionColumnsMissing: string[]; dropdownColsMissing: boolean }> {
+export async function checkSchema(): Promise<{ missing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[]; adColumnsMissing: string[]; sessionColumnsMissing: string[]; commentColumnsMissing: string[]; dropdownColsMissing: boolean }> {
   const requiredTables = [
     'clients', 'posts', 'goals', 'drive_folders',
     'subscriber_snapshots', 'research_items', 'revenue_entries',
@@ -69,6 +69,17 @@ export async function checkSchema(): Promise<{ missing: string[]; postColumnsMis
     }
   }
 
+  // Threaded replies: the self-referencing parent_comment_id on studio_comments.
+  // Probed directly (not via a row) so it's detected on an empty comment table —
+  // without it, posting a reply fails while top-level comments keep working.
+  const commentColumnsMissing: string[] = [];
+  if (!missing.includes('studio_comments')) {
+    const { error } = await supabase.from('studio_comments').select('parent_comment_id').limit(0);
+    if (error && (error.code === '42703' || error.code === 'PGRST204' || /column/i.test(error.message))) {
+      commentColumnsMissing.push('parent_comment_id');
+    }
+  }
+
   // Built-in Format/Status options become DB-backed: detect the `color` column.
   let dropdownColsMissing = false;
   if (!missing.includes('studio_dropdown_options')) {
@@ -78,10 +89,10 @@ export async function checkSchema(): Promise<{ missing: string[]; postColumnsMis
     }
   }
 
-  return { missing, postColumnsMissing, researchColumnsMissing, adColumnsMissing, sessionColumnsMissing, dropdownColsMissing };
+  return { missing, postColumnsMissing, researchColumnsMissing, adColumnsMissing, sessionColumnsMissing, commentColumnsMissing, dropdownColsMissing };
 }
 
-export function getMigrationSQL(missing: string[], postColumnsMissing: string[] = [], researchColumnsMissing: string[] = [], adColumnsMissing: string[] = [], sessionColumnsMissing: string[] = [], dropdownColsMissing = false): string {
+export function getMigrationSQL(missing: string[], postColumnsMissing: string[] = [], researchColumnsMissing: string[] = [], adColumnsMissing: string[] = [], sessionColumnsMissing: string[] = [], dropdownColsMissing = false, commentColumnsMissing: string[] = []): string {
   const parts: string[] = [];
 
   if (missing.includes('clients')) {
@@ -272,8 +283,11 @@ create policy "anon_all_studio_ad_creatives" on studio_ad_creatives for all to a
   item_type text not null,
   item_id uuid not null,
   text text not null,
+  -- null = top-level; set = a reply nested under that comment (single-level).
+  parent_comment_id uuid references studio_comments(id) on delete cascade,
   created_at timestamptz default now()
 );
+create index if not exists studio_comments_parent_idx on studio_comments (parent_comment_id);
 alter table studio_comments enable row level security;
 drop policy if exists "anon_all_studio_comments" on studio_comments;
 create policy "anon_all_studio_comments" on studio_comments for all to anon using (true) with check (true);`);
@@ -492,6 +506,35 @@ drop policy if exists "custom_property_options_read" on custom_property_options;
 create policy "custom_property_options_read" on custom_property_options for select to authenticated using (true);
 drop policy if exists "custom_property_options_admin_write" on custom_property_options;
 create policy "custom_property_options_admin_write" on custom_property_options for all to authenticated using (public.is_admin()) with check (public.is_admin());`);
+  }
+
+  // Threaded replies on comments — nullable self-reference, cascade delete.
+  // Full annotated version (incl. the single-level trigger) lives in
+  // supabase/comment_threads.sql.
+  if (commentColumnsMissing.includes('parent_comment_id')) {
+    parts.push(`alter table studio_comments add column if not exists parent_comment_id uuid references studio_comments(id) on delete cascade;
+create index if not exists studio_comments_parent_idx on studio_comments (parent_comment_id);
+
+-- Single-level threading: a reply to a reply collapses onto the top-level parent.
+create or replace function public.studio_comments_flatten_thread()
+returns trigger language plpgsql as $$
+begin
+  if new.parent_comment_id is not null then
+    if new.parent_comment_id = new.id then
+      new.parent_comment_id := null;
+    else
+      select coalesce(p.parent_comment_id, p.id) into new.parent_comment_id
+        from public.studio_comments p where p.id = new.parent_comment_id;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists studio_comments_flatten_thread_trg on studio_comments;
+create trigger studio_comments_flatten_thread_trg
+  before insert or update of parent_comment_id on studio_comments
+  for each row execute function public.studio_comments_flatten_thread();
+notify pgrst, 'reload schema';`);
   }
 
   if (dropdownColsMissing) {

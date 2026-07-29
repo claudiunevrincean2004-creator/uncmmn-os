@@ -133,6 +133,11 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
   // this list optimistically. pickerFor is the comment whose emoji picker is open.
   const [reactions, setReactions] = useState<CommentReaction[]>([]);
   const [pickerFor, setPickerFor] = useState<string | null>(null);
+  // Open reply composer, keyed by the TOP-LEVEL comment it will attach to (never a
+  // reply's id — threading is single-level, see openReply).
+  const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [replySaving, setReplySaving] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Close on click-outside / Escape, committing pending field edits like the ✕ does
@@ -155,9 +160,27 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
     return p ? profileName(p) : null;
   };
 
+  // Every comment on this item — top-level AND replies. Replies are ordinary rows
+  // with the same item_type/item_id, so they come down the same prop and share the
+  // reaction fetch below without any extra plumbing.
   const itemComments = comments
     .filter(c => c.item_type === itemType && c.item_id === itemId)
     .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+  // Threads: top-level comments keep the existing newest-first order; each one's
+  // replies read chronologically (oldest first) beneath it, the way a conversation
+  // actually runs. A row whose parent is missing (deleted mid-session, before the
+  // reload lands) falls back to rendering as top-level rather than disappearing.
+  const topLevelIds = new Set(itemComments.filter(c => !c.parent_comment_id).map(c => c.id));
+  const topLevelComments = itemComments.filter(c => !c.parent_comment_id || !topLevelIds.has(c.parent_comment_id));
+  const repliesByParent = new Map<string, StudioComment[]>();
+  for (const c of itemComments) {
+    if (!c.parent_comment_id || !topLevelIds.has(c.parent_comment_id)) continue;
+    const list = repliesByParent.get(c.parent_comment_id);
+    if (list) list.push(c); else repliesByParent.set(c.parent_comment_id, [c]);
+  }
+  repliesByParent.forEach(list => list.sort((a, b) => (a.created_at || '').localeCompare(b.created_at || '')));
+  const repliesFor = (id: string) => repliesByParent.get(id) || [];
+
   const itemActivity = activity
     .filter(a => a.item_type === itemType && a.item_id === itemId)
     .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
@@ -235,6 +258,42 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
     onReload();
   }
 
+  // Open the reply box for the thread `c` belongs to. SINGLE-LEVEL THREADING: a
+  // reply's own Reply button attaches to that reply's parent, not to the reply, so
+  // a thread is never more than two levels deep. Because that makes "who am I
+  // answering?" ambiguous, replying to a reply pre-fills an @mention of its author.
+  function openReply(c: StudioComment) {
+    const parentId = c.parent_comment_id || c.id;
+    // Already composing in this thread — never clobber what's been typed.
+    if (replyTo === parentId) return;
+    const answering = c.parent_comment_id && c.author_id !== currentUserId ? authorName(c.author_id) : null;
+    setReplyTo(parentId);
+    setReplyText(answering ? `@${answering} ` : '');
+  }
+
+  function closeReply() {
+    setReplyTo(null);
+    setReplyText('');
+  }
+
+  async function addReply(parentId: string) {
+    const text = replyText.trim();
+    if (!text || replySaving) return;
+    setReplySaving(true);
+    const { error } = await supabase
+      .from('studio_comments')
+      .insert([{ item_type: itemType, item_id: itemId, text, author_id: currentUserId, mentions: parseMentions(text, profiles), parent_comment_id: parentId }]);
+    setReplySaving(false);
+    if (error) {
+      // Most likely a missing parent_comment_id column — run comment_threads.sql.
+      console.error('[ItemPanel] failed to add reply', error);
+      alert(`Couldn't add reply: ${error.message}`);
+      return;
+    }
+    closeReply();
+    onReload();
+  }
+
   function startEdit(c: StudioComment) {
     setEditingId(c.id);
     setEditText(c.text);
@@ -259,6 +318,13 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
   }
 
   async function deleteComment(id: string) {
+    // Deleting a parent takes its replies with it (studio_comments.parent_comment_id
+    // is ON DELETE CASCADE, as are the reactions and read-state rows hanging off
+    // each). That's destructive enough to be worth confirming — but only when there
+    // is actually a thread to lose.
+    const replies = repliesFor(id).length;
+    if (replies > 0 && !confirm(`Delete this comment and its ${replies} ${replies === 1 ? 'reply' : 'replies'}? This can't be undone.`)) return;
+    if (replyTo === id) closeReply();
     const { error } = await supabase.from('studio_comments').delete().eq('id', id);
     if (error) {
       console.error('[ItemPanel] failed to delete comment', error);
@@ -266,6 +332,132 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
       return;
     }
     onReload();
+  }
+
+  // One comment card — used for both a top-level comment and a reply, so the two
+  // support exactly the same things (reactions, edit, delete, @mentions, linkified
+  // URLs). A reply differs only in chrome: it sits on --surface rather than
+  // --surface-2 and runs slightly tighter, which (with the thread rail it's drawn
+  // inside) is what marks it as belonging to the comment above.
+  //
+  // Written as a plain function rather than a nested component so React keeps the
+  // same element identity across renders — a component declared inside render
+  // remounts on every keystroke and would blow away the edit box's focus.
+  function renderComment(c: StudioComment, isReply: boolean) {
+    const who = authorName(c.author_id);
+    const isOwn = !!currentUserId && c.author_id === currentUserId;
+    const editing = editingId === c.id;
+    const groups = groupReactions(reactions.filter(r => r.comment_id === c.id), currentUserId, profiles);
+    return (
+      <div
+        key={c.id}
+        style={{
+          background: isReply ? 'var(--surface)' : 'var(--surface-2)',
+          border: '0.5px solid var(--border)',
+          borderRadius: 8,
+          padding: isReply ? '7px 9px' : '8px 10px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+          <Avatar name={who || 'Unknown'} size={isReply ? 16 : 18} />
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)' }}>{who || 'Unknown'}</div>
+        </div>
+        {editing ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 5 }}>
+            <MentionTextarea
+              value={editText}
+              onChange={setEditText}
+              profiles={profiles}
+              autoFocus
+            />
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button className="btn-primary" style={{ fontSize: 10, padding: '4px 10px' }} onClick={() => saveEdit(c.id)} disabled={!editText.trim()}>Save</button>
+              <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 10px' }} onClick={cancelEdit}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.4, whiteSpace: 'pre-wrap', marginBottom: 5 }}>
+            <CommentText text={c.text} profiles={profiles} currentUserId={currentUserId} />
+          </div>
+        )}
+        {!editing && groups.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, marginBottom: 5 }}>
+            {groups.map(g => (
+              <button
+                key={g.emoji}
+                type="button"
+                onClick={() => toggleReaction(c.id, g.emoji)}
+                title={g.who.join(', ')}
+                disabled={!currentUserId}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  fontSize: 11, lineHeight: 1.4, padding: '1px 7px', borderRadius: 999,
+                  cursor: currentUserId ? 'pointer' : 'default', fontFamily: 'inherit',
+                  background: g.mine ? 'var(--accent-soft)' : (isReply ? 'var(--surface-2)' : 'var(--surface)'),
+                  border: g.mine ? '1px solid var(--accent)' : '0.5px solid var(--border)',
+                  color: g.mine ? 'var(--accent)' : 'var(--text-dim)',
+                }}
+              >
+                <span style={{ fontSize: 12 }}>{g.emoji}</span>
+                <span style={{ fontWeight: 600 }}>{g.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{formatActivityTime(c.created_at)}</span>
+          {!editing && (
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              {/* Reply / React live inline with Edit/Delete — always visible, same
+                  text-button style, so the card never reflows. The picker anchors
+                  to the React button (opens upward/leftward). */}
+              {currentUserId && (
+                <button
+                  onClick={() => openReply(c)}
+                  title={isReply ? 'Reply in this thread' : 'Reply to this comment'}
+                  style={{ background: 'none', border: 'none', color: replyTo === (c.parent_comment_id || c.id) ? 'var(--accent)' : 'var(--text-faint)', cursor: 'pointer', fontSize: 10, padding: 0 }}
+                  onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.color = replyTo === (c.parent_comment_id || c.id) ? 'var(--accent)' : 'var(--text-faint)'; }}
+                >Reply</button>
+              )}
+              {currentUserId && (
+                <span style={{ position: 'relative', display: 'inline-flex' }}>
+                  <button
+                    onClick={() => setPickerFor(prev => (prev === c.id ? null : c.id))}
+                    title="Add reaction"
+                    style={{ background: 'none', border: 'none', color: pickerFor === c.id ? 'var(--accent)' : 'var(--text-faint)', cursor: 'pointer', fontSize: 10, padding: 0 }}
+                    onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = pickerFor === c.id ? 'var(--accent)' : 'var(--text-faint)'; }}
+                  >React</button>
+                  {pickerFor === c.id && (
+                    <EmojiPicker
+                      onPick={emoji => { setPickerFor(null); toggleReaction(c.id, emoji); }}
+                      onClose={() => setPickerFor(null)}
+                    />
+                  )}
+                </span>
+              )}
+              {isOwn && (
+                <button
+                  onClick={() => startEdit(c)}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 10, padding: 0 }}
+                  onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; }}
+                >Edit</button>
+              )}
+              {(isAdmin || isOwn) && (
+                <button
+                  onClick={() => deleteComment(c.id)}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 10, padding: 0 }}
+                  onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; }}
+                  onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; }}
+                >Delete</button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -352,105 +544,48 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
           <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>No comments yet.</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {itemComments.map(c => {
-              const who = authorName(c.author_id);
-              const isOwn = !!currentUserId && c.author_id === currentUserId;
-              const editing = editingId === c.id;
-              const groups = groupReactions(reactions.filter(r => r.comment_id === c.id), currentUserId, profiles);
+            {topLevelComments.map(c => {
+              const replies = repliesFor(c.id);
+              const composing = replyTo === c.id;
               return (
-                <div
-                  key={c.id}
-                  style={{ background: 'var(--surface-2)', border: '0.5px solid var(--border)', borderRadius: 8, padding: '8px 10px' }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
-                    <Avatar name={who || 'Unknown'} size={18} />
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)' }}>{who || 'Unknown'}</div>
-                  </div>
-                  {editing ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 5 }}>
-                      <MentionTextarea
-                        value={editText}
-                        onChange={setEditText}
-                        profiles={profiles}
-                        autoFocus
-                      />
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button className="btn-primary" style={{ fontSize: 10, padding: '4px 10px' }} onClick={() => saveEdit(c.id)} disabled={!editText.trim()}>Save</button>
-                        <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 10px' }} onClick={cancelEdit}>Cancel</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.4, whiteSpace: 'pre-wrap', marginBottom: 5 }}>
-                      <CommentText text={c.text} profiles={profiles} currentUserId={currentUserId} />
-                    </div>
-                  )}
-                  {!editing && groups.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, marginBottom: 5 }}>
-                      {groups.map(g => (
-                        <button
-                          key={g.emoji}
-                          type="button"
-                          onClick={() => toggleReaction(c.id, g.emoji)}
-                          title={g.who.join(', ')}
-                          disabled={!currentUserId}
-                          style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 4,
-                            fontSize: 11, lineHeight: 1.4, padding: '1px 7px', borderRadius: 999,
-                            cursor: currentUserId ? 'pointer' : 'default', fontFamily: 'inherit',
-                            background: g.mine ? 'var(--accent-soft)' : 'var(--surface)',
-                            border: g.mine ? '1px solid var(--accent)' : '0.5px solid var(--border)',
-                            color: g.mine ? 'var(--accent)' : 'var(--text-dim)',
-                          }}
-                        >
-                          <span style={{ fontSize: 12 }}>{g.emoji}</span>
-                          <span style={{ fontWeight: 600 }}>{g.count}</span>
-                        </button>
-                      ))}
+                <div key={c.id}>
+                  {renderComment(c, false)}
+                  {(replies.length > 0 || composing) && (
+                    // The thread rail: an indent plus a vertical connector running
+                    // down the left of everything that belongs to this comment, so
+                    // a reply is never mistaken for a new top-level comment.
+                    <div
+                      style={{
+                        marginLeft: 14,
+                        paddingLeft: 12,
+                        marginTop: 6,
+                        borderLeft: '1.5px solid var(--border)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 6,
+                      }}
+                    >
+                      {replies.map(r => renderComment(r, true))}
+                      {composing && (
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <MentionTextarea
+                            value={replyText}
+                            onChange={setReplyText}
+                            profiles={profiles}
+                            onSubmit={() => addReply(c.id)}
+                            autoFocus
+                            placeholder="Write a reply… (@ to mention, Enter to send)"
+                          />
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignSelf: 'flex-end' }}>
+                            <button className="btn-primary" style={{ fontSize: 10, padding: '4px 10px' }} onClick={() => addReply(c.id)} disabled={replySaving || !replyText.trim()}>
+                              {replySaving ? '…' : 'Reply'}
+                            </button>
+                            <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 10px' }} onClick={closeReply}>Cancel</button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{formatActivityTime(c.created_at)}</span>
-                    {!editing && (
-                      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                        {/* React lives inline with Edit/Delete — always visible, same
-                            text-button style, so the card never reflows. The picker
-                            anchors to this button (opens upward/leftward). */}
-                        {currentUserId && (
-                          <span style={{ position: 'relative', display: 'inline-flex' }}>
-                            <button
-                              onClick={() => setPickerFor(prev => (prev === c.id ? null : c.id))}
-                              title="Add reaction"
-                              style={{ background: 'none', border: 'none', color: pickerFor === c.id ? 'var(--accent)' : 'var(--text-faint)', cursor: 'pointer', fontSize: 10, padding: 0 }}
-                              onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; }}
-                              onMouseLeave={e => { e.currentTarget.style.color = pickerFor === c.id ? 'var(--accent)' : 'var(--text-faint)'; }}
-                            >React</button>
-                            {pickerFor === c.id && (
-                              <EmojiPicker
-                                onPick={emoji => { setPickerFor(null); toggleReaction(c.id, emoji); }}
-                                onClose={() => setPickerFor(null)}
-                              />
-                            )}
-                          </span>
-                        )}
-                        {isOwn && (
-                          <button
-                            onClick={() => startEdit(c)}
-                            style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 10, padding: 0 }}
-                            onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; }}
-                            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; }}
-                          >Edit</button>
-                        )}
-                        {(isAdmin || isOwn) && (
-                          <button
-                            onClick={() => deleteComment(c.id)}
-                            style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 10, padding: 0 }}
-                            onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; }}
-                            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; }}
-                          >Delete</button>
-                        )}
-                      </div>
-                    )}
-                  </div>
                 </div>
               );
             })}
