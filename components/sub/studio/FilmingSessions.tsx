@@ -6,7 +6,7 @@ import { usePersistedState } from '@/lib/use-persisted-state';
 import { usePagedRows } from '@/lib/use-paged-rows';
 import LoadMore from './LoadMore';
 import { SESSION_STATUSES, SESSION_STATUS_COLORS, SESSION_TYPES, SESSION_TYPE_COLORS, todayISO, logActivity, inDateRange, getFieldOptions, colorMap, buildAddOptionRows } from '@/lib/studio';
-import { EditPillSelect, MiniSelect, UrlCell, InlineDate, InlineNumber } from './cells';
+import { EditPillSelect, MiniSelect, UrlCell, InlineDate } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import SortControl from './SortControl';
 import { SortOption, SortDir, sortRows } from '@/lib/sort';
@@ -35,8 +35,6 @@ interface SessionDraft {
   footage_link: string;
   date: string;
   status: string;
-  videos_planned: number;
-  videos_filmed: number;
 }
 const EMPTY_DRAFT: SessionDraft = {
   name: '',
@@ -45,8 +43,6 @@ const EMPTY_DRAFT: SessionDraft = {
   footage_link: '',
   date: '',
   status: 'Planned',
-  videos_planned: 0,
-  videos_filmed: 0,
 };
 
 interface Props {
@@ -168,8 +164,6 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
       footage_link: draft.footage_link.trim() || null,
       date: draft.date || null,
       status: draft.status || 'Planned',
-      videos_planned: draft.videos_planned || 0,
-      videos_filmed: draft.videos_filmed || 0,
     };
     const { error } = await supabase.from('studio_sessions').insert([row]);
     setCreating(false);
@@ -232,8 +226,6 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
     { key: 'footage_link', label: 'Footage', type: 'url' },
     { key: 'date', label: 'Date', type: 'date' },
     { key: 'status', label: 'Status', type: 'pill', field: 'session_status', options: statusValues, colors: statusColors, allowAdd: isAdmin },
-    { key: 'videos_planned', label: 'Videos to Film', type: 'number' },
-    { key: 'videos_filmed', label: 'Videos Filmed', type: 'number' },
   ], [statusValues, statusColors, typeValues, typeColors, isAdmin]);
 
   const selected = selectedId ? sessions.find(s => s.id === selectedId) : null;
@@ -266,18 +258,12 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                   <th>Footage</th>
                   <th>Date</th>
                   <th onClick={isAdmin ? () => setOptsField({ field: 'session_status', title: 'Status' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Status{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
-                  <th>To Film</th>
-                  <th>Filmed</th>
-                  <th style={{ minWidth: 120 }}>Completion</th>
                   <CustomHeaderCells props={cprops} isAdmin={isAdmin} onManage={() => setMgrOpen(true)} />
                   <th style={{ textAlign: 'right' }}>{isAdmin && <AddPropertyButton onClick={() => setMgrOpen(true)} />}</th>
                 </tr>
               </thead>
               <tbody>
                 {visible.map(s => {
-                  const planned = s.videos_planned || 0;
-                  const filmed = s.videos_filmed || 0;
-                  const pct = planned > 0 ? Math.min(100, Math.round((filmed / planned) * 100)) : 0;
                   const isPast = s.date && s.date.slice(0, 10) < today;
                   return (
                     <Fragment key={s.id}>
@@ -293,16 +279,6 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                         <td><UrlCell value={s.footage_link} onCommit={u => patch(s.id, { footage_link: u })} /></td>
                         <td><InlineDate value={s.date} onCommit={d => patch(s.id, { date: d || undefined })} /></td>
                         <td><EditPillSelect field="session_status" value={s.status} options={statusValues} colors={statusColors} onChange={st => changeStatus(s, st)} onAddOption={addOption} allowAdd={isAdmin} /></td>
-                        <td style={{ textAlign: 'center' }}><InlineNumber value={planned} onCommit={n => patch(s.id, { videos_planned: n })} /></td>
-                        <td style={{ textAlign: 'center' }}><InlineNumber value={filmed} onCommit={n => patch(s.id, { videos_filmed: n })} /></td>
-                        <td style={{ minWidth: 120 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div className="progress-bar" style={{ flex: 1, minWidth: 60 }}>
-                              <div className={`progress-bar-fill${pct >= 100 ? ' complete' : ''}`} style={{ width: `${pct}%` }} />
-                            </div>
-                            <span style={{ fontSize: 10, color: 'var(--text-faint)', width: 30, textAlign: 'right' }}>{pct}%</span>
-                          </div>
-                        </td>
                         <CustomRowCells row={s} props={cprops} optionsByProp={optsByProp} onPatch={patch} />
                         <td><button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteSession(s.id)}>✕</button></td>
                       </tr>
@@ -362,12 +338,6 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
               </DraftField>
               <DraftField label="Status">
                 <EditPillSelect field="session_status" value={draft.status} options={statusValues} colors={statusColors} onChange={st => setDraft(d => ({ ...d, status: st }))} onAddOption={addOption} allowAdd={isAdmin} />
-              </DraftField>
-              <DraftField label="Videos to Film">
-                <input className="form-input" type="number" min={0} value={draft.videos_planned} onChange={e => setDraft(d => ({ ...d, videos_planned: Math.max(0, Number(e.target.value) || 0) }))} style={{ width: 90, fontSize: 12 }} />
-              </DraftField>
-              <DraftField label="Videos Filmed">
-                <input className="form-input" type="number" min={0} value={draft.videos_filmed} onChange={e => setDraft(d => ({ ...d, videos_filmed: Math.max(0, Number(e.target.value) || 0) }))} style={{ width: 90, fontSize: 12 }} />
               </DraftField>
             </div>
 

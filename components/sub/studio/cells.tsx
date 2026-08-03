@@ -260,61 +260,27 @@ export function MaybeUrl({ value }: { value?: string | null }) {
   return <span style={{ fontSize: 12 }} title={value}>{value}</span>;
 }
 
-// Editable variant of MaybeUrl: shows a clickable link (when http) or plain text,
-// with a pencil to edit inline. Commits on blur/Enter, reverts on Escape.
-export function MaybeUrlCell({
+// Where a link cell is rendered: a table cell (compact, fixed widths) or a detail
+// panel property row (fills the row, truncates later). Both look and behave the
+// same — the resting state is always the clickable, truncated url, never an input.
+export type LinkVariant = 'table' | 'panel';
+
+// Click-to-edit link field shared by the tables and the detail panels.
+//   • resting → the truncated url as a clickable link (opens in a new tab), or a
+//     subtle "—" when empty; the ✎ (and the "—" itself) opens the editor
+//   • editing → an inline input that commits on blur/Enter and reverts on Escape
+// `allowPlainText` keeps a non-url value (e.g. a bare filename) readable as text
+// rather than linking it.
+function LinkEditable({
   value,
   onCommit,
+  variant = 'table',
+  allowPlainText = false,
 }: {
   value?: string;
   onCommit: (v: string) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [v, setV] = useState(value ?? '');
-  useEffect(() => { setV(value ?? ''); }, [value]);
-  const skipCommit = useRef(false);
-
-  if (editing) {
-    return (
-      <input
-        autoFocus
-        className="form-input"
-        style={{ width: 150, padding: '4px 7px', fontSize: 11 }}
-        value={v}
-        placeholder="https://… or filename"
-        onChange={e => setV(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === 'Escape') { skipCommit.current = true; setV(value ?? ''); e.currentTarget.blur(); }
-          else if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); }
-        }}
-        onBlur={() => {
-          if (skipCommit.current) skipCommit.current = false;
-          else if ((v ?? '') !== (value ?? '')) onCommit(v.trim());
-          setEditing(false);
-        }}
-      />
-    );
-  }
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, maxWidth: 220 }}>
-      <MaybeUrl value={value} />
-      <button
-        onClick={() => setEditing(true)}
-        style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 11, padding: 0, flexShrink: 0 }}
-        title={value ? 'Edit' : 'Add'}
-      >✎</button>
-    </div>
-  );
-}
-
-// A clickable, readable link (short URL) with an inline-editable URL behind a pencil.
-export function UrlCell({
-  value,
-  onCommit,
-}: {
-  value?: string;
-  onCommit: (v: string) => void;
+  variant?: LinkVariant;
+  allowPlainText?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [v, setV] = useState(value ?? '');
@@ -322,14 +288,17 @@ export function UrlCell({
   // Set when Escape reverts, so the blur it triggers doesn't commit the change.
   const skipCommit = useRef(false);
 
+  const panel = variant === 'panel';
+  const fontSize = panel ? 12 : 11;
+
   if (editing) {
     return (
       <input
         autoFocus
         className="form-input"
-        style={{ width: 130, padding: '4px 7px', fontSize: 11 }}
+        style={{ width: panel ? '100%' : (allowPlainText ? 150 : 130), padding: '4px 7px', fontSize }}
         value={v}
-        placeholder="https://…"
+        placeholder={allowPlainText ? 'https://… or filename' : 'https://…'}
         onChange={e => setV(e.target.value)}
         onKeyDown={e => {
           if (e.key === 'Escape') { skipCommit.current = true; setV(value ?? ''); e.currentTarget.blur(); }
@@ -344,26 +313,67 @@ export function UrlCell({
     );
   }
 
+  // minWidth 0 lets the link shrink inside the flex row so long values ellipsize
+  // instead of pushing the ✎ out of the cell.
+  const textStyle: React.CSSProperties = {
+    minWidth: 0, fontSize, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+  };
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, maxWidth: 200 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, maxWidth: panel ? '100%' : (allowPlainText ? 220 : 200) }}>
       {value ? (
-        <a
-          href={value}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ color: 'var(--accent)', textDecoration: 'none', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-          title={value}
-        >{shortUrl(value)}</a>
+        allowPlainText && !isHttpUrl(value)
+          ? <span style={{ ...textStyle, color: 'var(--text-dim)' }} title={value}>{value}</span>
+          : (
+            <a
+              href={value}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ ...textStyle, color: 'var(--accent)', textDecoration: 'none' }}
+              title={value}
+            >{shortUrl(value, panel ? 46 : 30)}</a>
+          )
       ) : (
-        <span style={{ color: 'var(--text-faint)' }}>—</span>
+        <button
+          onClick={() => setEditing(true)}
+          style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize, padding: 0, fontFamily: 'inherit' }}
+          title={allowPlainText ? 'Add' : 'Add link'}
+        >—</button>
       )}
       <button
         onClick={() => setEditing(true)}
         style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 11, padding: 0, flexShrink: 0 }}
-        title={value ? 'Edit link' : 'Add link'}
+        title={value ? (allowPlainText ? 'Edit' : 'Edit link') : (allowPlainText ? 'Add' : 'Add link')}
       >✎</button>
     </div>
   );
+}
+
+// Editable variant of MaybeUrl: shows a clickable link (when http) or plain text,
+// with a pencil to edit inline. Commits on blur/Enter, reverts on Escape.
+export function MaybeUrlCell({
+  value,
+  onCommit,
+  variant,
+}: {
+  value?: string;
+  onCommit: (v: string) => void;
+  variant?: LinkVariant;
+}) {
+  return <LinkEditable value={value} onCommit={onCommit} variant={variant} allowPlainText />;
+}
+
+// A clickable, readable link (short URL) with an inline-editable URL behind a pencil.
+export function UrlCell({
+  value,
+  onCommit,
+  variant,
+}: {
+  value?: string;
+  onCommit: (v: string) => void;
+  variant?: LinkVariant;
+}) {
+  return <LinkEditable value={value} onCommit={onCommit} variant={variant} />;
 }
 
 // Inline number input that commits on blur

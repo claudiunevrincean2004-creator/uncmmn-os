@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { StudioComment, StudioActivity, Profile, CommentReaction } from '@/lib/types';
 import { formatActivityTime } from '@/lib/studio';
 import { useDismiss } from '@/lib/use-dismiss';
-import { InlineText, MiniSelect, PillSelect, EditSelect, EditPillSelect, InlineDate, InlineNumber, MaybeUrl, MaybeUrlCell, isHttpUrl, shortUrl } from './cells';
+import { InlineText, MiniSelect, PillSelect, EditSelect, EditPillSelect, InlineDate, InlineNumber, MaybeUrl, MaybeUrlCell, UrlCell, isHttpUrl, shortUrl } from './cells';
 import { UserPicker, profileName } from './UserPicker';
 import Avatar from '@/components/Avatar';
 import MentionTextarea from '@/components/MentionTextarea';
@@ -86,12 +86,10 @@ function FieldControl({ field, values, onChangeField, onAddOption, profiles }: {
         ? <EditPillSelect field={field.field} value={value || ''} options={field.options || []} colors={field.colors || {}} onChange={v => onChangeField(field.key, v)} onAddOption={onAddOption} allowAdd={field.allowAdd} allowEmpty={field.allowEmpty} />
         : <PillSelect value={value} options={field.options || []} colors={field.colors || {}} onChange={v => onChangeField(field.key, v)} />;
     case 'url':
-      return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
-          <InlineText value={value} onCommit={v => onChangeField(field.key, v)} placeholder="https://…" style={{ flex: 1 }} />
-          {value && <a href={value} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontSize: 14 }} title={value}>↗</a>}
-        </div>
-      );
+      // Same renderer the main tables use: the resting state is the clickable,
+      // truncated url (opens in a new tab), with the ✎ swapping in the editor —
+      // never a bare input box with a launch arrow beside it.
+      return <UrlCell value={value || undefined} onCommit={v => onChangeField(field.key, v)} variant="panel" />;
     case 'readonly-url':
       return value
         ? <a href={value} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontSize: 12, wordBreak: 'break-all' }}>{value} ↗</a>
@@ -107,7 +105,7 @@ function FieldControl({ field, values, onChangeField, onAddOption, profiles }: {
     case 'maybe-url':
       // Editable value that may be a URL or a bare filename (e.g. Full version file):
       // renders a clickable link when it's a URL, plain text otherwise, edit behind a ✎.
-      return <MaybeUrlCell value={value || undefined} onCommit={v => onChangeField(field.key, v)} />;
+      return <MaybeUrlCell value={value || undefined} onCommit={v => onChangeField(field.key, v)} variant="panel" />;
     case 'readonly-maybe-url':
       // Link when the value is an http(s) URL, otherwise plain text (e.g. a filename).
       return <MaybeUrl value={value} />;
