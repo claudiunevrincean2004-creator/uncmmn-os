@@ -8,8 +8,8 @@ export const TEAM = ['Unassigned', 'Nathan', 'Editor', 'Videographer', 'Scriptwr
 
 // Video Review is purely organic content production — no ad-lifecycle statuses
 // live here. The ad lifecycle (Ad Creative Needed → … → Winner/Killed) lives
-// entirely on Ad Creative; videos move through to "Posted" and spawn ad work via
-// the per-row "Ad Creative Needed" button instead of an in-flow status.
+// entirely on Ad Creative, whose rows are created there by hand; videos just move
+// through to "Posted".
 export const VIDEO_STATUSES = [
   'Briefing',
   'Ready to Edit',

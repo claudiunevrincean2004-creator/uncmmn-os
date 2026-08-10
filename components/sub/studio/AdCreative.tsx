@@ -5,7 +5,7 @@ import { StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, Studi
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { usePagedRows } from '@/lib/use-paged-rows';
 import LoadMore from './LoadMore';
-import { AD_FORMATS, AD_STATUSES, AD_STATUS_COLORS, todayISO, logActivity, mergeOptions, inDateRange, getFieldOptions, colorMap, buildAddOptionRows } from '@/lib/studio';
+import { AD_FORMATS, AD_STATUSES, AD_STATUS_COLORS, todayISO, logActivity, inDateRange, getFieldOptions, colorMap, buildAddOptionRows } from '@/lib/studio';
 import { EditPillSelect, MiniSelect, InlineDate, UrlCell } from './cells';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import QuickLinks from './QuickLinks';
@@ -27,11 +27,9 @@ const PIPELINE_NOTIFY_STATUSES = ['Ad Creative Needed', 'Ready for Review', 'Rev
 
 // In-code fallback options per built-in select field, so adding an option can
 // backfill them as rows instead of dropping them (see buildAddOptionRows).
-// ad_angle has no built-in defaults (its options are entirely user-defined).
 const FIELD_FALLBACKS: Record<string, { values: string[]; colors?: Record<string, string> }> = {
   ad_status: { values: AD_STATUSES, colors: AD_STATUS_COLORS },
   ad_format: { values: AD_FORMATS },
-  ad_angle: { values: [] },
 };
 
 // Draft for the "Add Ad Creative" form. The row is only written to the database
@@ -41,7 +39,6 @@ interface AdDraft {
   creative_id: string;
   date_added: string;
   ad_format: string;
-  angle: string;
   final_link: string;
   assigned_to_user_id: string;
   status: string;
@@ -50,7 +47,6 @@ const EMPTY_DRAFT: AdDraft = {
   creative_id: '',
   date_added: '',
   ad_format: '',
-  angle: '',
   final_link: '',
   assigned_to_user_id: '',
   status: 'Ad Creative Needed',
@@ -76,7 +72,6 @@ interface Props {
 export default function AdCreative({ adCreatives, comments, activity, quickLinks, dropdownOptions, properties, customOptions, profiles, isAdmin, openItemId, onOpened, onReload, showToast }: Props) {
   const [fStatus, setFStatus] = usePersistedState<string>('studio_ad_status', 'All');
   const [fFormat, setFFormat] = usePersistedState<string>('studio_ad_format', 'All');
-  const [fAngle, setFAngle] = usePersistedState<string>('studio_ad_angle', 'All');
   const [sortKey, setSortKey] = usePersistedState<string>('studio_ad_sortkey', 'date_added');
   const [sortDir, setSortDir] = usePersistedState<SortDir>('studio_ad_sortdir', 'desc');
   const [dateFrom, setDateFrom] = usePersistedState<string>('studio_ad_from', '');
@@ -96,19 +91,12 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   const cprops = useMemo(() => sortProps(properties, TABLE_KEY), [properties]);
   const optsByProp = useMemo(() => groupOptions(customOptions), [customOptions]);
 
-  const presentAngles = Array.from(new Set(adCreatives.map(a => a.angle).filter(Boolean) as string[]));
   const statusFieldOpts = getFieldOptions(dropdownOptions, 'ad_status', AD_STATUSES, AD_STATUS_COLORS);
   const statusValues = statusFieldOpts.map(o => o.value);
   const statusColors = colorMap(statusFieldOpts);
   const formatFieldOpts = getFieldOptions(dropdownOptions, 'ad_format', AD_FORMATS);
   const formatValues = formatFieldOpts.map(o => o.value);
   const formatColors = colorMap(formatFieldOpts);
-  // Angle is an admin-managed select like Format/Status (editable options + colors
-  // via FieldOptionsManager). Merge any angles already present in data so legacy
-  // free-text values stay selectable even before they're saved as options.
-  const angleFieldOpts = getFieldOptions(dropdownOptions, 'ad_angle', []);
-  const angleColors = colorMap(angleFieldOpts);
-  const angleOpts = mergeOptions(angleFieldOpts.map(o => o.value), presentAngles);
 
   async function addOption(field: string, value: string) {
     const fb = FIELD_FALLBACKS[field] ?? { values: [] };
@@ -173,7 +161,6 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
       creative_id: draft.creative_id.trim() || 'New Creative',
       date_added: draft.date_added || null,
       ad_format: draft.ad_format || null,
-      angle: draft.angle.trim() || null,
       final_link: draft.final_link.trim() || null,
       assigned_to_user_id: draft.assigned_to_user_id || null,
       status,
@@ -185,8 +172,8 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
       alert(`Couldn't create ad creative: ${error.message}`);
       return;
     }
-    // A row created directly at a notify status pings the pipeline too (mirrors
-    // the "Ad Creative Needed" button creating one at "Ad Creative Needed").
+    // A row created directly at a notify status pings the pipeline too, so a new
+    // row added straight at "Ad Creative Needed" still reaches the editor.
     if (PIPELINE_NOTIFY_STATUSES.includes(status)) {
       notifyAdPipeline({
         status,
@@ -224,7 +211,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   }
 
   // Iterate: spawn a new Draft variation of the clicked creative, copying its
-  // format/angle (Final left blank), then ping the pipeline channel.
+  // format (Final left blank), then ping the pipeline channel.
   async function handleIterate(a: StudioAdCreative) {
     const rawName = (a.creative_id || 'Untitled').trim();
     // Number variations off the ROOT name (strip any existing " — Variation N")
@@ -244,7 +231,6 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
       creative_id: variationName,
       date_added: todayISO(),
       ad_format: a.ad_format || null,
-      angle: a.angle || null,
       final_link: null,        // start blank — this is a fresh draft to make
       status: 'Draft',
     };
@@ -265,7 +251,6 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   // through to the empty state.
   const statusPresent = ['All', ...Array.from(new Set([...statusValues, ...adCreatives.map(a => a.status).filter(Boolean) as string[]]))];
   const formatPresent = present(adCreatives.map(a => a.ad_format));
-  const anglePresent = present(adCreatives.map(a => a.angle));
 
   // Status sorts by pipeline position (Ad Creative Needed → … → Winner/Killed),
   // using the same admin-ordered option list the status pills render from.
@@ -274,7 +259,6 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
     { key: 'assigned', label: 'Assigned To', kind: 'text', value: a => resolveAssignee(a.assigned_to_user_id, profiles) },
     { key: 'date_added', label: 'Date Added', kind: 'date', value: a => a.date_added },
     { key: 'creative_id', label: 'Creative ID', kind: 'text', value: a => a.creative_id },
-    { key: 'angle', label: 'Angle', kind: 'text', value: a => a.angle },
   ], [statusValues, profiles]);
 
   const filtered = useMemo(() => {
@@ -283,29 +267,27 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
     if (q) r = r.filter(a => (a.creative_id || '').toLowerCase().includes(q));
     if (fStatus !== 'All') r = r.filter(a => a.status === fStatus);
     if (fFormat !== 'All') r = r.filter(a => (a.ad_format || '') === fFormat);
-    if (fAngle !== 'All') r = r.filter(a => (a.angle || '') === fAngle);
     if (dateFrom || dateTo) r = r.filter(a => inDateRange(a.date_added, dateFrom, dateTo));
     return sortRows(r, sortOptions, sortKey, sortDir);
-  }, [adCreatives, search, fStatus, fFormat, fAngle, sortKey, sortDir, dateFrom, dateTo, sortOptions]);
+  }, [adCreatives, search, fStatus, fFormat, sortKey, sortDir, dateFrom, dateTo, sortOptions]);
 
   const rows = useMemo(() => applyCustomFilters(filtered, cprops, custFilters), [filtered, cprops, custFilters]);
 
   // "Load more" pagination — resets to the first page on filter/sort change only.
   const { visible, hasMore, remaining, loadMore } = usePagedRows(
     rows,
-    [search, fStatus, fFormat, fAngle, sortKey, sortDir, dateFrom, dateTo, JSON.stringify(custFilters)].join('|'),
+    [search, fStatus, fFormat, sortKey, sortDir, dateFrom, dateTo, JSON.stringify(custFilters)].join('|'),
   );
 
   const fields: FieldDef[] = useMemo(() => [
     { key: 'creative_id', label: 'Creative ID', type: 'text', placeholder: 'Name / identifier' },
     { key: 'date_added', label: 'Date Added', type: 'date' },
     { key: 'ad_format', label: 'Format', type: 'pill', field: 'ad_format', options: formatValues, colors: formatColors, allowAdd: isAdmin, allowEmpty: true },
-    { key: 'angle', label: 'Angle', type: 'pill', field: 'ad_angle', options: angleOpts, colors: angleColors, allowAdd: isAdmin, allowEmpty: true },
     { key: 'assigned_to_user_id', label: 'Assigned To', type: 'user' },
     { key: 'source_video_url', label: 'Source Video', type: 'url' },
     { key: 'final_link', label: 'Final', type: 'url' },
     { key: 'status', label: 'Status', type: 'pill', field: 'ad_status', options: statusValues, colors: statusColors, allowAdd: isAdmin },
-  ], [formatValues, formatColors, angleOpts, angleColors, statusValues, statusColors, isAdmin]);
+  ], [formatValues, formatColors, statusValues, statusColors, isAdmin]);
 
   const selected = selectedId ? adCreatives.find(a => a.id === selectedId) : null;
 
@@ -330,7 +312,6 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
           {/* Labeled filters */}
           <FilterField label="Format"><MiniSelect value={fFormat} options={formatPresent} onChange={setFFormat} /></FilterField>
-          <FilterField label="Angle"><MiniSelect value={fAngle} options={anglePresent} onChange={setFAngle} /></FilterField>
           <FilterField label="Status"><MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} /></FilterField>
 
           {/* Sort by + direction */}
@@ -343,7 +324,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
         </div>
 
         {rows.length === 0 ? (
-          <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>{fStatus !== 'All' ? `No ad creatives with status “${fStatus}”.` : 'No ad creatives yet. Add one, or click "Ad Creative Needed" on a video in Video Review.'}</div>
+          <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>{fStatus !== 'All' ? `No ad creatives with status “${fStatus}”.` : 'No ad creatives yet. Add one with “+ Add Ad Creative”.'}</div>
         ) : (
           <>
           <div style={{ overflowX: 'auto' }}>
@@ -353,7 +334,6 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                   <th style={{ minWidth: 160 }}>Creative ID</th>
                   <th>Date Added</th>
                   <th onClick={isAdmin ? () => setOptsField({ field: 'ad_format', title: 'Format' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Format{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
-                  <th onClick={isAdmin ? () => setOptsField({ field: 'ad_angle', title: 'Angle' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Angle{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <th>Assigned To</th>
                   <th>Source Video</th>
                   <th>Final</th>
@@ -375,7 +355,6 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                       </td>
                       <td><InlineDate value={a.date_added} onCommit={d => patch(a.id, { date_added: d || undefined })} /></td>
                       <td><EditPillSelect field="ad_format" value={a.ad_format || ''} options={formatValues} colors={formatColors} onChange={f => patch(a.id, { ad_format: f })} onAddOption={addOption} allowAdd={isAdmin} allowEmpty /></td>
-                      <td><EditPillSelect field="ad_angle" value={a.angle || ''} options={angleOpts} colors={angleColors} onChange={x => patch(a.id, { angle: x })} onAddOption={addOption} allowAdd={isAdmin} allowEmpty /></td>
                       <td><UserPicker value={a.assigned_to_user_id ?? undefined} profiles={profiles} onChange={uid => patch(a.id, { assigned_to_user_id: uid || null })} /></td>
                       <td><UrlCell value={a.source_video_url} onCommit={u => patch(a.id, { source_video_url: u })} /></td>
                       <td><UrlCell value={a.final_link} onCommit={u => patch(a.id, { final_link: u })} /></td>
@@ -436,9 +415,6 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
               </DraftField>
               <DraftField label="Format">
                 <EditPillSelect field="ad_format" value={draft.ad_format} options={formatValues} colors={formatColors} onChange={f => setDraft(d => ({ ...d, ad_format: f }))} onAddOption={addOption} allowAdd={isAdmin} allowEmpty />
-              </DraftField>
-              <DraftField label="Angle">
-                <EditPillSelect field="ad_angle" value={draft.angle} options={angleOpts} colors={angleColors} onChange={x => setDraft(d => ({ ...d, angle: x }))} onAddOption={addOption} allowAdd={isAdmin} allowEmpty />
               </DraftField>
               <DraftField label="Assigned To">
                 <UserPicker value={draft.assigned_to_user_id} profiles={profiles} onChange={uid => setDraft(d => ({ ...d, assigned_to_user_id: uid }))} />

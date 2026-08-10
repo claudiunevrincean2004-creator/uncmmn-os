@@ -9,7 +9,7 @@ import FilterField from './FilterField';
 import {
   VIDEO_FORMATS, VIDEO_STATUSES, VIDEO_STATUS_COLORS,
   PRIORITIES, PRIORITY_COLORS,
-  isOverdue, logActivity, todayISO, mergeOptions, inDateRange,
+  isOverdue, logActivity, mergeOptions, inDateRange,
   getFieldOptions, colorMap, buildAddOptionRows,
 } from '@/lib/studio';
 import { EditPillSelect, MiniSelect, UrlCell, InlineDate } from './cells';
@@ -73,10 +73,9 @@ interface Props {
   openItemId?: string;
   onOpened?: () => void;
   onReload: () => void;
-  showToast: (msg: string) => void;
 }
 
-export default function VideoReview({ videos, comments, activity, quickLinks, dropdownOptions, profiles, isAdmin, openItemId, onOpened, onReload, showToast }: Props) {
+export default function VideoReview({ videos, comments, activity, quickLinks, dropdownOptions, profiles, isAdmin, openItemId, onOpened, onReload }: Props) {
   const [fStatus, setFStatus] = usePersistedState<string>('studio_v_status', 'All');
   const [fAssigned, setFAssigned] = usePersistedState<string>('studio_v_assigned', 'All');
   const [fFormat, setFFormat] = usePersistedState<string>('studio_v_format', 'All');
@@ -90,7 +89,6 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState<VideoDraft>(EMPTY_DRAFT);
   const [creating, setCreating] = useState(false);
-  const [adBusy, setAdBusy] = useState<string | null>(null);
 
   // Open a row's panel when arriving via a deep link (Slack "Open in UNCMMN OS").
   // Signal onOpened so the parent clears the one-shot deep link (returning to this
@@ -161,49 +159,6 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }).catch(err => console.warn('[VideoReview] /api/video-notify call failed', err));
-  }
-
-  // Fire-and-forget POST to the Ad Creative pipeline notify (server holds the
-  // Slack webhook URL, skips silently if unset). Never blocks the UI or throws.
-  function notifyAdPipeline(payload: { status: string; creativeId: string; itemUrl: string; sourceLink: string; finalLink: string; editorMention: string }) {
-    fetch('/api/ads-notify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    }).catch(err => console.warn('[VideoReview] /api/ads-notify call failed', err));
-  }
-
-  // "Ad Creative Needed": spawn a new Ad Creative row from this video to kick off
-  // the ad lifecycle. Pre-fills the creative id (video title + " — Ad"), the
-  // source link (the video's Final Product link), and the assigned editor; starts
-  // it at "Ad Creative Needed", which pings the editor in #ad-creative-pipeline.
-  async function createAdCreative(v: StudioVideo) {
-    if (adBusy) return;
-    setAdBusy(v.id);
-    const creativeId = `${(v.title || 'Untitled').trim()} — Ad`;
-    const editorName = resolveAssignee(v.assigned_to_user_id, profiles) || '';
-    const mentions = buildPipelineMentions(v.assigned_to_user_id, profiles);
-    const sourceLink = v.final_url || '';
-    const row = {
-      creative_id: creativeId,
-      source_video_url: sourceLink || null,
-      // Carry the user REFERENCE (not the legacy text) onto the new ad creative.
-      assigned_to_user_id: v.assigned_to_user_id || null,
-      date_added: todayISO(),
-      ad_format: 'Video',
-      status: 'Ad Creative Needed',
-    };
-    const { data: created, error } = await supabase.from('studio_ad_creatives').insert([row]).select().single();
-    setAdBusy(null);
-    if (error) {
-      console.error('[VideoReview] failed to create ad creative', { row, error });
-      alert(`Couldn't create ad creative: ${error.message}`);
-      return;
-    }
-    const adUrl = created?.id ? itemUrl('ad', created.id) : '';
-    notifyAdPipeline({ status: 'Ad Creative Needed', creativeId, itemUrl: adUrl, sourceLink, finalLink: '', ...mentions });
-    showToast(`Ad creative created for ${creativeId} → assigned to ${editorName || 'unassigned'}`);
-    onReload();
   }
 
   async function createVideo() {
@@ -351,7 +306,6 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                   <th>Deadline</th>
                   <th>Priority</th>
                   <th>Rev.</th>
-                  <th>Ad Creative</th>
                   <th></th>
                 </tr>
               </thead>
@@ -384,17 +338,6 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                           {v.revision_count > 0
                             ? <span className="badge" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }} title={`${v.revision_count} revision round(s)`}>{v.revision_count}</span>
                             : <span style={{ color: 'var(--text-faint)' }}>0</span>}
-                        </td>
-                        <td>
-                          <button
-                            className="btn-ghost"
-                            style={{ fontSize: 11, padding: '4px 10px', color: 'var(--accent)', whiteSpace: 'nowrap' }}
-                            onClick={() => createAdCreative(v)}
-                            disabled={adBusy === v.id}
-                            title="Create an Ad Creative from this video and start the ad lifecycle"
-                          >
-                            {adBusy === v.id ? '…' : '🎬 Ad Creative Needed'}
-                          </button>
                         </td>
                         <td><button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteVideo(v.id)}>✕</button></td>
                       </tr>
