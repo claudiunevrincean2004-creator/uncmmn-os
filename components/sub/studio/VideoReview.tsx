@@ -1,5 +1,5 @@
 'use client';
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StudioVideo, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
@@ -284,6 +284,17 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
             <FilterField label="Priority"><MiniSelect value={fPriority} options={priorityPresent} onChange={setFPriority} /></FilterField>
             <SortControl options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
             <FilterField label="Date"><DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
+            {/* Managing Format/Status options used to hang off the table's column
+                headers. The card layout has no header row, so the same two
+                editors live here instead — same FieldOptionsManager, same
+                admin-only gating. */}
+            {isAdmin && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ fontSize: 10, color: 'var(--text-faint)', whiteSpace: 'nowrap' }}>Edit options</span>
+                <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setOptsField({ field: 'video_format', title: 'Format' })}>Format ✎</button>
+                <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setOptsField({ field: 'video_status', title: 'Status' })}>Status ✎</button>
+              </span>
+            )}
           </div>
           <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', flexShrink: 0 }} onClick={() => { setDraft(EMPTY_DRAFT); setAddOpen(true); }}>+ Add Video</button>
         </div>
@@ -292,60 +303,65 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
           <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>No videos match. Add a video or adjust filters.</div>
         ) : (
           <>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th style={{ minWidth: 180 }}>Title / Description</th>
-                  <th onClick={isAdmin ? () => setOptsField({ field: 'video_format', title: 'Format' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Format{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
-                  <th>Assigned To</th>
-                  <th onClick={isAdmin ? () => setOptsField({ field: 'video_status', title: 'Status' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Status{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
-                  <th>Brief</th>
-                  <th>Raw Files</th>
-                  <th>Final</th>
-                  <th>Deadline</th>
-                  <th>Priority</th>
-                  <th>Rev.</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map(v => {
-                  const overdue = isOverdue(v.deadline, v.status, DONE);
-                  return (
-                    <Fragment key={v.id}>
-                      <tr style={overdue ? { background: 'rgba(239,68,68,0.06)', boxShadow: 'inset 3px 0 0 #ef4444' } : (selectedId === v.id ? { background: 'var(--surface-2)' } : undefined)}>
-                        <td style={{ minWidth: 180 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <button onClick={() => setSelectedId(v.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{v.title}</button>
-                            <CopyLinkButton type="video" id={v.id} />
-                          </div>
-                        </td>
-                        <td><EditPillSelect field="video_format" value={v.format || ''} options={formatValues} colors={formatColors} onChange={f => patch(v.id, { format: f })} onAddOption={addOption} allowAdd={isAdmin} allowEmpty /></td>
-                        <td><UserPicker value={v.assigned_to_user_id ?? undefined} profiles={profiles} onChange={uid => patch(v.id, { assigned_to_user_id: uid || null })} /></td>
-                        <td><EditPillSelect field="video_status" value={v.status} options={statusValues} colors={statusColors} onChange={s => changeStatus(v, s)} onAddOption={addOption} allowAdd={isAdmin} /></td>
-                        <td><UrlCell value={v.brief_url} onCommit={u => patch(v.id, { brief_url: u })} /></td>
-                        <td><UrlCell value={v.raw_files_url} onCommit={u => patch(v.id, { raw_files_url: u })} /></td>
-                        <td><UrlCell value={v.final_url} onCommit={u => patch(v.id, { final_url: u })} /></td>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <InlineDate value={v.deadline} onCommit={d => patch(v.id, { deadline: d || undefined })} highlight={overdue} />
-                            {overdue && <span style={{ color: '#ef4444', fontSize: 9, fontWeight: 700, whiteSpace: 'nowrap' }}>OVERDUE</span>}
-                          </div>
-                        </td>
-                        <td><EditPillSelect field="video_priority" value={v.priority || 'Normal'} options={priorityOpts} colors={PRIORITY_COLORS} onChange={p => patch(v.id, { priority: p })} onAddOption={addOption} allowAdd={isAdmin} /></td>
-                        <td style={{ textAlign: 'center' }}>
-                          {v.revision_count > 0
-                            ? <span className="badge" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }} title={`${v.revision_count} revision round(s)`}>{v.revision_count}</span>
-                            : <span style={{ color: 'var(--text-faint)' }}>0</span>}
-                        </td>
-                        <td><button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteVideo(v.id)}>✕</button></td>
-                      </tr>
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
+          {/* Card rows. Every field, edit path and the click-to-open panel are
+              exactly what the table had — only the arrangement changed:
+              title on top, the tag-like fields as pills beneath it, and the
+              links/dates in a wrapping grid below a hairline. */}
+          <div className="vr-list">
+            {visible.map(v => {
+              const overdue = isOverdue(v.deadline, v.status, DONE);
+              return (
+                <div
+                  key={v.id}
+                  className={`vr-card hover-card${overdue ? ' is-overdue' : ''}${selectedId === v.id ? ' is-selected' : ''}`}
+                >
+                  <div className="vr-card-head">
+                    <button className="vr-title" onClick={() => setSelectedId(v.id)} title="Open details">
+                      {v.title || 'Untitled'}
+                    </button>
+                    <div className="vr-actions">
+                      <CopyLinkButton type="video" id={v.id} />
+                      <button className="btn-danger" style={{ padding: '3px 8px' }} onClick={() => deleteVideo(v.id)} title="Delete video" aria-label="Delete video">✕</button>
+                    </div>
+                  </div>
+
+                  <div className="vr-pills">
+                    <EditPillSelect size="lg" field="video_status" value={v.status} options={statusValues} colors={statusColors} onChange={s => changeStatus(v, s)} onAddOption={addOption} allowAdd={isAdmin} />
+                    <UserPicker size="lg" value={v.assigned_to_user_id ?? undefined} profiles={profiles} onChange={uid => patch(v.id, { assigned_to_user_id: uid || null })} />
+                    <EditPillSelect size="lg" field="video_format" value={v.format || ''} options={formatValues} colors={formatColors} onChange={f => patch(v.id, { format: f })} onAddOption={addOption} allowAdd={isAdmin} allowEmpty />
+                    <EditPillSelect size="lg" field="video_priority" value={v.priority || 'Normal'} options={priorityOpts} colors={PRIORITY_COLORS} onChange={p => patch(v.id, { priority: p })} onAddOption={addOption} allowAdd={isAdmin} />
+                    {/* Was a tiny label beside the deadline; as a pill up here it
+                        reads at a glance, alongside the card's overdue rail. */}
+                    {overdue && <span className="vr-flag">Overdue</span>}
+                  </div>
+
+                  <div className="vr-meta">
+                    <div className="vr-meta-cell">
+                      <div className="vr-meta-label">Brief</div>
+                      <UrlCell value={v.brief_url} onCommit={u => patch(v.id, { brief_url: u })} />
+                    </div>
+                    <div className="vr-meta-cell">
+                      <div className="vr-meta-label">Raw Files</div>
+                      <UrlCell value={v.raw_files_url} onCommit={u => patch(v.id, { raw_files_url: u })} />
+                    </div>
+                    <div className="vr-meta-cell">
+                      <div className="vr-meta-label">Final</div>
+                      <UrlCell value={v.final_url} onCommit={u => patch(v.id, { final_url: u })} />
+                    </div>
+                    <div className="vr-meta-cell">
+                      <div className="vr-meta-label">Deadline</div>
+                      <InlineDate value={v.deadline} onCommit={d => patch(v.id, { deadline: d || undefined })} highlight={overdue} />
+                    </div>
+                    <div className="vr-meta-cell">
+                      <div className="vr-meta-label">Revisions</div>
+                      {v.revision_count > 0
+                        ? <span className="badge" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', padding: '4px 11px', fontSize: 11 }} title={`${v.revision_count} revision round(s)`}>{v.revision_count}</span>
+                        : <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>0</span>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
           {hasMore && <LoadMore remaining={remaining} onClick={loadMore} />}
           </>

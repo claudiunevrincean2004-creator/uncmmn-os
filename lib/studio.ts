@@ -58,9 +58,14 @@ export const AD_STATUS_COLORS: Record<string, string> = {
 
 export const PRIORITIES = ['Low', 'Normal', 'High', 'Urgent'];
 
+// Used by Video Review only. Pills tint their background from the colour and
+// draw their LABEL in it, so a near-white value is unreadable on aurora's white
+// surface — hence Normal is a mid slate (was #e5e7eb) that holds up on both
+// themes. Low stays a close neutral on purpose: neither of the two calm
+// priorities should shout, and the pill's own text says which is which.
 export const PRIORITY_COLORS: Record<string, string> = {
   Low: '#6b7280',     // gray
-  Normal: '#e5e7eb',  // white
+  Normal: '#64748b',  // slate — readable on light and dark alike
   High: '#f59e0b',    // orange
   Urgent: '#ef4444',  // red
 };

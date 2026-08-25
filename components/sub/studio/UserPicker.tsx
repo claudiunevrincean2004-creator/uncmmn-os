@@ -74,14 +74,18 @@ export function AssigneeTag({ name, size = 16 }: { name: string | null; size?: n
 
 // Searchable picker backed by all real platform users. Everyone is assignable;
 // the legacy `assignable` flag is ignored (kept in the DB, no longer used).
+// `size` is presentation only — 'sm' is the dense table trigger every Studio
+// table has always used, 'lg' the roomier pill Video Review's card rows want.
 export function UserPicker({
-  value, profiles, onChange,
+  value, profiles, onChange, size = 'sm',
 }: {
   value?: string;
   profiles: Profile[];
   onChange: (userId: string) => void;
   width?: number;
+  size?: 'sm' | 'lg';
 }) {
+  const lg = size === 'lg';
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -146,10 +150,20 @@ export function UserPicker({
         ref={btnRef}
         onClick={() => setOpen(o => !o)}
         className="btn-ghost"
-        style={{ fontSize: 11, padding: display ? '3px 9px 3px 4px' : '4px 9px', maxWidth: 150, overflow: 'hidden', whiteSpace: 'nowrap', color: display ? 'var(--text)' : 'var(--text-faint)' }}
+        style={{
+          fontSize: lg ? 12 : 11,
+          padding: lg
+            ? (display ? '5px 16px 5px 6px' : '7px 16px')
+            : (display ? '3px 9px 3px 4px' : '4px 9px'),
+          borderRadius: lg ? 999 : undefined,
+          maxWidth: lg ? 200 : 150,
+          overflow: 'hidden',
+          whiteSpace: 'nowrap',
+          color: display ? 'var(--text)' : 'var(--text-faint)',
+        }}
         title={display || 'Assign a user'}
       >
-        <AssigneeTag name={display} />
+        <AssigneeTag name={display} size={lg ? 22 : 16} />
       </button>
 
       {open && pos && typeof document !== 'undefined' && createPortal(

@@ -172,6 +172,10 @@ export function EditSelect({
 }
 
 // Colored pill select that also supports adding custom options.
+//
+// `size` is presentation only — 'sm' is the dense table pill every Studio table
+// has always used, 'lg' the roomier one Video Review's card rows want. Behaviour
+// (options, "+ Add new…", admin gating) is identical either way.
 export function EditPillSelect({
   field,
   options,
@@ -181,6 +185,7 @@ export function EditPillSelect({
   onAddOption,
   allowAdd = true,
   allowEmpty = false,
+  size = 'sm',
 }: {
   field: string;
   options: string[];
@@ -190,7 +195,9 @@ export function EditPillSelect({
   onAddOption?: (field: string, value: string) => void;
   allowAdd?: boolean;
   allowEmpty?: boolean;
+  size?: 'sm' | 'lg';
 }) {
+  const lg = size === 'lg';
   const color = colors[value] || '#6b7280';
   const opts = value && !options.includes(value) ? [value, ...options] : options;
   function handle(v: string) {
@@ -210,10 +217,11 @@ export function EditPillSelect({
         ...pillStyle(color),
         appearance: 'none',
         WebkitAppearance: 'none',
-        borderRadius: 20,
-        padding: '3px 9px',
-        fontSize: 10,
-        fontWeight: 700,
+        borderRadius: lg ? 999 : 20,
+        padding: lg ? '7px 16px' : '3px 9px',
+        fontSize: lg ? 12 : 10,
+        fontWeight: lg ? 600 : 700,
+        maxWidth: lg ? 220 : undefined,
         cursor: 'pointer',
         outline: 'none',
         fontFamily: 'inherit',

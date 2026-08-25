@@ -242,6 +242,166 @@ html, body {
   opacity: 1;
 }
 
+/* Touch devices have no hover, so a hover-reveal would make these unreachable. */
+@media (hover: none) {
+  .row-copy { opacity: 1; }
+}
+
+/* ===== Video Review — spacious card rows =====================================
+   Video Review ONLY for now; every other Studio table still uses .data-table.
+   Each row is its own card separated by whitespace rather than gridlines, so
+   the list reads as a calm stack instead of a dense spreadsheet. Every colour
+   is a theme token (or derived from the row's own status colour), so this works
+   in aurora and midnight alike. */
+.vr-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.vr-card {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  padding: 26px 28px;
+  /* Clips the overdue rail to the rounded corners. Safe here: the only things
+     that escape a card are the UserPicker dropdown (a portal) and native
+     <select> menus (drawn by the OS) — neither is clipped by this. */
+  overflow: hidden;
+  transition: box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.vr-card:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+.vr-card.is-selected {
+  border-color: var(--accent);
+}
+
+/* Overdue rail — replaces the old red row tint. A quiet vertical marker reads
+   at a glance without staining the whole card. */
+.vr-card.is-overdue::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--neg);
+}
+
+.vr-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+/* The title carries the row: the largest, darkest thing on the card. */
+.vr-title {
+  font-family: var(--font-head);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+  transition: color 150ms ease;
+  /* A pasted paragraph must not turn one row into a wall of text. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.vr-title:hover {
+  color: var(--accent);
+}
+
+/* Copy-link + delete, quiet until the card is hovered or focused. */
+.vr-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.vr-card:hover .vr-actions,
+.vr-card:focus-within .vr-actions {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .vr-actions { opacity: 1; }
+}
+
+/* Tag-like fields (status, assignee, format, priority) — soft pills, given room
+   to breathe rather than packed into columns. */
+.vr-pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Non-editable flags that sit alongside the pills. Tinted from --neg so they
+   track the theme rather than hardcoding a red. */
+.vr-flag {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-family: var(--font-ui);
+  background: color-mix(in srgb, var(--neg) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--neg) 32%, transparent);
+  color: var(--neg);
+}
+
+/* Links + dates, on their own line under a hairline so the pills stay scannable. */
+.vr-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 18px 24px;
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.vr-meta-cell {
+  min-width: 0;
+}
+
+.vr-meta-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  font-weight: 700;
+  font-family: var(--font-ui);
+  margin-bottom: 8px;
+}
+
+/* Mobile: tighter padding and a smaller title, but the same card rhythm. */
+@media (max-width: 640px) {
+  .vr-card { padding: 18px; border-radius: 16px; }
+  .vr-title { font-size: 15px; }
+  .vr-meta { gap: 16px; margin-top: 18px; padding-top: 16px; }
+}
+
 /* Modal overlay */
 .modal-overlay {
   position: fixed;
