@@ -6,6 +6,7 @@ import { Role, canAccess } from '@/lib/auth-config';
 import { checkSchema, getMigrationSQL } from '@/lib/setup-db';
 import { Client, Post, DriveFolder, SubscriberSnapshot, ResearchItem, StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile, ClipperAccount, ClipperContent, TrialReelSource, TrialReelProduction, ClipSource, ClipSnippet, MainPage } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
+import { useRealtimeSync, byField, type RealtimeBinding } from '@/lib/use-realtime';
 
 import Sidebar from '@/components/Sidebar';
 import Dashboard from '@/components/Dashboard';
@@ -315,6 +316,68 @@ export default function Home() {
       });
     if (error) console.warn('[inbox] could not save read state (run supabase/comment_inbox.sql):', error.message);
   }, [currentUserId]);
+
+  // ── Live sync ──────────────────────────────────────────────────────────────
+  // Every board reads from the lists above, so subscribing here makes ALL of
+  // them live at once: another user's insert/update/delete is patched straight
+  // into the matching list, with no refetch and no navigation — scroll, open
+  // side panels, filters and in-progress typing all survive.
+  //
+  // Each `sort` mirrors that table's `.order(...)` in loadData, so a row that
+  // arrives over the wire lands exactly where a reload would have put it.
+  //
+  // Each table must be in the `supabase_realtime` publication — see
+  // supabase/realtime.sql.
+  const realtimeBindings: RealtimeBinding[] = [
+    // Studio boards
+    { table: 'studio_videos', setRows: setStudioVideos, sort: byField('created_at', false) },
+    { table: 'studio_sequences', setRows: setStudioSequences, sort: byField('created_at', false) },
+    { table: 'studio_sessions', setRows: setStudioSessions, sort: byField('created_at', false) },
+    { table: 'studio_ad_creatives', setRows: setStudioAdCreatives, sort: byField('created_at', false) },
+    // Trial Reels — source library + production board
+    { table: 'trial_reel_source', setRows: setTrialReelSources, sort: byField('created_at', false) },
+    { table: 'trial_reel_production', setRows: setTrialReelProductions, sort: byField('created_at', false) },
+    // Clippers
+    { table: 'clipper_accounts', setRows: setClipperAccounts, sort: byField('created_at') },
+    { table: 'clipper_content', setRows: setClipperContent, sort: byField('created_at', false) },
+    // Clip Library
+    { table: 'clip_source', setRows: setClipSources, sort: byField('name') },
+    { table: 'clip_snippet', setRows: setClipSnippets, sort: byField('created_at') },
+    // Comments & inbox — a new comment updates the panel, the sidebar badge and
+    // the unread banner together, because all three read this one list.
+    { table: 'studio_comments', setRows: setStudioComments, sort: byField('created_at') },
+    { table: 'studio_activity', setRows: setStudioActivity, sort: byField('created_at', false) },
+    // Board scaffolding: an admin adding a status option, renaming themselves or
+    // pinning a quick link shows up on everyone's board without a refresh too.
+    { table: 'studio_quick_links', setRows: setStudioQuickLinks, sort: byField('created_at') },
+    { table: 'studio_dropdown_options', setRows: setStudioDropdownOptions, sort: byField('created_at') },
+    { table: 'custom_properties', setRows: setCustomProperties, sort: byField('position') },
+    { table: 'custom_property_options', setRows: setCustomPropOptions, sort: byField('position') },
+    { table: 'profiles', setRows: setStudioProfiles, sort: byField('created_at') },
+  ];
+  // Read state is per-user and lives in a Set, not a list — its own binding, and
+  // scoped server-side to this user's rows so other people's reads never travel.
+  // Keeps the inbox badge honest across this user's own open tabs.
+  if (currentUserId) {
+    realtimeBindings.push({
+      table: 'comment_reads',
+      filter: `user_id=eq.${currentUserId}`,
+      onChange: payload => {
+        const id = (payload.eventType === 'DELETE' ? payload.old : payload.new)?.comment_id as string | undefined;
+        if (!id) return;
+        setReadIds(prev => {
+          if (payload.eventType === 'DELETE' ? !prev.has(id) : prev.has(id)) return prev;
+          const next = new Set(prev);
+          if (payload.eventType === 'DELETE') next.delete(id); else next.add(id);
+          return next;
+        });
+      },
+    });
+  }
+  // Subscribe only once the initial load has landed, so an early event can't be
+  // overwritten by the load that was already in flight. A reconnect refetches
+  // once, to recover whatever was missed while the socket was down.
+  useRealtimeSync(realtimeBindings, !loading, loadData);
 
   // "<item_type>:<item_id>" → display name, so an inbox entry can say which item
   // (and which tab) a comment was left on. Trial Reel productions take their name

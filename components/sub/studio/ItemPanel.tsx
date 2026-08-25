@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { StudioComment, StudioActivity, Profile, CommentReaction } from '@/lib/types';
 import { formatActivityTime } from '@/lib/studio';
 import { useDismiss } from '@/lib/use-dismiss';
+import { nextChannelName } from '@/lib/use-realtime';
 import { InlineText, MiniSelect, PillSelect, EditSelect, EditPillSelect, InlineDate, InlineNumber, MaybeUrl, MaybeUrlCell, UrlCell, isHttpUrl, shortUrl } from './cells';
 import { UserPicker, profileName } from './UserPicker';
 import Avatar from '@/components/Avatar';
@@ -202,6 +203,42 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
     });
     return () => { cancelled = true; };
   }, [itemCommentIdsKey]);
+
+  // Live reactions. The fetch above only reruns when the comment SET changes, so
+  // without this a reaction another user adds to a comment already on screen
+  // would never show up. postgres_changes has no "in (…)" filter, so the panel's
+  // own comment ids are matched client-side, through a ref the handler reads at
+  // event time (the subscription itself must not churn as comments come and go).
+  const visibleCommentIds = useRef<Set<string>>(new Set());
+  visibleCommentIds.current = new Set(itemCommentIdsKey ? itemCommentIdsKey.split(',') : []);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(nextChannelName(`uncmmn-os-reactions:${itemType}:${itemId}`))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'comment_reactions' }, payload => {
+        if (payload.eventType === 'DELETE') {
+          // `old` carries only the primary key, so "is this one of ours?" is
+          // answered by whether we're actually holding that row.
+          const id = payload.old?.id as string | undefined;
+          if (!id) return;
+          setReactions(prev => (prev.some(r => r.id === id) ? prev.filter(r => r.id !== id) : prev));
+          return;
+        }
+        const row = payload.new as CommentReaction;
+        if (!row?.id || !visibleCommentIds.current.has(row.comment_id)) return;
+        setReactions(prev => {
+          // Match on the unique (comment, user, emoji) triple as well as the id,
+          // so this also absorbs the echo of our own optimistic insert — whose
+          // temp row carries a `tmp-…` id — instead of double-counting it.
+          const same = (r: CommentReaction) =>
+            r.id === row.id ||
+            (r.comment_id === row.comment_id && r.user_id === row.user_id && r.emoji === row.emoji);
+          return prev.some(same) ? prev.map(r => (same(r) ? row : r)) : [...prev, row];
+        });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [itemType, itemId]);
 
   // Add or remove the current user's `emoji` reaction on a comment. Optimistic: the
   // pill updates immediately and the row is written behind it; the insert's real id
