@@ -247,159 +247,269 @@ html, body {
   .row-copy { opacity: 1; }
 }
 
-/* ===== Video Review — spacious card rows =====================================
-   Video Review ONLY for now; every other Studio table still uses .data-table.
-   Each row is its own card separated by whitespace rather than gridlines, so
-   the list reads as a calm stack instead of a dense spreadsheet. Every colour
-   is a theme token (or derived from the row's own status colour), so this works
-   in aurora and midnight alike. */
-.vr-list {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+/* ===== Studio tables — refined single-line rows ==============================
+   Shared by all four Studio tabs (Video Review, Story Sequences, Filming
+   Sessions, Ad Creative) so they read identically. One item per row, everything
+   on ONE line in aligned columns, separated by hairlines rather than gridlines
+   or cards. Every colour is a theme token or the row's own status colour, so
+   this holds up in both light (aurora) and dark (midnight). */
+
+/* Data tables are wider than a phone. Horizontal scroll inside this box keeps
+   the columns aligned instead of reflowing them into an unreadable stack, and
+   the page body itself never scrolls sideways. */
+.studio-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
-.vr-card {
-  position: relative;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  box-shadow: var(--shadow);
-  padding: 26px 28px;
-  /* Clips the overdue rail to the rounded corners. Safe here: the only things
-     that escape a card are the UserPicker dropdown (a portal) and native
-     <select> menus (drawn by the OS) — neither is clipped by this. */
-  overflow: hidden;
-  transition: box-shadow 180ms ease, border-color 180ms ease;
-}
-
-.vr-card:hover {
-  box-shadow: var(--shadow-lg);
-}
-
-.vr-card.is-selected {
-  border-color: var(--accent);
-}
-
-/* Overdue rail — replaces the old red row tint. A quiet vertical marker reads
-   at a glance without staining the whole card. */
-.vr-card.is-overdue::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: var(--neg);
-}
-
-.vr-card-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 18px;
-}
-
-/* The title carries the row: the largest, darkest thing on the card. */
-.vr-title {
-  font-family: var(--font-head);
-  font-size: 17px;
-  font-weight: 700;
-  line-height: 1.35;
-  letter-spacing: -0.01em;
-  color: var(--text);
-  background: none;
-  border: none;
-  padding: 0;
-  text-align: left;
-  cursor: pointer;
-  min-width: 0;
-  transition: color 150ms ease;
-  /* A pasted paragraph must not turn one row into a wall of text. */
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.vr-title:hover {
-  color: var(--accent);
-}
-
-/* Copy-link + delete, quiet until the card is hovered or focused. */
-.vr-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  opacity: 0;
-  transition: opacity 150ms ease;
-}
-
-.vr-card:hover .vr-actions,
-.vr-card:focus-within .vr-actions {
-  opacity: 1;
-}
-
-@media (hover: none) {
-  .vr-actions { opacity: 1; }
-}
-
-/* Tag-like fields (status, assignee, format, priority) — soft pills, given room
-   to breathe rather than packed into columns. */
-.vr-pills {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-}
-
-/* Non-editable flags that sit alongside the pills. Tinted from --neg so they
-   track the theme rather than hardcoding a red. */
-.vr-flag {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 14px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+.studio-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
   font-family: var(--font-ui);
-  background: color-mix(in srgb, var(--neg) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--neg) 32%, transparent);
-  color: var(--neg);
 }
 
-/* Links + dates, on their own line under a hairline so the pills stay scannable. */
-.vr-meta {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
-  gap: 18px 24px;
-  margin-top: 22px;
-  padding-top: 20px;
-  border-top: 1px solid var(--border);
-}
-
-.vr-meta-cell {
-  min-width: 0;
-}
-
-.vr-meta-label {
+.studio-table th {
+  text-align: left;
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-faint);
   font-weight: 700;
-  font-family: var(--font-ui);
-  margin-bottom: 8px;
+  padding: 0 14px 12px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
 }
 
-/* Mobile: tighter padding and a smaller title, but the same card rhythm. */
+.studio-table td {
+  padding: 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  vertical-align: middle;
+  /* The whole point: a row is one line, never a wrapped block. */
+  white-space: nowrap;
+}
+
+.studio-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* First column carries the row's accent rail, so it needs the extra left inset
+   and a positioning context for it. */
+.studio-table th:first-child,
+.studio-table td:first-child {
+  padding-left: 18px;
+}
+
+.studio-table td:first-child {
+  position: relative;
+}
+
+/* The rail itself — tinted per row from --row-accent, which each tab sets
+   inline from that row's status colour (or --neg when the row is overdue). */
+.studio-table tbody td:first-child::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--row-accent, var(--accent));
+}
+
+.studio-table tbody tr {
+  transition: background 140ms ease;
+}
+
+.studio-table tbody tr:hover td {
+  background: var(--surface-2);
+}
+
+.studio-table tbody tr.is-selected td {
+  background: var(--accent-soft);
+}
+
+/* Title — the prominent element in the row. Truncates rather than wrapping, so
+   a long description can never push the row onto a second line. */
+.st-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.st-title {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 140ms ease;
+}
+
+.st-title:hover {
+  color: var(--accent);
+}
+
+/* Muted secondary date riding inline after the title. */
+.st-sub {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-faint);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.st-right {
+  text-align: right;
+}
+
+.st-overdue {
+  color: var(--neg);
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 @media (max-width: 640px) {
-  .vr-card { padding: 18px; border-radius: 16px; }
-  .vr-title { font-size: 15px; }
-  .vr-meta { gap: 16px; margin-top: 18px; padding-top: 16px; }
+  .studio-table td { padding: 11px 12px; }
+  .studio-table th { padding: 0 12px 10px; }
+  .st-title { max-width: 200px; }
+}
+
+/* ===== Studio toolbar — search · filters · count · action ==================== */
+.studio-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.studio-search {
+  position: relative;
+  flex: 0 1 260px;
+  min-width: 170px;
+}
+
+.studio-search input {
+  padding-left: 30px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.studio-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-faint);
+  font-size: 13px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.studio-filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.studio-toolbar-end {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.studio-count {
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+/* Narrow: search takes its own line, and the count/action pair spans the width
+   so "+ Add" stays reachable at the right edge. */
+@media (max-width: 720px) {
+  .studio-search { flex: 1 1 100%; }
+  .studio-toolbar-end { width: 100%; margin-left: 0; justify-content: space-between; }
+}
+
+/* ===== Segmented Light / Dark theme control ================================= */
+.theme-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.theme-seg button {
+  border: none;
+  background: none;
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-ui);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.theme-seg button:hover {
+  color: var(--text);
+}
+
+.theme-seg button.active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+/* ===== Sidebar wordmark — star + "uncmmn" + OS badge ======================== */
+.logo-lockup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.logo-word {
+  font-family: var(--font-head);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--text);
+}
+
+.logo-badge {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-radius: 6px;
+  padding: 3px 5px;
 }
 
 /* Modal overlay */
@@ -661,26 +771,6 @@ html, body {
 @keyframes emojiGlow {
   0%, 100% { filter: drop-shadow(0 0 1px rgba(226, 232, 240, 0.3)); }
   50% { filter: drop-shadow(0 0 7px rgba(226, 232, 240, 0.9)); }
-}
-
-/* Theme toggle — quiet, icon-only */
-.theme-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--text-faint);
-  cursor: pointer;
-  transition: color 0.15s, background 0.15s;
-}
-
-.theme-toggle:hover {
-  color: var(--text-dim);
-  background: var(--surface-2);
 }
 
 /* "vs Prev Month" comparison button */

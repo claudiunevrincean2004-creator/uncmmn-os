@@ -1,5 +1,5 @@
 'use client';
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StudioSequence, StudioComment, StudioActivity, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
@@ -7,9 +7,10 @@ import { usePagedRows } from '@/lib/use-paged-rows';
 import LoadMore from './LoadMore';
 import {
   SEQUENCE_STATUSES, SEQUENCE_STATUS_COLORS,
-  isOverdue, logActivity, inDateRange, getFieldOptions, colorMap, buildAddOptionRows,
+  isOverdue, logActivity, inDateRange, getFieldOptions, colorMap, buildAddOptionRows, shortDate,
 } from '@/lib/studio';
 import { EditPillSelect, MiniSelect, UrlCell, InlineDate } from './cells';
+import TableToolbar, { rowAccent, openOnRowClick, TitleCell } from './table-ui';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import SortControl from './SortControl';
 import { SortOption, SortDir, sortRows } from '@/lib/sort';
@@ -63,6 +64,7 @@ interface Props {
 
 export default function StorySequences({ sequences, comments, activity, dropdownOptions, properties, customOptions, profiles, isAdmin, openItemId, onOpened, onReload }: Props) {
   const [fStatus, setFStatus] = usePersistedState<string>('studio_s_status', 'All');
+  const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = usePersistedState<string>('studio_s_sortkey', 'scheduled_date');
   const [sortDir, setSortDir] = usePersistedState<SortDir>('studio_s_sortdir', 'asc');
   const [dateFrom, setDateFrom] = usePersistedState<string>('studio_s_from', '');
@@ -184,17 +186,19 @@ export default function StorySequences({ sequences, comments, activity, dropdown
 
   const filtered = useMemo(() => {
     let r = sequences;
+    const q = search.trim().toLowerCase();
+    if (q) r = r.filter(s => (s.title || '').toLowerCase().includes(q));
     if (fStatus !== 'All') r = r.filter(s => s.status === fStatus);
     if (dateFrom || dateTo) r = r.filter(s => inDateRange(s.scheduled_date, dateFrom, dateTo));
     return sortRows(r, sortOptions, sortKey, sortDir);
-  }, [sequences, fStatus, sortKey, sortDir, dateFrom, dateTo, sortOptions]);
+  }, [sequences, search, fStatus, sortKey, sortDir, dateFrom, dateTo, sortOptions]);
 
   const rows = useMemo(() => applyCustomFilters(filtered, cprops, custFilters), [filtered, cprops, custFilters]);
 
   // "Load more" pagination — resets to the first page on filter/sort change only.
   const { visible, hasMore, remaining, loadMore } = usePagedRows(
     rows,
-    [fStatus, sortKey, sortDir, dateFrom, dateTo, JSON.stringify(custFilters)].join('|'),
+    [search, fStatus, sortKey, sortDir, dateFrom, dateTo, JSON.stringify(custFilters)].join('|'),
   );
 
   const fields: FieldDef[] = useMemo(() => [
@@ -209,29 +213,34 @@ export default function StorySequences({ sequences, comments, activity, dropdown
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
-            <FilterField label="Status"><MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} /></FilterField>
-            <SortControl options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
-            <FilterField label="Date"><DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
-            <CustomFilterControls props={cprops} optionsByProp={optsByProp} filters={custFilters} setFilters={setCustFilters} />
-          </div>
-          <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', flexShrink: 0 }} onClick={() => { setDraft(EMPTY_DRAFT); setAddOpen(true); }}>+ Add Sequence</button>
-        </div>
+        <TableToolbar
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search sequences…"
+          count={rows.length}
+          countNoun="sequence"
+          actionLabel="+ Add Sequence"
+          onAction={() => { setDraft(EMPTY_DRAFT); setAddOpen(true); }}
+        >
+          <FilterField label="Status"><MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} /></FilterField>
+          <SortControl options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
+          <FilterField label="Date"><DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
+          <CustomFilterControls props={cprops} optionsByProp={optsByProp} filters={custFilters} setFilters={setCustFilters} />
+        </TableToolbar>
 
         {rows.length === 0 ? (
           <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>No sequences match. Add a sequence or adjust filters.</div>
         ) : (
           <>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="data-table">
+          <div className="studio-scroll">
+            <table className="studio-table">
               <thead>
                 <tr>
-                  <th style={{ minWidth: 200 }}>Title / Description</th>
+                  <th style={{ minWidth: 200 }}>Title</th>
                   <th onClick={isAdmin ? () => setOptsField({ field: 'sequence_status', title: 'Status' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Status{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <th>Final</th>
-                  <th>Scheduled</th>
                   <CustomHeaderCells props={cprops} isAdmin={isAdmin} onManage={() => setMgrOpen(true)} />
+                  <th className="st-right">Scheduled</th>
                   <th style={{ textAlign: 'right' }}>{isAdmin && <AddPropertyButton onClick={() => setMgrOpen(true)} />}</th>
                 </tr>
               </thead>
@@ -239,26 +248,28 @@ export default function StorySequences({ sequences, comments, activity, dropdown
                 {visible.map(s => {
                   const overdue = isOverdue(s.scheduled_date, s.status, DONE);
                   return (
-                    <Fragment key={s.id}>
-                      <tr style={overdue ? { background: 'rgba(239,68,68,0.06)', boxShadow: 'inset 3px 0 0 #ef4444' } : (selectedId === s.id ? { background: 'var(--surface-2)' } : undefined)}>
-                        <td style={{ minWidth: 200 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <button onClick={() => setSelectedId(s.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{s.title}</button>
-                            <CopyLinkButton type="story" id={s.id} />
-                          </div>
-                        </td>
-                        <td><EditPillSelect field="sequence_status" value={s.status} options={statusValues} colors={statusColors} onChange={st => changeStatus(s, st)} onAddOption={addOption} allowAdd={isAdmin} /></td>
-                        <td><UrlCell value={s.final_url} onCommit={u => patch(s.id, { final_url: u })} /></td>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <InlineDate value={s.scheduled_date} onCommit={d => patch(s.id, { scheduled_date: d || undefined })} highlight={overdue} />
-                            {overdue && <span style={{ color: '#ef4444', fontSize: 9, fontWeight: 700 }}>OVERDUE</span>}
-                          </div>
-                        </td>
-                        <CustomRowCells row={s} props={cprops} optionsByProp={optsByProp} onPatch={patch} />
-                        <td><button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteSequence(s.id)}>✕</button></td>
-                      </tr>
-                    </Fragment>
+                    <tr
+                      key={s.id}
+                      className={selectedId === s.id ? 'is-selected' : undefined}
+                      style={{ ...rowAccent(overdue ? 'var(--neg)' : statusColors[s.status]), cursor: 'pointer' }}
+                      onClick={openOnRowClick(() => setSelectedId(s.id))}
+                    >
+                      <td style={{ minWidth: 200 }}>
+                        <TitleCell title={s.title} sub={shortDate(s.created_at)} onOpen={() => setSelectedId(s.id)}>
+                          <CopyLinkButton type="story" id={s.id} />
+                        </TitleCell>
+                      </td>
+                      <td><EditPillSelect size="md" field="sequence_status" value={s.status} options={statusValues} colors={statusColors} onChange={st => changeStatus(s, st)} onAddOption={addOption} allowAdd={isAdmin} /></td>
+                      <td><UrlCell value={s.final_url} onCommit={u => patch(s.id, { final_url: u })} /></td>
+                      <CustomRowCells row={s} props={cprops} optionsByProp={optsByProp} onPatch={patch} size="md" />
+                      <td className="st-right">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          {overdue && <span className="st-overdue">OVERDUE</span>}
+                          <InlineDate value={s.scheduled_date} onCommit={d => patch(s.id, { scheduled_date: d || undefined })} highlight={overdue} />
+                        </div>
+                      </td>
+                      <td><button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteSequence(s.id)} title="Delete sequence" aria-label="Delete sequence">✕</button></td>
+                    </tr>
                   );
                 })}
               </tbody>

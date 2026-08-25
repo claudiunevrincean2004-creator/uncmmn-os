@@ -236,6 +236,16 @@ export async function logActivity(
   }]);
 }
 
+// Compact "Aug 12" for the muted secondary date that rides inline after a
+// Studio row's title. Empty string for a missing/unparseable value, so the
+// caller can just skip rendering it.
+export function shortDate(iso?: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('default', { month: 'short', day: 'numeric' });
+}
+
 // Format an ISO timestamp like "Apr 25 at 3:45pm"
 export function formatActivityTime(iso?: string): string {
   if (!iso) return '';

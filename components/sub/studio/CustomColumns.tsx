@@ -67,9 +67,10 @@ export function AddPropertyButton({ onClick }: { onClick: () => void }) {
 
 // ---- a single select cell (styled like the status/format pills) -----------
 function CustomCell({
-  value, options, onChange,
-}: { value: string; options: CustomPropertyOption[]; onChange: (optionId: string) => void }) {
+  value, options, onChange, size = 'sm',
+}: { value: string; options: CustomPropertyOption[]; onChange: (optionId: string) => void; size?: 'sm' | 'md' }) {
   const selected = options.find(o => o.id === value);
+  const md = size === 'md';
   const base: React.CSSProperties = selected?.color
     ? pillStyle(selected.color)
     : { background: 'var(--surface-2)', color: 'var(--text-faint)', border: '1px solid var(--border)' };
@@ -77,7 +78,7 @@ function CustomCell({
     <select
       value={value || ''}
       onChange={e => onChange(e.target.value)}
-      style={{ ...base, appearance: 'none', WebkitAppearance: 'none', borderRadius: 20, padding: '3px 9px', fontSize: 10, fontWeight: 700, cursor: 'pointer', outline: 'none', fontFamily: 'inherit' }}
+      style={{ ...base, appearance: 'none', WebkitAppearance: 'none', borderRadius: md ? 999 : 20, padding: md ? '4px 12px' : '3px 9px', fontSize: md ? 11 : 10, fontWeight: md ? 600 : 700, cursor: 'pointer', outline: 'none', fontFamily: 'inherit' }}
       title="Set value"
     >
       <option value="" style={{ background: 'var(--surface-2)', color: 'var(--text)', fontWeight: 600 }}>—</option>
@@ -90,8 +91,8 @@ function CustomCell({
 
 // ---- row cells -------------------------------------------------------------
 export function CustomRowCells<T extends { id: string; custom_values?: Record<string, string> }>({
-  row, props, optionsByProp, onPatch,
-}: { row: T; props: CustomProperty[]; optionsByProp: Record<string, CustomPropertyOption[]>; onPatch: (id: string, partial: { custom_values: Record<string, string> }) => void }) {
+  row, props, optionsByProp, onPatch, size,
+}: { row: T; props: CustomProperty[]; optionsByProp: Record<string, CustomPropertyOption[]>; onPatch: (id: string, partial: { custom_values: Record<string, string> }) => void; size?: 'sm' | 'md' }) {
   function setValue(propId: string, optionId: string) {
     const cv = { ...(row.custom_values || {}) };
     if (optionId) cv[propId] = optionId; else delete cv[propId];
@@ -101,7 +102,7 @@ export function CustomRowCells<T extends { id: string; custom_values?: Record<st
     <>
       {props.map(p => (
         <td key={p.id}>
-          <CustomCell value={row.custom_values?.[p.id] || ''} options={optionsByProp[p.id] || []} onChange={id => setValue(p.id, id)} />
+          <CustomCell value={row.custom_values?.[p.id] || ''} options={optionsByProp[p.id] || []} onChange={id => setValue(p.id, id)} size={size} />
         </td>
       ))}
     </>

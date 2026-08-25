@@ -1,12 +1,13 @@
 'use client';
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { usePagedRows } from '@/lib/use-paged-rows';
 import LoadMore from './LoadMore';
-import { AD_FORMATS, AD_STATUSES, AD_STATUS_COLORS, todayISO, logActivity, inDateRange, getFieldOptions, colorMap, buildAddOptionRows } from '@/lib/studio';
+import { AD_FORMATS, AD_STATUSES, AD_STATUS_COLORS, todayISO, logActivity, inDateRange, getFieldOptions, colorMap, buildAddOptionRows, shortDate } from '@/lib/studio';
 import { EditPillSelect, MiniSelect, InlineDate, UrlCell } from './cells';
+import TableToolbar, { rowAccent, openOnRowClick, TitleCell } from './table-ui';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import QuickLinks from './QuickLinks';
 import { UserPicker, buildPipelineMentions, resolveAssignee } from './UserPicker';
@@ -296,76 +297,67 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
       <div style={{ flex: 1, minWidth: 0 }}>
         <QuickLinks context="ad-creative" links={quickLinks} onReload={onReload} />
 
-        {/* Top row: search (left) + add (right) — kept off the filter row so it never wraps. */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-          <input
-            className="form-input"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search Creative ID…"
-            style={{ width: 240, padding: '5px 9px', fontSize: 11 }}
-          />
-          <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', marginLeft: 'auto' }} onClick={() => { setDraft({ ...EMPTY_DRAFT, date_added: todayISO() }); setAddOpen(true); }}>+ Add Ad Creative</button>
-        </div>
-
-        {/* Filter / sort row */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
-          {/* Labeled filters */}
+        <TableToolbar
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search Creative ID…"
+          count={rows.length}
+          countNoun="creative"
+          actionLabel="+ Add Ad Creative"
+          onAction={() => { setDraft({ ...EMPTY_DRAFT, date_added: todayISO() }); setAddOpen(true); }}
+        >
           <FilterField label="Format"><MiniSelect value={fFormat} options={formatPresent} onChange={setFFormat} /></FilterField>
           <FilterField label="Status"><MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} /></FilterField>
-
-          {/* Sort by + direction */}
           <SortControl options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
-
-          {/* Date range (kept) */}
           <FilterField label="Date"><DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
-
           <CustomFilterControls props={cprops} optionsByProp={optsByProp} filters={custFilters} setFilters={setCustFilters} />
-        </div>
+        </TableToolbar>
 
         {rows.length === 0 ? (
           <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>{fStatus !== 'All' ? `No ad creatives with status “${fStatus}”.` : 'No ad creatives yet. Add one with “+ Add Ad Creative”.'}</div>
         ) : (
           <>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="data-table">
+          <div className="studio-scroll">
+            <table className="studio-table">
               <thead>
                 <tr>
-                  <th style={{ minWidth: 160 }}>Creative ID</th>
-                  <th>Date Added</th>
+                  <th style={{ minWidth: 180 }}>Creative ID</th>
                   <th onClick={isAdmin ? () => setOptsField({ field: 'ad_format', title: 'Format' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Format{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
-                  <th>Assigned To</th>
+                  <th>Assigned</th>
+                  <th onClick={isAdmin ? () => setOptsField({ field: 'ad_status', title: 'Status' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Status{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <th>Source Video</th>
                   <th>Final</th>
                   <th>Iterate</th>
-                  <th onClick={isAdmin ? () => setOptsField({ field: 'ad_status', title: 'Status' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Status{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <CustomHeaderCells props={cprops} isAdmin={isAdmin} onManage={() => setMgrOpen(true)} />
+                  <th className="st-right">Date Added</th>
                   <th style={{ textAlign: 'right' }}>{isAdmin && <AddPropertyButton onClick={() => setMgrOpen(true)} />}</th>
                 </tr>
               </thead>
               <tbody>
                 {visible.map(a => (
-                  <Fragment key={a.id}>
-                    <tr style={selectedId === a.id ? { background: 'var(--surface-2)' } : undefined}>
-                      <td style={{ minWidth: 160 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <button onClick={() => setSelectedId(a.id)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'left', padding: '4px 0', fontFamily: 'inherit', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Open details">{a.creative_id || 'Untitled'}</button>
-                            <CopyLinkButton type="ad" id={a.id} />
-                          </div>
-                      </td>
-                      <td><InlineDate value={a.date_added} onCommit={d => patch(a.id, { date_added: d || undefined })} /></td>
-                      <td><EditPillSelect field="ad_format" value={a.ad_format || ''} options={formatValues} colors={formatColors} onChange={f => patch(a.id, { ad_format: f })} onAddOption={addOption} allowAdd={isAdmin} allowEmpty /></td>
-                      <td><UserPicker value={a.assigned_to_user_id ?? undefined} profiles={profiles} onChange={uid => patch(a.id, { assigned_to_user_id: uid || null })} /></td>
-                      <td><UrlCell value={a.source_video_url} onCommit={u => patch(a.id, { source_video_url: u })} /></td>
-                      <td><UrlCell value={a.final_link} onCommit={u => patch(a.id, { final_link: u })} /></td>
-                      <td>
-                        <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px', color: 'var(--accent)' }} onClick={() => handleIterate(a)} title="Trigger iteration">↻ Iterate</button>
-                      </td>
-                      <td><EditPillSelect field="ad_status" value={a.status} options={statusValues} colors={statusColors} onChange={s => changeStatus(a, s)} onAddOption={addOption} allowAdd={isAdmin} /></td>
-                      <CustomRowCells row={a} props={cprops} optionsByProp={optsByProp} onPatch={patch} />
-                      <td><button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteAd(a.id)}>✕</button></td>
-                    </tr>
-                  </Fragment>
+                  <tr
+                    key={a.id}
+                    className={selectedId === a.id ? 'is-selected' : undefined}
+                    style={{ ...rowAccent(statusColors[a.status]), cursor: 'pointer' }}
+                    onClick={openOnRowClick(() => setSelectedId(a.id))}
+                  >
+                    <td style={{ minWidth: 180 }}>
+                      <TitleCell title={a.creative_id || 'Untitled'} sub={shortDate(a.created_at)} onOpen={() => setSelectedId(a.id)}>
+                        <CopyLinkButton type="ad" id={a.id} />
+                      </TitleCell>
+                    </td>
+                    <td><EditPillSelect size="md" field="ad_format" value={a.ad_format || ''} options={formatValues} colors={formatColors} onChange={f => patch(a.id, { ad_format: f })} onAddOption={addOption} allowAdd={isAdmin} allowEmpty /></td>
+                    <td><UserPicker size="md" value={a.assigned_to_user_id ?? undefined} profiles={profiles} onChange={uid => patch(a.id, { assigned_to_user_id: uid || null })} /></td>
+                    <td><EditPillSelect size="md" field="ad_status" value={a.status} options={statusValues} colors={statusColors} onChange={s => changeStatus(a, s)} onAddOption={addOption} allowAdd={isAdmin} /></td>
+                    <td><UrlCell value={a.source_video_url} onCommit={u => patch(a.id, { source_video_url: u })} /></td>
+                    <td><UrlCell value={a.final_link} onCommit={u => patch(a.id, { final_link: u })} /></td>
+                    <td>
+                      <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px', color: 'var(--accent)' }} onClick={() => handleIterate(a)} title="Trigger iteration">↻ Iterate</button>
+                    </td>
+                    <CustomRowCells row={a} props={cprops} optionsByProp={optsByProp} onPatch={patch} size="md" />
+                    <td className="st-right"><InlineDate value={a.date_added} onCommit={d => patch(a.id, { date_added: d || undefined })} /></td>
+                    <td><button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteAd(a.id)} title="Delete ad creative" aria-label="Delete ad creative">✕</button></td>
+                  </tr>
                 ))}
               </tbody>
             </table>

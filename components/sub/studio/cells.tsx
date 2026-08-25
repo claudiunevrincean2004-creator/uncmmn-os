@@ -173,9 +173,9 @@ export function EditSelect({
 
 // Colored pill select that also supports adding custom options.
 //
-// `size` is presentation only — 'sm' is the dense table pill every Studio table
-// has always used, 'lg' the roomier one Video Review's card rows want. Behaviour
-// (options, "+ Add new…", admin gating) is identical either way.
+// `size` is presentation only — 'sm' is the dense legacy pill (still used by the
+// non-Studio tables), 'md' the softer, roomier one the Studio tables use.
+// Behaviour (options, "+ Add new…", admin gating) is identical either way.
 export function EditPillSelect({
   field,
   options,
@@ -195,9 +195,9 @@ export function EditPillSelect({
   onAddOption?: (field: string, value: string) => void;
   allowAdd?: boolean;
   allowEmpty?: boolean;
-  size?: 'sm' | 'lg';
+  size?: 'sm' | 'md';
 }) {
-  const lg = size === 'lg';
+  const md = size === 'md';
   const color = colors[value] || '#6b7280';
   const opts = value && !options.includes(value) ? [value, ...options] : options;
   function handle(v: string) {
@@ -217,11 +217,11 @@ export function EditPillSelect({
         ...pillStyle(color),
         appearance: 'none',
         WebkitAppearance: 'none',
-        borderRadius: lg ? 999 : 20,
-        padding: lg ? '7px 16px' : '3px 9px',
-        fontSize: lg ? 12 : 10,
-        fontWeight: lg ? 600 : 700,
-        maxWidth: lg ? 220 : undefined,
+        borderRadius: md ? 999 : 20,
+        padding: md ? '4px 12px' : '3px 9px',
+        fontSize: md ? 11 : 10,
+        fontWeight: md ? 600 : 700,
+        maxWidth: md ? 190 : undefined,
         cursor: 'pointer',
         outline: 'none',
         fontFamily: 'inherit',

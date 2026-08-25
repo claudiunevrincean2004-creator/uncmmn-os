@@ -1,0 +1,113 @@
+'use client';
+import { ReactNode } from 'react';
+
+// ============================================================================
+// Shared shell for the four Studio tables (Video Review, Story Sequences,
+// Filming Sessions, Ad Creative). Everything visual lives here or in the
+// .studio-* block in globals.css, so the tabs can't drift apart: one item per
+// row, aligned columns, a status-tinted rail on the left, hairline dividers.
+// ============================================================================
+
+/**
+ * The row's left accent rail colour, passed down as a CSS custom property that
+ * `.studio-table tbody td:first-child::before` reads. Falls back to the brand
+ * accent when a status has no colour of its own.
+ */
+export function rowAccent(color?: string | null): React.CSSProperties {
+  return { '--row-accent': color || 'var(--accent)' } as React.CSSProperties;
+}
+
+/**
+ * Click anywhere on the row to open its side panel — except on the row's own
+ * controls. Pills, link editors, date inputs, the copy-link icon and the delete
+ * button all keep their own click; only the inert parts of the row open it.
+ */
+export function openOnRowClick(open: () => void) {
+  return (e: React.MouseEvent<HTMLTableRowElement>) => {
+    const el = e.target as HTMLElement | null;
+    if (el?.closest('button, a, select, input, textarea, label')) return;
+    open();
+  };
+}
+
+/**
+ * First cell of every Studio row: the prominent title, an optional muted date
+ * riding inline after it, and the hover-revealed copy-link button.
+ */
+export function TitleCell({
+  title,
+  sub,
+  onOpen,
+  children,
+}: {
+  title: string;
+  sub?: string;
+  onOpen: () => void;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="st-title-wrap">
+      <button className="st-title" onClick={onOpen} title="Open details">
+        {title || 'Untitled'}
+      </button>
+      {sub && <span className="st-sub">{sub}</span>}
+      {children}
+    </div>
+  );
+}
+
+interface ToolbarProps {
+  search: string;
+  onSearchChange: (v: string) => void;
+  searchPlaceholder: string;
+  /** Rows after filtering — what the count reports. */
+  count: number;
+  /** Singular noun; pluralised with a trailing "s". */
+  countNoun: string;
+  actionLabel: string;
+  onAction: () => void;
+  /** The tab's own filter / sort / date controls. */
+  children?: ReactNode;
+}
+
+/**
+ * Search on the left, the tab's filters in the middle, item count and the
+ * primary "+ Add …" action on the right. Wraps to stacked rows under 720px.
+ */
+export default function TableToolbar({
+  search,
+  onSearchChange,
+  searchPlaceholder,
+  count,
+  countNoun,
+  actionLabel,
+  onAction,
+  children,
+}: ToolbarProps) {
+  return (
+    <div className="studio-toolbar">
+      <div className="studio-search">
+        <span className="studio-search-icon" aria-hidden>⌕</span>
+        <input
+          className="form-input"
+          type="search"
+          value={search}
+          onChange={e => onSearchChange(e.target.value)}
+          placeholder={searchPlaceholder}
+          aria-label={searchPlaceholder}
+        />
+      </div>
+
+      <div className="studio-filters">{children}</div>
+
+      <div className="studio-toolbar-end">
+        <span className="studio-count">
+          {count} {count === 1 ? countNoun : `${countNoun}s`}
+        </span>
+        <button className="btn-primary" style={{ fontSize: 11, padding: '6px 12px' }} onClick={onAction}>
+          {actionLabel}
+        </button>
+      </div>
+    </div>
+  );
+}

@@ -103,8 +103,16 @@ export default function Sidebar({ activeMP, collapsed, role, userName, unreadCou
       </button>
 
       <div style={{ padding: collapsed ? '18px 8px 14px' : '18px 14px 14px', borderBottom: '0.5px solid var(--border)', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-        <div style={{ display: 'flex', justifyContent: collapsed ? 'center' : 'flex-start', lineHeight: 1 }}>
-          <StarLogo size={collapsed ? 28 : 30} />
+        {/* Wordmark lockup: star + "uncmmn" + a small OS badge. Collapsed, the
+            star stands in for the whole thing — there's no room for the words. */}
+        <div className="logo-lockup" style={{ justifyContent: collapsed ? 'center' : 'flex-start' }} title="uncmmn OS">
+          <StarLogo size={collapsed ? 26 : 22} />
+          {!collapsed && (
+            <>
+              <span className="logo-word">uncmmn</span>
+              <span className="logo-badge">OS</span>
+            </>
+          )}
         </div>
       </div>
 

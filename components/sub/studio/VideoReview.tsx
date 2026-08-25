@@ -10,9 +10,10 @@ import {
   VIDEO_FORMATS, VIDEO_STATUSES, VIDEO_STATUS_COLORS,
   PRIORITIES, PRIORITY_COLORS,
   isOverdue, logActivity, mergeOptions, inDateRange,
-  getFieldOptions, colorMap, buildAddOptionRows,
+  getFieldOptions, colorMap, buildAddOptionRows, shortDate,
 } from '@/lib/studio';
 import { EditPillSelect, MiniSelect, UrlCell, InlineDate } from './cells';
+import TableToolbar, { rowAccent, openOnRowClick, TitleCell } from './table-ui';
 import SortControl from './SortControl';
 import { SortOption, SortDir, sortRows } from '@/lib/sort';
 import ItemPanel, { FieldDef } from './ItemPanel';
@@ -80,6 +81,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   const [fAssigned, setFAssigned] = usePersistedState<string>('studio_v_assigned', 'All');
   const [fFormat, setFFormat] = usePersistedState<string>('studio_v_format', 'All');
   const [fPriority, setFPriority] = usePersistedState<string>('studio_v_priority', 'All');
+  const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = usePersistedState<string>('studio_v_sortkey', 'deadline');
   const [sortDir, setSortDir] = usePersistedState<SortDir>('studio_v_sortdir', 'asc');
   const [dateFrom, setDateFrom] = usePersistedState<string>('studio_v_from', '');
@@ -237,19 +239,21 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
 
   const filtered = useMemo(() => {
     let r = videos;
+    const q = search.trim().toLowerCase();
+    if (q) r = r.filter(v => (v.title || '').toLowerCase().includes(q));
     if (fStatus !== 'All') r = r.filter(v => v.status === fStatus);
     if (fAssigned !== 'All') r = r.filter(v => (resolveAssignee(v.assigned_to_user_id, profiles) || '') === fAssigned);
     if (fFormat !== 'All') r = r.filter(v => (v.format || '') === fFormat);
     if (fPriority !== 'All') r = r.filter(v => (v.priority || 'Normal') === fPriority);
     if (dateFrom || dateTo) r = r.filter(v => inDateRange(v.deadline, dateFrom, dateTo));
     return sortRows(r, sortOptions, sortKey, sortDir);
-  }, [videos, fStatus, fAssigned, fFormat, fPriority, sortKey, sortDir, dateFrom, dateTo, profiles, sortOptions]);
+  }, [videos, search, fStatus, fAssigned, fFormat, fPriority, sortKey, sortDir, dateFrom, dateTo, profiles, sortOptions]);
 
   // "Load more" pagination — resets to the first page when filters/sort change,
   // not on data refresh (so editing a cell doesn't collapse the list).
   const { visible, hasMore, remaining, loadMore } = usePagedRows(
     filtered,
-    [fStatus, fAssigned, fFormat, fPriority, sortKey, sortDir, dateFrom, dateTo].join('|'),
+    [search, fStatus, fAssigned, fFormat, fPriority, sortKey, sortDir, dateFrom, dateTo].join('|'),
   );
 
   const fields: FieldDef[] = useMemo(() => [
@@ -276,92 +280,86 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
       <div style={{ flex: 1, minWidth: 0 }}>
         <QuickLinks context="video-review" links={quickLinks} onReload={onReload} />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
-            <FilterField label="Status"><MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} /></FilterField>
-            <FilterField label="Assigned to"><MiniSelect value={fAssigned} options={assignedPresent} onChange={setFAssigned} /></FilterField>
-            <FilterField label="Format"><MiniSelect value={fFormat} options={formatPresent} onChange={setFFormat} /></FilterField>
-            <FilterField label="Priority"><MiniSelect value={fPriority} options={priorityPresent} onChange={setFPriority} /></FilterField>
-            <SortControl options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
-            <FilterField label="Date"><DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
-            {/* Managing Format/Status options used to hang off the table's column
-                headers. The card layout has no header row, so the same two
-                editors live here instead — same FieldOptionsManager, same
-                admin-only gating. */}
-            {isAdmin && (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                <span style={{ fontSize: 10, color: 'var(--text-faint)', whiteSpace: 'nowrap' }}>Edit options</span>
-                <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setOptsField({ field: 'video_format', title: 'Format' })}>Format ✎</button>
-                <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setOptsField({ field: 'video_status', title: 'Status' })}>Status ✎</button>
-              </span>
-            )}
-          </div>
-          <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', flexShrink: 0 }} onClick={() => { setDraft(EMPTY_DRAFT); setAddOpen(true); }}>+ Add Video</button>
-        </div>
+        <TableToolbar
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search videos…"
+          count={filtered.length}
+          countNoun="video"
+          actionLabel="+ Add Video"
+          onAction={() => { setDraft(EMPTY_DRAFT); setAddOpen(true); }}
+        >
+          <FilterField label="Status"><MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} /></FilterField>
+          <FilterField label="Assigned to"><MiniSelect value={fAssigned} options={assignedPresent} onChange={setFAssigned} /></FilterField>
+          <FilterField label="Format"><MiniSelect value={fFormat} options={formatPresent} onChange={setFFormat} /></FilterField>
+          <FilterField label="Priority"><MiniSelect value={fPriority} options={priorityPresent} onChange={setFPriority} /></FilterField>
+          <SortControl options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
+          <FilterField label="Date"><DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
+        </TableToolbar>
 
         {filtered.length === 0 ? (
           <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>No videos match. Add a video or adjust filters.</div>
         ) : (
           <>
-          {/* Card rows. Every field, edit path and the click-to-open panel are
-              exactly what the table had — only the arrangement changed:
-              title on top, the tag-like fields as pills beneath it, and the
-              links/dates in a wrapping grid below a hairline. */}
-          <div className="vr-list">
-            {visible.map(v => {
-              const overdue = isOverdue(v.deadline, v.status, DONE);
-              return (
-                <div
-                  key={v.id}
-                  className={`vr-card hover-card${overdue ? ' is-overdue' : ''}${selectedId === v.id ? ' is-selected' : ''}`}
-                >
-                  <div className="vr-card-head">
-                    <button className="vr-title" onClick={() => setSelectedId(v.id)} title="Open details">
-                      {v.title || 'Untitled'}
-                    </button>
-                    <div className="vr-actions">
-                      <CopyLinkButton type="video" id={v.id} />
-                      <button className="btn-danger" style={{ padding: '3px 8px' }} onClick={() => deleteVideo(v.id)} title="Delete video" aria-label="Delete video">✕</button>
-                    </div>
-                  </div>
-
-                  <div className="vr-pills">
-                    <EditPillSelect size="lg" field="video_status" value={v.status} options={statusValues} colors={statusColors} onChange={s => changeStatus(v, s)} onAddOption={addOption} allowAdd={isAdmin} />
-                    <UserPicker size="lg" value={v.assigned_to_user_id ?? undefined} profiles={profiles} onChange={uid => patch(v.id, { assigned_to_user_id: uid || null })} />
-                    <EditPillSelect size="lg" field="video_format" value={v.format || ''} options={formatValues} colors={formatColors} onChange={f => patch(v.id, { format: f })} onAddOption={addOption} allowAdd={isAdmin} allowEmpty />
-                    <EditPillSelect size="lg" field="video_priority" value={v.priority || 'Normal'} options={priorityOpts} colors={PRIORITY_COLORS} onChange={p => patch(v.id, { priority: p })} onAddOption={addOption} allowAdd={isAdmin} />
-                    {/* Was a tiny label beside the deadline; as a pill up here it
-                        reads at a glance, alongside the card's overdue rail. */}
-                    {overdue && <span className="vr-flag">Overdue</span>}
-                  </div>
-
-                  <div className="vr-meta">
-                    <div className="vr-meta-cell">
-                      <div className="vr-meta-label">Brief</div>
-                      <UrlCell value={v.brief_url} onCommit={u => patch(v.id, { brief_url: u })} />
-                    </div>
-                    <div className="vr-meta-cell">
-                      <div className="vr-meta-label">Raw Files</div>
-                      <UrlCell value={v.raw_files_url} onCommit={u => patch(v.id, { raw_files_url: u })} />
-                    </div>
-                    <div className="vr-meta-cell">
-                      <div className="vr-meta-label">Final</div>
-                      <UrlCell value={v.final_url} onCommit={u => patch(v.id, { final_url: u })} />
-                    </div>
-                    <div className="vr-meta-cell">
-                      <div className="vr-meta-label">Deadline</div>
-                      <InlineDate value={v.deadline} onCommit={d => patch(v.id, { deadline: d || undefined })} highlight={overdue} />
-                    </div>
-                    <div className="vr-meta-cell">
-                      <div className="vr-meta-label">Revisions</div>
-                      {v.revision_count > 0
-                        ? <span className="badge" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', padding: '4px 11px', fontSize: 11 }} title={`${v.revision_count} revision round(s)`}>{v.revision_count}</span>
-                        : <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>0</span>}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="studio-scroll">
+            <table className="studio-table">
+              <thead>
+                <tr>
+                  <th style={{ minWidth: 200 }}>Title</th>
+                  <th onClick={isAdmin ? () => setOptsField({ field: 'video_format', title: 'Format' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Format{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
+                  <th>Assigned</th>
+                  <th onClick={isAdmin ? () => setOptsField({ field: 'video_status', title: 'Status' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Status{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
+                  <th>Priority</th>
+                  <th>Brief</th>
+                  <th>Raw Files</th>
+                  <th>Final</th>
+                  <th>Rev.</th>
+                  <th className="st-right">Deadline</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map(v => {
+                  const overdue = isOverdue(v.deadline, v.status, DONE);
+                  return (
+                    // The rail carries the row's status colour, or --neg when
+                    // it's overdue — the urgent signal outranks the status one,
+                    // and the status pill is right there either way.
+                    <tr
+                      key={v.id}
+                      className={selectedId === v.id ? 'is-selected' : undefined}
+                      style={{ ...rowAccent(overdue ? 'var(--neg)' : statusColors[v.status]), cursor: 'pointer' }}
+                      onClick={openOnRowClick(() => setSelectedId(v.id))}
+                    >
+                      <td style={{ minWidth: 200 }}>
+                        <TitleCell title={v.title} sub={shortDate(v.created_at)} onOpen={() => setSelectedId(v.id)}>
+                          <CopyLinkButton type="video" id={v.id} />
+                        </TitleCell>
+                      </td>
+                      <td><EditPillSelect size="md" field="video_format" value={v.format || ''} options={formatValues} colors={formatColors} onChange={f => patch(v.id, { format: f })} onAddOption={addOption} allowAdd={isAdmin} allowEmpty /></td>
+                      <td><UserPicker size="md" value={v.assigned_to_user_id ?? undefined} profiles={profiles} onChange={uid => patch(v.id, { assigned_to_user_id: uid || null })} /></td>
+                      <td><EditPillSelect size="md" field="video_status" value={v.status} options={statusValues} colors={statusColors} onChange={s => changeStatus(v, s)} onAddOption={addOption} allowAdd={isAdmin} /></td>
+                      <td><EditPillSelect size="md" field="video_priority" value={v.priority || 'Normal'} options={priorityOpts} colors={PRIORITY_COLORS} onChange={p => patch(v.id, { priority: p })} onAddOption={addOption} allowAdd={isAdmin} /></td>
+                      <td><UrlCell value={v.brief_url} onCommit={u => patch(v.id, { brief_url: u })} /></td>
+                      <td><UrlCell value={v.raw_files_url} onCommit={u => patch(v.id, { raw_files_url: u })} /></td>
+                      <td><UrlCell value={v.final_url} onCommit={u => patch(v.id, { final_url: u })} /></td>
+                      <td style={{ textAlign: 'center' }}>
+                        {v.revision_count > 0
+                          ? <span className="badge" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }} title={`${v.revision_count} revision round(s)`}>{v.revision_count}</span>
+                          : <span style={{ color: 'var(--text-faint)' }}>0</span>}
+                      </td>
+                      <td className="st-right">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          {overdue && <span className="st-overdue">OVERDUE</span>}
+                          <InlineDate value={v.deadline} onCommit={d => patch(v.id, { deadline: d || undefined })} highlight={overdue} />
+                        </div>
+                      </td>
+                      <td><button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteVideo(v.id)} title="Delete video" aria-label="Delete video">✕</button></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
           {hasMore && <LoadMore remaining={remaining} onClick={loadMore} />}
           </>
