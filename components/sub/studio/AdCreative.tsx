@@ -306,8 +306,8 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
           actionLabel="+ Add Ad Creative"
           onAction={() => { setDraft({ ...EMPTY_DRAFT, date_added: todayISO() }); setAddOpen(true); }}
         >
-          <FilterField label="Format"><MiniSelect value={fFormat} options={formatPresent} onChange={setFFormat} /></FilterField>
-          <FilterField label="Status"><MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} /></FilterField>
+          <MiniSelect size="md" allLabel="All status" value={fStatus} options={statusPresent} onChange={setFStatus} />
+          <MiniSelect size="md" allLabel="All formats" value={fFormat} options={formatPresent} onChange={setFFormat} />
           <SortControl options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
           <FilterField label="Date"><DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
           <CustomFilterControls props={cprops} optionsByProp={optsByProp} filters={custFilters} setFilters={setCustFilters} />
@@ -317,11 +317,12 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
           <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>{fStatus !== 'All' ? `No ad creatives with status “${fStatus}”.` : 'No ad creatives yet. Add one with “+ Add Ad Creative”.'}</div>
         ) : (
           <>
+          <div className="studio-panel">
           <div className="studio-scroll">
             <table className="studio-table">
               <thead>
                 <tr>
-                  <th style={{ minWidth: 180 }}>Creative ID</th>
+                  <th style={{ minWidth: 240 }}>Creative ID</th>
                   <th onClick={isAdmin ? () => setOptsField({ field: 'ad_format', title: 'Format' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Format{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <th>Assigned</th>
                   <th onClick={isAdmin ? () => setOptsField({ field: 'ad_status', title: 'Status' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Status{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
@@ -341,7 +342,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                     style={{ ...rowAccent(statusColors[a.status]), cursor: 'pointer' }}
                     onClick={openOnRowClick(() => setSelectedId(a.id))}
                   >
-                    <td style={{ minWidth: 180 }}>
+                    <td style={{ minWidth: 240 }}>
                       <TitleCell title={a.creative_id || 'Untitled'} sub={shortDate(a.created_at)} onOpen={() => setSelectedId(a.id)}>
                         <CopyLinkButton type="ad" id={a.id} />
                       </TitleCell>
@@ -355,12 +356,13 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                       <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px', color: 'var(--accent)' }} onClick={() => handleIterate(a)} title="Trigger iteration">↻ Iterate</button>
                     </td>
                     <CustomRowCells row={a} props={cprops} optionsByProp={optsByProp} onPatch={patch} size="md" />
-                    <td className="st-right"><InlineDate value={a.date_added} onCommit={d => patch(a.id, { date_added: d || undefined })} /></td>
-                    <td><button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteAd(a.id)} title="Delete ad creative" aria-label="Delete ad creative">✕</button></td>
+                    <td className="st-right"><InlineDate display="text" value={a.date_added} onCommit={d => patch(a.id, { date_added: d || undefined })} /></td>
+                    <td><button className="btn-danger row-action" style={{ padding: '2px 6px' }} onClick={() => deleteAd(a.id)} title="Delete ad creative" aria-label="Delete ad creative">✕</button></td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
           </div>
           {hasMore && <LoadMore remaining={remaining} onClick={loadMore} />}
           </>

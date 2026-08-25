@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { pillStyle } from '@/lib/studio';
+import { pillStyle, shortDate } from '@/lib/studio';
 
 // Inline text/textarea editor with uniform keyboard behavior across every table:
 //   • Enter           → commit the value and blur (single-line and multi-line)
@@ -96,29 +96,43 @@ export function PillSelect({
   );
 }
 
-// Plain select for non-pill dropdowns (Format, Assigned To, Platform…)
+// Plain select for non-pill dropdowns (Format, Assigned To, Platform…).
+//
+// `size='md'` is the roomier Studio-toolbar form. `allLabel` renames the "All"
+// option so the resting dropdown reads as its own label ("All status",
+// "Everyone", "All formats") — the filter VALUE is still "All", so no caller's
+// comparison changes.
 export function MiniSelect({
   value,
   options,
   onChange,
   placeholder,
   width,
+  size = 'sm',
+  allLabel,
 }: {
   value?: string;
   options: string[];
   onChange: (v: string) => void;
   placeholder?: string;
   width?: number | string;
+  size?: 'sm' | 'md';
+  allLabel?: string;
 }) {
+  const md = size === 'md';
   return (
     <select
       className="form-input"
-      style={{ width: width ?? 'auto', padding: '4px 7px', fontSize: 11 }}
+      style={
+        md
+          ? { width: width ?? 'auto', padding: '8px 12px', fontSize: 12, borderRadius: 10, minWidth: 120 }
+          : { width: width ?? 'auto', padding: '4px 7px', fontSize: 11 }
+      }
       value={value ?? ''}
       onChange={e => onChange(e.target.value)}
     >
       {placeholder && <option value="">{placeholder}</option>}
-      {options.map(o => <option key={o} value={o}>{o}</option>)}
+      {options.map(o => <option key={o} value={o}>{o === 'All' && allLabel ? allLabel : o}</option>)}
     </select>
   );
 }
@@ -217,8 +231,10 @@ export function EditPillSelect({
         ...pillStyle(color),
         appearance: 'none',
         WebkitAppearance: 'none',
-        borderRadius: md ? 999 : 20,
-        padding: md ? '4px 12px' : '3px 9px',
+        // Studio pills are soft rounded RECTANGLES (radius 6), not lozenges —
+        // matching the Format/Status chips in the design.
+        borderRadius: md ? 6 : 20,
+        padding: md ? '4px 10px' : '3px 9px',
         fontSize: md ? 11 : 10,
         fontWeight: md ? 600 : 700,
         maxWidth: md ? 190 : undefined,
@@ -339,7 +355,11 @@ function LinkEditable({
               rel="noopener noreferrer"
               style={{ ...textStyle, color: 'var(--accent)', textDecoration: 'none' }}
               title={value}
-            >{shortUrl(value, panel ? 46 : 30)}</a>
+            >
+              {shortUrl(value, panel ? 46 : 30)}
+              {/* Opens-in-new-tab marker, part of the link so it can't wrap away from it. */}
+              <span className="st-arrow" aria-hidden> ↗</span>
+            </a>
           )
       ) : (
         <button
@@ -348,7 +368,10 @@ function LinkEditable({
           title={allowPlainText ? 'Add' : 'Add link'}
         >—</button>
       )}
+      {/* Inside a Studio table this stays hidden until the row is hovered, so a
+          column of links reads clean; everywhere else it's always visible. */}
       <button
+        className="link-pencil"
         onClick={() => setEditing(true)}
         style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 11, padding: 0, flexShrink: 0 }}
         title={value ? (allowPlainText ? 'Edit' : 'Edit link') : (allowPlainText ? 'Add' : 'Add link')}
@@ -410,29 +433,60 @@ export function InlineNumber({
   );
 }
 
-// Inline date picker that commits on change
+// Inline date picker that commits on change.
+//
+// `display='text'` is the Studio-table form: at rest it's just the short date
+// ("Aug 13") or a muted "—", and clicking swaps in the real date input. Keeps the
+// row line quiet without giving up inline editing. `display='input'` (default) is
+// the always-visible picker every other table and the panels use.
 export function InlineDate({
   value,
   onCommit,
   highlight,
+  display = 'input',
 }: {
   value?: string;
   onCommit: (v: string) => void;
   highlight?: boolean;
+  display?: 'input' | 'text';
 }) {
+  const [editing, setEditing] = useState(false);
+
+  if (display === 'text' && !editing) {
+    return (
+      <button
+        onClick={() => setEditing(true)}
+        title={value ? 'Edit date' : 'Set date'}
+        style={{
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          fontSize: 11,
+          whiteSpace: 'nowrap',
+          color: highlight ? 'var(--neg)' : (value ? 'var(--text-dim)' : 'var(--text-faint)'),
+        }}
+      >
+        {value ? shortDate(value) : '—'}
+      </button>
+    );
+  }
+
   return (
     <input
       className="form-input"
       type="date"
+      autoFocus={display === 'text'}
       style={{
         width: 130,
         padding: '4px 7px',
         fontSize: 11,
-        color: highlight ? '#ef4444' : undefined,
-        borderColor: highlight ? '#3a1a1a' : undefined,
+        color: highlight ? 'var(--neg)' : undefined,
       }}
       value={value ? value.slice(0, 10) : ''}
       onChange={e => onCommit(e.target.value)}
+      onBlur={() => setEditing(false)}
     />
   );
 }

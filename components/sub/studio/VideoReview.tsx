@@ -289,10 +289,10 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
           actionLabel="+ Add Video"
           onAction={() => { setDraft(EMPTY_DRAFT); setAddOpen(true); }}
         >
-          <FilterField label="Status"><MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} /></FilterField>
-          <FilterField label="Assigned to"><MiniSelect value={fAssigned} options={assignedPresent} onChange={setFAssigned} /></FilterField>
-          <FilterField label="Format"><MiniSelect value={fFormat} options={formatPresent} onChange={setFFormat} /></FilterField>
-          <FilterField label="Priority"><MiniSelect value={fPriority} options={priorityPresent} onChange={setFPriority} /></FilterField>
+          <MiniSelect size="md" allLabel="All status" value={fStatus} options={statusPresent} onChange={setFStatus} />
+          <MiniSelect size="md" allLabel="Everyone" value={fAssigned} options={assignedPresent} onChange={setFAssigned} />
+          <MiniSelect size="md" allLabel="All formats" value={fFormat} options={formatPresent} onChange={setFFormat} />
+          <MiniSelect size="md" allLabel="All priorities" value={fPriority} options={priorityPresent} onChange={setFPriority} />
           <SortControl options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
           <FilterField label="Date"><DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
         </TableToolbar>
@@ -301,19 +301,18 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
           <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>No videos match. Add a video or adjust filters.</div>
         ) : (
           <>
+          <div className="studio-panel">
           <div className="studio-scroll">
             <table className="studio-table">
               <thead>
                 <tr>
-                  <th style={{ minWidth: 200 }}>Title</th>
+                  <th style={{ minWidth: 240 }}>Title</th>
                   <th onClick={isAdmin ? () => setOptsField({ field: 'video_format', title: 'Format' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Format{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <th>Assigned</th>
                   <th onClick={isAdmin ? () => setOptsField({ field: 'video_status', title: 'Status' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Status{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
-                  <th>Priority</th>
                   <th>Brief</th>
                   <th>Raw Files</th>
                   <th>Final</th>
-                  <th>Rev.</th>
                   <th className="st-right">Deadline</th>
                   <th></th>
                 </tr>
@@ -331,7 +330,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                       style={{ ...rowAccent(overdue ? 'var(--neg)' : statusColors[v.status]), cursor: 'pointer' }}
                       onClick={openOnRowClick(() => setSelectedId(v.id))}
                     >
-                      <td style={{ minWidth: 200 }}>
+                      <td style={{ minWidth: 240 }}>
                         <TitleCell title={v.title} sub={shortDate(v.created_at)} onOpen={() => setSelectedId(v.id)}>
                           <CopyLinkButton type="video" id={v.id} />
                         </TitleCell>
@@ -339,27 +338,22 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                       <td><EditPillSelect size="md" field="video_format" value={v.format || ''} options={formatValues} colors={formatColors} onChange={f => patch(v.id, { format: f })} onAddOption={addOption} allowAdd={isAdmin} allowEmpty /></td>
                       <td><UserPicker size="md" value={v.assigned_to_user_id ?? undefined} profiles={profiles} onChange={uid => patch(v.id, { assigned_to_user_id: uid || null })} /></td>
                       <td><EditPillSelect size="md" field="video_status" value={v.status} options={statusValues} colors={statusColors} onChange={s => changeStatus(v, s)} onAddOption={addOption} allowAdd={isAdmin} /></td>
-                      <td><EditPillSelect size="md" field="video_priority" value={v.priority || 'Normal'} options={priorityOpts} colors={PRIORITY_COLORS} onChange={p => patch(v.id, { priority: p })} onAddOption={addOption} allowAdd={isAdmin} /></td>
                       <td><UrlCell value={v.brief_url} onCommit={u => patch(v.id, { brief_url: u })} /></td>
                       <td><UrlCell value={v.raw_files_url} onCommit={u => patch(v.id, { raw_files_url: u })} /></td>
                       <td><UrlCell value={v.final_url} onCommit={u => patch(v.id, { final_url: u })} /></td>
-                      <td style={{ textAlign: 'center' }}>
-                        {v.revision_count > 0
-                          ? <span className="badge" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }} title={`${v.revision_count} revision round(s)`}>{v.revision_count}</span>
-                          : <span style={{ color: 'var(--text-faint)' }}>0</span>}
-                      </td>
                       <td className="st-right">
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                           {overdue && <span className="st-overdue">OVERDUE</span>}
-                          <InlineDate value={v.deadline} onCommit={d => patch(v.id, { deadline: d || undefined })} highlight={overdue} />
+                          <InlineDate display="text" value={v.deadline} onCommit={d => patch(v.id, { deadline: d || undefined })} highlight={overdue} />
                         </div>
                       </td>
-                      <td><button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteVideo(v.id)} title="Delete video" aria-label="Delete video">✕</button></td>
+                      <td><button className="btn-danger row-action" style={{ padding: '2px 6px' }} onClick={() => deleteVideo(v.id)} title="Delete video" aria-label="Delete video">✕</button></td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
+          </div>
           </div>
           {hasMore && <LoadMore remaining={remaining} onClick={loadMore} />}
           </>

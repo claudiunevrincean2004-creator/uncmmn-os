@@ -574,10 +574,10 @@ export default function Home() {
 
         {/* Page header */}
         {client && (
-          <div style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface)', padding: '16px 24px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ padding: '22px 24px 6px', flexShrink: 0, display: 'flex', alignItems: 'flex-start', gap: 16 }}>
             <div>
-              <div className="font-head" style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.15, color: 'var(--text)' }}>{PAGE_LABELS[mainPage]}</div>
-              <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 2 }}>{PAGE_SUBTITLES[mainPage]}</div>
+              <div className="font-head" style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.15, letterSpacing: '-0.02em', color: 'var(--text)' }}>{PAGE_LABELS[mainPage]}</div>
+              <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 3 }}>{PAGE_SUBTITLES[mainPage]}</div>
             </div>
             <div style={{ flex: 1 }} />
             <div className="theme-seg" role="group" aria-label="Theme">
@@ -586,13 +586,19 @@ export default function Home() {
                 className={theme === 'aurora' ? 'active' : undefined}
                 aria-pressed={theme === 'aurora'}
                 onClick={() => applyTheme('aurora')}
-              >Light</button>
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></svg>
+                Light
+              </button>
               <button
                 type="button"
                 className={theme === 'midnight' ? 'active' : undefined}
                 aria-pressed={theme === 'midnight'}
                 onClick={() => applyTheme('midnight')}
-              >Dark</button>
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
+                Dark
+              </button>
             </div>
           </div>
         )}

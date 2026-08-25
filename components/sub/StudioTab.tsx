@@ -10,6 +10,10 @@ import AdCreative from './studio/AdCreative';
 
 type SubTab = 'videos' | 'sequences' | 'sessions' | 'ads';
 
+// One chip in the summary row above the sub-tabs: a coloured dot, the count, and
+// a lower-case label ("6 ready to edit").
+interface StatPill { label: string; value: number; color: string }
+
 const SUBTABS: { key: SubTab; label: string }[] = [
   { key: 'videos', label: 'Video Review' },
   { key: 'sequences', label: 'Story Sequences' },
@@ -56,71 +60,44 @@ export default function StudioTab({ videos, sequences, sessions, adCreatives, co
     setSub(map[deepLink.type]);
   }, [deepLink, setSub]);
 
-  const stats = useMemo(() => {
-    const today = todayISO();
-    const inReview = videos.filter(v => v.status === 'In Review').length;
-    const awaitingRevision = videos.filter(v => v.status === 'Revisions Needed').length;
-    const overdue = videos.filter(v =>
-      v.deadline && v.deadline.slice(0, 10) < today && v.status !== 'Posted'
-    ).length;
-    return { inReview, awaitingRevision, overdue };
-  }, [videos]);
+  // Pipeline counts for the Video Review pill row.
+  const overviewItems: StatPill[] = useMemo(() => [
+    { label: 'ready to edit', value: videos.filter(v => v.status === 'Ready to Edit').length, color: '#10b981' },
+    { label: 'in editing', value: videos.filter(v => v.status === 'Editing').length, color: '#f59e0b' },
+    { label: 'posted', value: videos.filter(v => v.status === 'Posted').length, color: '#14b8a6' },
+    { label: 'with revisions', value: videos.filter(v => (v.revision_count || 0) > 0).length, color: '#8b5cf6' },
+  ], [videos]);
 
-  const overviewItems: { label: string; value: string; color?: string }[] = [
-    { label: 'Videos in Review', value: String(stats.inReview), color: '#8b5cf6' },
-    { label: 'Awaiting Revision', value: String(stats.awaitingRevision), color: stats.awaitingRevision > 0 ? '#ef4444' : 'var(--text)' },
-    { label: 'Overdue', value: String(stats.overdue), color: stats.overdue > 0 ? '#ef4444' : 'var(--text)' },
-  ];
-
-  // Filming Sessions-specific cards: what's still ahead to film, and what shipped
-  // this calendar month. Only used while the Sessions sub-tab is active.
-  const sessionStats = useMemo(() => {
+  // Filming Sessions: what's still ahead to film, and what shipped this month.
+  const sessionOverviewItems: StatPill[] = useMemo(() => {
     const month = todayISO().slice(0, 7); // YYYY-MM
-    const planned = sessions.filter(s => s.status === 'Planned').length;
-    const readyToFilm = sessions.filter(s => s.status === 'Ready to Film').length;
-    const filmedThisMonth = sessions.filter(s => s.status === 'Filmed' && (s.date || '').slice(0, 7) === month).length;
-    return { planned, readyToFilm, filmedThisMonth };
+    return [
+      { label: 'planned', value: sessions.filter(s => s.status === 'Planned').length, color: '#3b82f6' },
+      { label: 'ready to film', value: sessions.filter(s => s.status === 'Ready to Film').length, color: '#eab308' },
+      { label: 'filmed this month', value: sessions.filter(s => s.status === 'Filmed' && (s.date || '').slice(0, 7) === month).length, color: '#10b981' },
+    ];
   }, [sessions]);
 
-  const sessionOverviewItems: { label: string; value: string; color?: string }[] = [
-    { label: 'Planned', value: String(sessionStats.planned), color: '#8b5cf6' },
-    { label: 'Ready to Film', value: String(sessionStats.readyToFilm), color: '#eab308' },
-    { label: 'Filmed this month', value: String(sessionStats.filmedThisMonth), color: 'var(--text)' },
-  ];
-
-  // Story Sequences-specific cards. "In progress" = anything not yet in a
-  // done/approved state. Unknown status names simply don't match, leaving 0.
-  const sequenceStats = useMemo(() => {
+  // Story Sequences. "In progress" = anything not yet in a done/approved state.
+  // Unknown status names simply don't match, leaving 0.
+  const sequenceOverviewItems: StatPill[] = useMemo(() => {
     const month = todayISO().slice(0, 7); // YYYY-MM
     const DONE = ['Approved', 'Posted'];
-    const inProgress = sequences.filter(s => !DONE.includes(s.status)).length;
-    const approved = sequences.filter(s => s.status === 'Approved').length;
-    const thisMonth = sequences.filter(s => ((s.created_at || s.scheduled_date) || '').slice(0, 7) === month).length;
-    return { inProgress, approved, thisMonth };
+    return [
+      { label: 'in progress', value: sequences.filter(s => !DONE.includes(s.status)).length, color: '#8b5cf6' },
+      { label: 'approved', value: sequences.filter(s => s.status === 'Approved').length, color: '#10b981' },
+      { label: 'this month', value: sequences.filter(s => ((s.created_at || s.scheduled_date) || '').slice(0, 7) === month).length, color: '#14b8a6' },
+    ];
   }, [sequences]);
 
-  const sequenceOverviewItems: { label: string; value: string; color?: string }[] = [
-    { label: 'In progress', value: String(sequenceStats.inProgress), color: '#8b5cf6' },
-    { label: 'Approved', value: String(sequenceStats.approved), color: 'var(--text)' },
-    { label: 'This month', value: String(sequenceStats.thisMonth), color: 'var(--text)' },
-  ];
-
-  // Ad Creative-specific cards, counted from real status values. Unknown status
-  // names simply don't match, leaving the relevant card at 0.
-  const adStats = useMemo(() => {
-    const readyForReview = adCreatives.filter(a => a.status === 'Ready for Review').length;
-    const testing = adCreatives.filter(a => a.status === 'Testing').length;
-    const winners = adCreatives.filter(a => a.status === 'Winner').length;
-    const total = adCreatives.length;
-    return { readyForReview, testing, winners, total };
-  }, [adCreatives]);
-
-  const adOverviewItems: { label: string; value: string; color?: string }[] = [
-    { label: 'Ready for Review', value: String(adStats.readyForReview), color: adStats.readyForReview > 0 ? '#eab308' : 'var(--text)' },
-    { label: 'Testing', value: String(adStats.testing), color: '#8b5cf6' },
-    { label: 'Winners', value: String(adStats.winners), color: 'var(--text)' },
-    { label: 'Total creatives', value: String(adStats.total), color: 'var(--text)' },
-  ];
+  // Ad Creative, counted from real status values. Unknown status names simply
+  // don't match, leaving the relevant pill at 0.
+  const adOverviewItems: StatPill[] = useMemo(() => [
+    { label: 'ready for review', value: adCreatives.filter(a => a.status === 'Ready for Review').length, color: '#eab308' },
+    { label: 'testing', value: adCreatives.filter(a => a.status === 'Testing').length, color: '#8b5cf6' },
+    { label: 'winners', value: adCreatives.filter(a => a.status === 'Winner').length, color: '#10b981' },
+    { label: 'total creatives', value: adCreatives.length, color: '#6b7280' },
+  ], [adCreatives]);
 
   const activeOverview =
     sub === 'sessions' ? sessionOverviewItems
@@ -130,20 +107,21 @@ export default function StudioTab({ videos, sequences, sessions, adCreatives, co
 
   return (
     <div style={{ position: 'relative' }}>
-      {/* Overview bar */}
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${activeOverview.length}, 1fr)`, gap: 10, marginBottom: 16 }}>
+      {/* Status summary — compact pills, one per meaningful state of the active tab */}
+      <div className="stat-pills">
         {activeOverview.map(item => (
-          <div key={item.label} className="metric-chip">
-            <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>{item.label}</div>
-            <div className="kpi-num" style={{ fontSize: item.value.length > 6 ? 18 : 30, color: item.color || 'var(--text)' }}>{item.value}</div>
+          <div key={item.label} className="stat-pill">
+            <span className="stat-pill-dot" style={{ background: item.color }} />
+            <span className="stat-pill-num">{item.value}</span>
+            <span className="stat-pill-label">{item.label}</span>
           </div>
         ))}
       </div>
 
       {/* Sub-tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '0.5px solid var(--border)', paddingBottom: 12 }}>
+      <div className="subtab-row">
         {SUBTABS.map(t => (
-          <button key={t.key} className={`subtab${sub === t.key ? ' active' : ''}`} onClick={() => setSub(t.key)}>
+          <button key={t.key} className={`subtab-underline${sub === t.key ? ' active' : ''}`} onClick={() => setSub(t.key)}>
             {t.label}
           </button>
         ))}

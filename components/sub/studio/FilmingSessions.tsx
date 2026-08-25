@@ -246,8 +246,8 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
           actionLabel="+ Add Session"
           onAction={() => { setDraft(EMPTY_DRAFT); setAddOpen(true); }}
         >
-          <FilterField label="Status"><MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} /></FilterField>
-          <FilterField label="Type"><MiniSelect value={fType} options={['All', ...typeValues]} onChange={setFType} /></FilterField>
+          <MiniSelect size="md" allLabel="All status" value={fStatus} options={statusPresent} onChange={setFStatus} />
+          <MiniSelect size="md" allLabel="All types" value={fType} options={['All', ...typeValues]} onChange={setFType} />
           <SortControl options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
           <FilterField label="Date"><DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
           <CustomFilterControls props={cprops} optionsByProp={optsByProp} filters={custFilters} setFilters={setCustFilters} />
@@ -257,11 +257,12 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
           <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>No sessions match. Add a session or adjust filters.</div>
         ) : (
           <>
+          <div className="studio-panel">
           <div className="studio-scroll">
             <table className="studio-table">
               <thead>
                 <tr>
-                  <th style={{ minWidth: 180 }}>Session</th>
+                  <th style={{ minWidth: 240 }}>Session</th>
                   <th onClick={isAdmin ? () => setOptsField({ field: 'session_type', title: 'Type' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Type{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <th onClick={isAdmin ? () => setOptsField({ field: 'session_status', title: 'Status' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Status{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <th>Script</th>
@@ -282,7 +283,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                       style={{ ...rowAccent(statusColors[s.status]), cursor: 'pointer', ...(isPast ? { opacity: 0.6 } : undefined) }}
                       onClick={openOnRowClick(() => setSelectedId(s.id))}
                     >
-                      <td style={{ minWidth: 180 }}>
+                      <td style={{ minWidth: 240 }}>
                         <TitleCell title={s.name} sub={shortDate(s.created_at)} onOpen={() => setSelectedId(s.id)}>
                           <CopyLinkButton type="filming" id={s.id} />
                         </TitleCell>
@@ -292,13 +293,14 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                       <td><UrlCell value={s.script_url} onCommit={u => patch(s.id, { script_url: u })} /></td>
                       <td><UrlCell value={s.footage_link} onCommit={u => patch(s.id, { footage_link: u })} /></td>
                       <CustomRowCells row={s} props={cprops} optionsByProp={optsByProp} onPatch={patch} size="md" />
-                      <td className="st-right"><InlineDate value={s.date} onCommit={d => patch(s.id, { date: d || undefined })} /></td>
-                      <td><button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteSession(s.id)} title="Delete session" aria-label="Delete session">✕</button></td>
+                      <td className="st-right"><InlineDate display="text" value={s.date} onCommit={d => patch(s.id, { date: d || undefined })} /></td>
+                      <td><button className="btn-danger row-action" style={{ padding: '2px 6px' }} onClick={() => deleteSession(s.id)} title="Delete session" aria-label="Delete session">✕</button></td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
+          </div>
           </div>
           {hasMore && <LoadMore remaining={remaining} onClick={loadMore} />}
           </>

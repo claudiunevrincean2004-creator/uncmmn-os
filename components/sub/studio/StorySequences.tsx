@@ -222,7 +222,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
           actionLabel="+ Add Sequence"
           onAction={() => { setDraft(EMPTY_DRAFT); setAddOpen(true); }}
         >
-          <FilterField label="Status"><MiniSelect value={fStatus} options={statusPresent} onChange={setFStatus} /></FilterField>
+          <MiniSelect size="md" allLabel="All status" value={fStatus} options={statusPresent} onChange={setFStatus} />
           <SortControl options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
           <FilterField label="Date"><DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
           <CustomFilterControls props={cprops} optionsByProp={optsByProp} filters={custFilters} setFilters={setCustFilters} />
@@ -232,11 +232,12 @@ export default function StorySequences({ sequences, comments, activity, dropdown
           <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>No sequences match. Add a sequence or adjust filters.</div>
         ) : (
           <>
+          <div className="studio-panel">
           <div className="studio-scroll">
             <table className="studio-table">
               <thead>
                 <tr>
-                  <th style={{ minWidth: 200 }}>Title</th>
+                  <th style={{ minWidth: 240 }}>Title</th>
                   <th onClick={isAdmin ? () => setOptsField({ field: 'sequence_status', title: 'Status' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Status{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <th>Final</th>
                   <CustomHeaderCells props={cprops} isAdmin={isAdmin} onManage={() => setMgrOpen(true)} />
@@ -254,7 +255,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
                       style={{ ...rowAccent(overdue ? 'var(--neg)' : statusColors[s.status]), cursor: 'pointer' }}
                       onClick={openOnRowClick(() => setSelectedId(s.id))}
                     >
-                      <td style={{ minWidth: 200 }}>
+                      <td style={{ minWidth: 240 }}>
                         <TitleCell title={s.title} sub={shortDate(s.created_at)} onOpen={() => setSelectedId(s.id)}>
                           <CopyLinkButton type="story" id={s.id} />
                         </TitleCell>
@@ -265,15 +266,16 @@ export default function StorySequences({ sequences, comments, activity, dropdown
                       <td className="st-right">
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                           {overdue && <span className="st-overdue">OVERDUE</span>}
-                          <InlineDate value={s.scheduled_date} onCommit={d => patch(s.id, { scheduled_date: d || undefined })} highlight={overdue} />
+                          <InlineDate display="text" value={s.scheduled_date} onCommit={d => patch(s.id, { scheduled_date: d || undefined })} highlight={overdue} />
                         </div>
                       </td>
-                      <td><button className="btn-danger" style={{ padding: '2px 6px' }} onClick={() => deleteSequence(s.id)} title="Delete sequence" aria-label="Delete sequence">✕</button></td>
+                      <td><button className="btn-danger row-action" style={{ padding: '2px 6px' }} onClick={() => deleteSequence(s.id)} title="Delete sequence" aria-label="Delete sequence">✕</button></td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
+          </div>
           </div>
           {hasMore && <LoadMore remaining={remaining} onClick={loadMore} />}
           </>

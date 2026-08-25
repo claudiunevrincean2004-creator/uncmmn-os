@@ -250,11 +250,21 @@ html, body {
 /* ===== Studio tables — refined single-line rows ==============================
    Shared by all four Studio tabs (Video Review, Story Sequences, Filming
    Sessions, Ad Creative) so they read identically. One item per row, everything
-   on ONE line in aligned columns, separated by hairlines rather than gridlines
-   or cards. Every colour is a theme token or the row's own status colour, so
-   this holds up in both light (aurora) and dark (midnight). */
+   on ONE line in aligned columns, sitting on a rounded surface panel that lifts
+   subtly off the page. Every colour is a theme token or the row's own status
+   colour, so this holds up in both light (aurora) and dark (midnight). */
 
-/* Data tables are wider than a phone. Horizontal scroll inside this box keeps
+/* The panel the whole table sits on. */
+.studio-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  /* Clips the header's top corners and the last row's bottom corners. */
+  overflow: hidden;
+}
+
+/* Data tables are wider than a phone. Horizontal scroll inside the panel keeps
    the columns aligned instead of reflowing them into an unreadable stack, and
    the page body itself never scrolls sideways. */
 .studio-scroll {
@@ -270,20 +280,21 @@ html, body {
   font-family: var(--font-ui);
 }
 
-.studio-table th {
+.studio-table thead th {
   text-align: left;
   font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   color: var(--text-faint);
-  font-weight: 700;
-  padding: 0 14px 12px;
+  font-weight: 600;
+  padding: 13px 14px;
+  background: var(--surface-2);
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
 
 .studio-table td {
-  padding: 14px;
+  padding: 16px 14px;
   border-bottom: 1px solid var(--border);
   color: var(--text);
   vertical-align: middle;
@@ -297,24 +308,26 @@ html, body {
 
 /* First column carries the row's accent rail, so it needs the extra left inset
    and a positioning context for it. */
-.studio-table th:first-child,
+.studio-table thead th:first-child,
 .studio-table td:first-child {
-  padding-left: 18px;
+  padding-left: 26px;
 }
 
 .studio-table td:first-child {
   position: relative;
 }
 
-/* The rail itself — tinted per row from --row-accent, which each tab sets
-   inline from that row's status colour (or --neg when the row is overdue). */
+/* The rail — a short rounded bar centred on the row, tinted per row from
+   --row-accent (each tab sets it inline from that row's status colour, or --neg
+   when the row is overdue). */
 .studio-table tbody td:first-child::before {
   content: '';
   position: absolute;
-  left: 0;
-  top: 8px;
-  bottom: 8px;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
   width: 3px;
+  height: 22px;
   border-radius: 999px;
   background: var(--row-accent, var(--accent));
 }
@@ -346,11 +359,11 @@ html, body {
   padding: 0;
   font-family: var(--font-ui);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text);
   text-align: left;
   cursor: pointer;
-  max-width: 320px;
+  max-width: 380px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -381,31 +394,171 @@ html, body {
   white-space: nowrap;
 }
 
+/* The ↗ on a link — quieter than the URL it follows. */
+.st-arrow {
+  font-size: 9px;
+  opacity: 0.75;
+}
+
+/* Link edit pencils stay out of the way until the row is hovered. Scoped to
+   .studio-table so the same control keeps its always-visible form in the detail
+   panels and every other table. */
+.studio-table .link-pencil {
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.studio-table tbody tr:hover .link-pencil,
+.studio-table .link-pencil:focus-visible {
+  opacity: 1;
+}
+
+/* Chromeless assignee trigger — avatar + name, with the border only on hover. */
+.assignee-trigger {
+  display: inline-flex;
+  align-items: center;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.assignee-trigger:hover {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+/* Row-end actions (delete) — quiet until the row is hovered. */
+.studio-table .row-action {
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.studio-table tbody tr:hover .row-action,
+.studio-table .row-action:focus-visible {
+  opacity: 1;
+}
+
+/* Touch devices have no hover, so hover-reveals would be unreachable. */
+@media (hover: none) {
+  .studio-table .link-pencil,
+  .studio-table .row-action { opacity: 1; }
+}
+
 @media (max-width: 640px) {
-  .studio-table td { padding: 11px 12px; }
-  .studio-table th { padding: 0 12px 10px; }
-  .st-title { max-width: 200px; }
+  .studio-table td { padding: 13px 12px; }
+  .studio-table thead th { padding: 11px 12px; }
+  .studio-table thead th:first-child,
+  .studio-table td:first-child { padding-left: 22px; }
+  .studio-table tbody td:first-child::before { left: 9px; }
+  .st-title { max-width: 210px; }
+}
+
+/* ===== Studio stat pills — the compact status summary above the tabs ========= */
+.stat-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.stat-pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.stat-pill-num {
+  font-family: var(--font-head);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.stat-pill-label {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* ===== Studio sub-tabs — underlined text tabs =============================== */
+.subtab-row {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 18px;
+}
+
+.subtab-underline {
+  position: relative;
+  background: none;
+  border: none;
+  padding: 0 0 11px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-faint);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 140ms ease;
+}
+
+.subtab-underline:hover {
+  color: var(--text-dim);
+}
+
+.subtab-underline.active {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.subtab-underline.active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
 }
 
 /* ===== Studio toolbar — search · filters · count · action ==================== */
 .studio-toolbar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
   margin-bottom: 16px;
 }
 
 .studio-search {
   position: relative;
-  flex: 0 1 260px;
+  flex: 0 1 235px;
   min-width: 170px;
 }
 
 .studio-search input {
-  padding-left: 30px;
-  border-radius: 999px;
+  padding: 8px 12px 8px 32px;
+  border-radius: 10px;
   font-size: 12px;
+  background: var(--surface);
 }
 
 .studio-search-icon {
@@ -422,21 +575,31 @@ html, body {
 .studio-filters {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
   min-width: 0;
+}
+
+/* Bare filter dropdowns — no label prefix; the selected value reads as the
+   label ("All status", "Everyone", "All formats"). */
+.studio-filters select.form-input {
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  min-width: 120px;
 }
 
 .studio-toolbar-end {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   margin-left: auto;
   flex-shrink: 0;
 }
 
 .studio-count {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-faint);
   white-space: nowrap;
 }
@@ -452,34 +615,37 @@ html, body {
 .theme-seg {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   padding: 3px;
-  background: var(--surface-2);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 999px;
 }
 
 .theme-seg button {
-  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid transparent;
   background: none;
   border-radius: 999px;
-  padding: 5px 14px;
+  padding: 5px 13px;
   font-size: 11px;
   font-weight: 600;
   font-family: var(--font-ui);
-  color: var(--text-dim);
+  color: var(--text-faint);
   cursor: pointer;
-  transition: background 140ms ease, color 140ms ease;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
 }
 
 .theme-seg button:hover {
-  color: var(--text);
+  color: var(--text-dim);
 }
 
 .theme-seg button.active {
-  background: var(--surface);
-  color: var(--text);
-  box-shadow: var(--shadow);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* ===== Sidebar wordmark — star + "uncmmn" + OS badge ======================== */

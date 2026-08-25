@@ -149,21 +149,23 @@ export function UserPicker({
       <button
         ref={btnRef}
         onClick={() => setOpen(o => !o)}
-        className="btn-ghost"
+        // 'md' is chromeless — just the avatar and the name, the way the Studio
+        // tables show an assignee. The surrounding row is what you click; the
+        // border only appears on hover so it still reads as editable.
+        className={md ? 'assignee-trigger' : 'btn-ghost'}
         style={{
-          fontSize: md ? 11 : 11,
+          fontSize: 11,
           padding: md
-            ? (display ? '3px 12px 3px 4px' : '5px 12px')
+            ? (display ? '3px 8px 3px 3px' : '4px 8px')
             : (display ? '3px 9px 3px 4px' : '4px 9px'),
-          borderRadius: md ? 999 : undefined,
           maxWidth: md ? 170 : 150,
           overflow: 'hidden',
           whiteSpace: 'nowrap',
-          color: display ? 'var(--text)' : 'var(--text-faint)',
+          color: display ? 'var(--text-dim)' : 'var(--text-faint)',
         }}
         title={display || 'Assign a user'}
       >
-        <AssigneeTag name={display} size={md ? 18 : 16} />
+        <AssigneeTag name={display} size={md ? 20 : 16} />
       </button>
 
       {open && pos && typeof document !== 'undefined' && createPortal(

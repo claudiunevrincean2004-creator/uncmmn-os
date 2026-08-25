@@ -104,8 +104,8 @@ export default function TableToolbar({
         <span className="studio-count">
           {count} {count === 1 ? countNoun : `${countNoun}s`}
         </span>
-        <button className="btn-primary" style={{ fontSize: 11, padding: '6px 12px' }} onClick={onAction}>
-          {actionLabel}
+        <button className="btn-primary" style={{ fontSize: 12, padding: '8px 16px', display: 'inline-flex', alignItems: 'center', gap: 7 }} onClick={onAction}>
+          <span aria-hidden style={{ fontSize: 13, lineHeight: 1 }}>+</span>{actionLabel}
         </button>
       </div>
     </div>
