@@ -148,6 +148,9 @@ html, body {
 }
 
 /* Sidebar nav items */
+/* The base row, also borrowed by the mention picker and the assignee dropdown —
+   those want to stay compact, so the roomier sidebar sizing lives on .nav-list
+   below rather than here. */
 .nav-item {
   display: flex;
   align-items: center;
@@ -163,6 +166,21 @@ html, body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Sidebar nav groups: a gap between items instead of a stack of touching rows,
+   and a roomier row inside each. */
+.nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.nav-list .nav-item {
+  gap: 11px;
+  padding: 11px 12px;
+  border-radius: 11px;
+  font-size: 14px;
 }
 
 .nav-item:hover {

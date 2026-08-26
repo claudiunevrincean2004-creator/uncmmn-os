@@ -14,16 +14,25 @@ interface NavItem {
 // One line-icon per destination, drawn from the shared set so the column reads
 // as a single family. They stroke in currentColor, so an active item's glyph
 // turns --accent along with its label.
+//
+// Trial Reels and Clippers are HIDDEN FROM THE NAV ONLY — their pages, routes,
+// components, tables and data are all still here and still work. To bring them
+// back, move their entry out of HIDDEN_NAV below; nothing else needs touching.
 const NAV: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', icon: 'grid' },
   { key: 'content', label: 'Content', icon: 'document' },
   { key: 'research', label: 'Research', icon: 'search' },
   { key: 'studio', label: 'Studio', icon: 'playSquare' },
-  { key: 'trialreels', label: 'Trial Reels', icon: 'film' },
   { key: 'cliplibrary', label: 'Clip Library', icon: 'stack' },
   { key: 'drive', label: 'Assets', icon: 'archive' },
+];
+
+/** Parked nav entries — restore one by moving it back into NAV. */
+const HIDDEN_NAV: NavItem[] = [
+  { key: 'trialreels', label: 'Trial Reels', icon: 'film' },
   { key: 'clippers', label: 'Clippers', icon: 'scissors' },
 ];
+void HIDDEN_NAV; // kept for reference, deliberately not rendered
 
 interface Props {
   activeMP: MainPage;
@@ -120,31 +129,31 @@ export default function Sidebar({ activeMP, collapsed, role, userName, unreadCou
         </div>
       </div>
 
-      <div style={{ padding: collapsed ? '10px 4px' : '10px 8px', flex: 1 }}>
+      <div className="nav-list" style={{ padding: collapsed ? '12px 4px' : '12px 8px', flex: 1 }}>
         {nav.map(item => (
           <div
             key={item.key}
             className={`nav-item${activeMP === item.key ? ' active' : ''}`}
             onClick={() => onSelectMain(item.key)}
             title={item.label}
-            style={collapsed ? { justifyContent: 'center', padding: '8px 0' } : undefined}
+            style={collapsed ? { justifyContent: 'center', padding: '11px 0' } : undefined}
           >
-            <Icon name={item.icon} size={17} />
+            <Icon name={item.icon} size={19} />
             {!collapsed && <span>{item.label}</span>}
           </div>
         ))}
       </div>
 
-      <div style={{ padding: collapsed ? '10px 4px' : '10px 8px', borderTop: '0.5px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div className="nav-list" style={{ padding: collapsed ? '12px 4px' : '12px 8px', borderTop: '0.5px solid var(--border)' }}>
         {/* Inbox — comment activity across every tab. Sits directly above the
             profile, the way Notion anchors it to the bottom of the sidebar. */}
         <div
           className="nav-item"
           onClick={onOpenInbox}
           title={unreadCount > 0 ? `Inbox — ${unreadCount} unread` : 'Inbox'}
-          style={collapsed ? { justifyContent: 'center', padding: '8px 0', position: 'relative' } : { position: 'relative' }}
+          style={collapsed ? { justifyContent: 'center', padding: '11px 0', position: 'relative' } : { position: 'relative' }}
         >
-          <Icon name="mail" size={17} />
+          <Icon name="mail" size={19} />
           {!collapsed && <span>Inbox</span>}
           {!collapsed && <div style={{ flex: 1 }} />}
           <UnreadBadge count={unreadCount} dot={collapsed} />
@@ -153,18 +162,18 @@ export default function Sidebar({ activeMP, collapsed, role, userName, unreadCou
           className="nav-item"
           onClick={onOpenAccount}
           title={`${userName} — account`}
-          style={collapsed ? { justifyContent: 'center', padding: '8px 0' } : { gap: 8 }}
+          style={collapsed ? { justifyContent: 'center', padding: '11px 0' } : { gap: 11 }}
         >
-          <Avatar name={userName} size={20} />
+          <Avatar name={userName} size={22} />
           {!collapsed && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userName}</span>}
         </div>
         <div
           className="nav-item"
           onClick={onLogout}
           title="Sign out"
-          style={collapsed ? { justifyContent: 'center', padding: '8px 0' } : undefined}
+          style={collapsed ? { justifyContent: 'center', padding: '11px 0' } : undefined}
         >
-          <Icon name="power" size={17} />
+          <Icon name="power" size={19} />
           {!collapsed && <span>Sign out</span>}
         </div>
         <div style={{ fontSize: 10, color: 'var(--text-faint)', textAlign: collapsed ? 'center' : undefined, padding: collapsed ? 0 : '0 2px' }}>v1.0.0</div>
