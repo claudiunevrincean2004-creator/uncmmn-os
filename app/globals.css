@@ -383,7 +383,13 @@ html, body {
 
 /* Centred columns (Deadline, Revisions) — the chip and the count badge both
    centre their own contents, so the header centres over them to match. Applied
-   to the th AND the td so the two can't drift apart. */
+   to the th AND the td so the two can't drift apart.
+   The th selector has to carry `.studio-table thead` with it: the base
+   `.studio-table thead th { text-align: left }` above is more specific than a
+   lone class, so a bare `.st-center` loses on the header and the label drifts
+   back to the left edge while the values stay centred. */
+.studio-table thead th.st-center,
+.studio-table td.st-center,
 .st-center {
   text-align: center;
 }
