@@ -10,9 +10,9 @@ import {
   VIDEO_FORMATS, VIDEO_STATUSES, VIDEO_STATUS_COLORS,
   PRIORITIES, PRIORITY_COLORS,
   isOverdue, logActivity, mergeOptions, inDateRange,
-  getFieldOptions, colorMap, buildAddOptionRows, shortDate,
+  getFieldOptions, colorMap, buildAddOptionRows,
 } from '@/lib/studio';
-import { EditPillSelect, MiniSelect, UrlCell, InlineDate } from './cells';
+import { EditPillSelect, MiniSelect, UrlCell, InlineDate, openDatePicker } from './cells';
 import TableToolbar, { rowAccent, openOnRowClick, TitleCell } from './table-ui';
 import SortControl from './SortControl';
 import { SortOption, SortDir, sortRows } from '@/lib/sort';
@@ -286,7 +286,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
           searchPlaceholder="Search videos…"
           count={filtered.length}
           countNoun="video"
-          actionLabel="+ Add Video"
+          actionLabel="Add Video"
           onAction={() => { setDraft(EMPTY_DRAFT); setAddOpen(true); }}
         >
           <MiniSelect size="md" allLabel="All status" value={fStatus} options={statusPresent} onChange={setFStatus} />
@@ -313,8 +313,8 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                   <th>Brief</th>
                   <th>Raw Files</th>
                   <th>Final</th>
-                  <th className="st-right">Deadline</th>
-                  <th className="st-right">Revisions</th>
+                  <th>Deadline</th>
+                  <th>Revisions</th>
                   <th></th>
                 </tr>
               </thead>
@@ -332,7 +332,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                       onClick={openOnRowClick(() => setSelectedId(v.id))}
                     >
                       <td style={{ minWidth: 240 }}>
-                        <TitleCell title={v.title} sub={shortDate(v.created_at)} onOpen={() => setSelectedId(v.id)}>
+                        <TitleCell title={v.title} onOpen={() => setSelectedId(v.id)}>
                           <CopyLinkButton type="video" id={v.id} />
                         </TitleCell>
                       </td>
@@ -342,13 +342,13 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                       <td><UrlCell value={v.brief_url} onCommit={u => patch(v.id, { brief_url: u })} /></td>
                       <td><UrlCell value={v.raw_files_url} onCommit={u => patch(v.id, { raw_files_url: u })} /></td>
                       <td><UrlCell value={v.final_url} onCommit={u => patch(v.id, { final_url: u })} /></td>
-                      <td className="st-right">
+                      <td>
                         <div className="st-datecell">
-                          {overdue && <span className="st-overdue">OVERDUE</span>}
                           <InlineDate display="chip" value={v.deadline} onCommit={d => patch(v.id, { deadline: d || undefined })} highlight={overdue} />
+                          {overdue && <span className="st-overdue">OVERDUE</span>}
                         </div>
                       </td>
-                      <td className="st-right">
+                      <td>
                         <span
                           className={v.revision_count > 0 ? 'st-rev' : 'st-rev is-zero'}
                           title={v.revision_count > 0 ? `${v.revision_count} revision round(s)` : 'No revisions'}
@@ -426,7 +426,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                 <input className="form-input" value={draft.final_url} onChange={e => setDraft(d => ({ ...d, final_url: e.target.value }))} placeholder="https://…" style={{ width: '100%', fontSize: 12 }} />
               </DraftField>
               <DraftField label="Deadline">
-                <input className="form-input" type="date" value={draft.deadline} onChange={e => setDraft(d => ({ ...d, deadline: e.target.value }))} style={{ width: 160, fontSize: 12 }} />
+                <input className="form-input" type="date" value={draft.deadline} onChange={e => setDraft(d => ({ ...d, deadline: e.target.value }))} onClick={openDatePicker} style={{ width: 160, fontSize: 12 }} />
               </DraftField>
             </div>
 

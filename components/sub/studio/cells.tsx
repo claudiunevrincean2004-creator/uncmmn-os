@@ -430,6 +430,16 @@ export function InlineNumber({
   );
 }
 
+// Every date input in the app hides the browser's calendar glyph (see the
+// input[type='date'] block in globals.css), so clicking the field is what has to
+// open the picker. showPicker() is Chrome 99+/Safari 16+ and requires a user
+// gesture; where it's missing or throws, the field still types and arrow-keys
+// like any date input. Attach this to any <input type="date"> we render.
+export function openDatePicker(e: React.MouseEvent<HTMLInputElement>) {
+  const el = e.currentTarget as HTMLInputElement & { showPicker?: () => void };
+  try { el.showPicker?.(); } catch { /* unsupported here — typing still works */ }
+}
+
 // Inline date picker that commits on change.
 //
 // `display='chip'` is the Studio-table form: an always-editable date field
@@ -458,14 +468,7 @@ export function InlineDate({
         title={value ? 'Change date' : 'Set date'}
         value={value ? value.slice(0, 10) : ''}
         onChange={e => onCommit(e.target.value)}
-        // The chip hides the native calendar glyph, so the field itself has to
-        // open the picker. showPicker() is Chrome 99+/Safari 16+; where it's
-        // missing (or throws — it requires a user gesture) the field still
-        // types and arrow-keys like any date input.
-        onClick={e => {
-          const el = e.currentTarget as HTMLInputElement & { showPicker?: () => void };
-          try { el.showPicker?.(); } catch { /* not supported here — typing still works */ }
-        }}
+        onClick={openDatePicker}
       />
     );
   }
@@ -504,6 +507,7 @@ export function InlineDate({
       }}
       value={value ? value.slice(0, 10) : ''}
       onChange={e => onCommit(e.target.value)}
+      onClick={openDatePicker}
       onBlur={() => setEditing(false)}
     />
   );

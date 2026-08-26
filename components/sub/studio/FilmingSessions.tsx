@@ -5,8 +5,8 @@ import { StudioSession, StudioComment, StudioActivity, StudioDropdownOption, Cus
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { usePagedRows } from '@/lib/use-paged-rows';
 import LoadMore from './LoadMore';
-import { SESSION_STATUSES, SESSION_STATUS_COLORS, SESSION_TYPES, SESSION_TYPE_COLORS, todayISO, logActivity, inDateRange, getFieldOptions, colorMap, buildAddOptionRows, shortDate } from '@/lib/studio';
-import { EditPillSelect, MiniSelect, UrlCell, InlineDate } from './cells';
+import { SESSION_STATUSES, SESSION_STATUS_COLORS, SESSION_TYPES, SESSION_TYPE_COLORS, todayISO, logActivity, inDateRange, getFieldOptions, colorMap, buildAddOptionRows } from '@/lib/studio';
+import { EditPillSelect, MiniSelect, UrlCell, InlineDate, openDatePicker } from './cells';
 import TableToolbar, { rowAccent, openOnRowClick, TitleCell } from './table-ui';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import SortControl from './SortControl';
@@ -243,7 +243,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
           searchPlaceholder="Search sessions…"
           count={rows.length}
           countNoun="session"
-          actionLabel="+ Add Session"
+          actionLabel="Add Session"
           onAction={() => { setDraft(EMPTY_DRAFT); setAddOpen(true); }}
         >
           <MiniSelect size="md" allLabel="All status" value={fStatus} options={statusPresent} onChange={setFStatus} />
@@ -268,7 +268,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                   <th>Script</th>
                   <th>Footage</th>
                   <CustomHeaderCells props={cprops} isAdmin={isAdmin} onManage={() => setMgrOpen(true)} />
-                  <th className="st-right">Date</th>
+                  <th>Date</th>
                   <th style={{ textAlign: 'right' }}>{isAdmin && <AddPropertyButton onClick={() => setMgrOpen(true)} />}</th>
                 </tr>
               </thead>
@@ -284,7 +284,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                       onClick={openOnRowClick(() => setSelectedId(s.id))}
                     >
                       <td style={{ minWidth: 240 }}>
-                        <TitleCell title={s.name} sub={shortDate(s.created_at)} onOpen={() => setSelectedId(s.id)}>
+                        <TitleCell title={s.name} onOpen={() => setSelectedId(s.id)}>
                           <CopyLinkButton type="filming" id={s.id} />
                         </TitleCell>
                       </td>
@@ -293,7 +293,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                       <td><UrlCell value={s.script_url} onCommit={u => patch(s.id, { script_url: u })} /></td>
                       <td><UrlCell value={s.footage_link} onCommit={u => patch(s.id, { footage_link: u })} /></td>
                       <CustomRowCells row={s} props={cprops} optionsByProp={optsByProp} onPatch={patch} size="md" />
-                      <td className="st-right">
+                      <td>
                         <div className="st-datecell">
                           <InlineDate display="chip" value={s.date} onCommit={d => patch(s.id, { date: d || undefined })} />
                         </div>
@@ -352,7 +352,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                 <input className="form-input" value={draft.footage_link} onChange={e => setDraft(d => ({ ...d, footage_link: e.target.value }))} placeholder="https://…" style={{ width: '100%', fontSize: 12 }} />
               </DraftField>
               <DraftField label="Date">
-                <input className="form-input" type="date" value={draft.date} onChange={e => setDraft(d => ({ ...d, date: e.target.value }))} style={{ width: 160, fontSize: 12 }} />
+                <input className="form-input" type="date" value={draft.date} onChange={e => setDraft(d => ({ ...d, date: e.target.value }))} onClick={openDatePicker} style={{ width: 160, fontSize: 12 }} />
               </DraftField>
               <DraftField label="Status">
                 <EditPillSelect field="session_status" value={draft.status} options={statusValues} colors={statusColors} onChange={st => setDraft(d => ({ ...d, status: st }))} onAddOption={addOption} allowAdd={isAdmin} />

@@ -5,8 +5,8 @@ import { StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, Studi
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { usePagedRows } from '@/lib/use-paged-rows';
 import LoadMore from './LoadMore';
-import { AD_FORMATS, AD_STATUSES, AD_STATUS_COLORS, todayISO, logActivity, inDateRange, getFieldOptions, colorMap, buildAddOptionRows, shortDate } from '@/lib/studio';
-import { EditPillSelect, MiniSelect, InlineDate, UrlCell } from './cells';
+import { AD_FORMATS, AD_STATUSES, AD_STATUS_COLORS, todayISO, logActivity, inDateRange, getFieldOptions, colorMap, buildAddOptionRows } from '@/lib/studio';
+import { EditPillSelect, MiniSelect, InlineDate, UrlCell, openDatePicker } from './cells';
 import TableToolbar, { rowAccent, openOnRowClick, TitleCell } from './table-ui';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import QuickLinks from './QuickLinks';
@@ -303,7 +303,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
           searchPlaceholder="Search Creative ID…"
           count={rows.length}
           countNoun="creative"
-          actionLabel="+ Add Ad Creative"
+          actionLabel="Add Ad Creative"
           onAction={() => { setDraft({ ...EMPTY_DRAFT, date_added: todayISO() }); setAddOpen(true); }}
         >
           <MiniSelect size="md" allLabel="All status" value={fStatus} options={statusPresent} onChange={setFStatus} />
@@ -330,7 +330,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                   <th>Final</th>
                   <th>Iterate</th>
                   <CustomHeaderCells props={cprops} isAdmin={isAdmin} onManage={() => setMgrOpen(true)} />
-                  <th className="st-right">Date Added</th>
+                  <th>Date Added</th>
                   <th style={{ textAlign: 'right' }}>{isAdmin && <AddPropertyButton onClick={() => setMgrOpen(true)} />}</th>
                 </tr>
               </thead>
@@ -343,7 +343,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                     onClick={openOnRowClick(() => setSelectedId(a.id))}
                   >
                     <td style={{ minWidth: 240 }}>
-                      <TitleCell title={a.creative_id || 'Untitled'} sub={shortDate(a.created_at)} onOpen={() => setSelectedId(a.id)}>
+                      <TitleCell title={a.creative_id || 'Untitled'} onOpen={() => setSelectedId(a.id)}>
                         <CopyLinkButton type="ad" id={a.id} />
                       </TitleCell>
                     </td>
@@ -356,7 +356,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                       <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px', color: 'var(--accent)' }} onClick={() => handleIterate(a)} title="Trigger iteration">↻ Iterate</button>
                     </td>
                     <CustomRowCells row={a} props={cprops} optionsByProp={optsByProp} onPatch={patch} size="md" />
-                    <td className="st-right">
+                    <td>
                       <div className="st-datecell">
                         <InlineDate display="chip" value={a.date_added} onCommit={d => patch(a.id, { date_added: d || undefined })} />
                       </div>
@@ -409,7 +409,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                 <input className="form-input" value={draft.creative_id} onChange={e => setDraft(d => ({ ...d, creative_id: e.target.value }))} placeholder="Name / identifier" style={{ width: '100%', fontSize: 12 }} />
               </DraftField>
               <DraftField label="Date Added">
-                <input className="form-input" type="date" value={draft.date_added} onChange={e => setDraft(d => ({ ...d, date_added: e.target.value }))} style={{ width: 160, fontSize: 12 }} />
+                <input className="form-input" type="date" value={draft.date_added} onChange={e => setDraft(d => ({ ...d, date_added: e.target.value }))} onClick={openDatePicker} style={{ width: 160, fontSize: 12 }} />
               </DraftField>
               <DraftField label="Format">
                 <EditPillSelect field="ad_format" value={draft.ad_format} options={formatValues} colors={formatColors} onChange={f => setDraft(d => ({ ...d, ad_format: f }))} onAddOption={addOption} allowAdd={isAdmin} allowEmpty />

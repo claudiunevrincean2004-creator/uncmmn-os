@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Post, Client } from '@/lib/types';
 import { useDismiss } from '@/lib/use-dismiss';
+import { openDatePicker } from '@/components/sub/studio/cells';
 
 interface Props {
   post?: Post | null;
@@ -133,7 +134,7 @@ export default function PostModal({ post, client, onClose, onSaved }: Props) {
 
           <div>
             <label className="form-label">Date</label>
-            <input className="form-input" type="date" value={date} onChange={e => setDate(e.target.value)} style={inputStyle} />
+            <input className="form-input" type="date" value={date} onChange={e => setDate(e.target.value)} onClick={openDatePicker} style={inputStyle} />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>

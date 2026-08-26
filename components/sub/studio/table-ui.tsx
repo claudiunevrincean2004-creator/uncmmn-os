@@ -31,17 +31,16 @@ export function openOnRowClick(open: () => void) {
 }
 
 /**
- * First cell of every Studio row: the prominent title, an optional muted date
- * riding inline after it, and the hover-revealed copy-link button.
+ * First cell of every Studio row: the title on its own, plus the hover-revealed
+ * copy-link button. No date rides alongside it — every table already carries its
+ * dates in their own column.
  */
 export function TitleCell({
   title,
-  sub,
   onOpen,
   children,
 }: {
   title: string;
-  sub?: string;
   onOpen: () => void;
   children?: ReactNode;
 }) {
@@ -50,7 +49,6 @@ export function TitleCell({
       <button className="st-title" onClick={onOpen} title="Open details">
         {title || 'Untitled'}
       </button>
-      {sub && <span className="st-sub">{sub}</span>}
       {children}
     </div>
   );
@@ -64,6 +62,7 @@ interface ToolbarProps {
   count: number;
   /** Singular noun; pluralised with a trailing "s". */
   countNoun: string;
+  /** Bare label — the button draws its own "+", so don't prefix one. */
   actionLabel: string;
   onAction: () => void;
   /** The tab's own filter / sort / date controls. */

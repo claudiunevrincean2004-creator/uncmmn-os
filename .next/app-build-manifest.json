@@ -12,7 +12,7 @@
       "static/chunks/fd9d1056-94dae3868e3dce96.js",
       "static/chunks/23-6a44497528f4b1d4.js",
       "static/chunks/main-app-9f14a155ecf2d97e.js",
-      "static/css/3a7e487cfc39dfa2.css",
+      "static/css/a6a0efc7cd4145e0.css",
       "static/chunks/app/layout-9769e8395710ec88.js"
     ],
     "/clip/[id]/page": [
@@ -38,6 +38,20 @@
       "static/chunks/663-c10a9e09e5f131e3.js",
       "static/chunks/app/login/page-c1fb4f97f728341e.js"
     ],
+    "/studio/ad-creative/[id]/page": [
+      "static/chunks/webpack-91b2d14d0f678b80.js",
+      "static/chunks/fd9d1056-94dae3868e3dce96.js",
+      "static/chunks/23-6a44497528f4b1d4.js",
+      "static/chunks/main-app-9f14a155ecf2d97e.js",
+      "static/chunks/app/studio/ad-creative/[id]/page-66626c240b9b35ae.js"
+    ],
+    "/studio/video/[id]/page": [
+      "static/chunks/webpack-91b2d14d0f678b80.js",
+      "static/chunks/fd9d1056-94dae3868e3dce96.js",
+      "static/chunks/23-6a44497528f4b1d4.js",
+      "static/chunks/main-app-9f14a155ecf2d97e.js",
+      "static/chunks/app/studio/video/[id]/page-97dafd7a3ecb2f5d.js"
+    ],
     "/page": [
       "static/chunks/webpack-91b2d14d0f678b80.js",
       "static/chunks/fd9d1056-94dae3868e3dce96.js",
@@ -45,14 +59,7 @@
       "static/chunks/main-app-9f14a155ecf2d97e.js",
       "static/chunks/44530001-d85e2a39e6dbc43a.js",
       "static/chunks/663-c10a9e09e5f131e3.js",
-      "static/chunks/app/page-9b9e2a27841c7a24.js"
-    ],
-    "/studio/ad-creative/[id]/page": [
-      "static/chunks/webpack-91b2d14d0f678b80.js",
-      "static/chunks/fd9d1056-94dae3868e3dce96.js",
-      "static/chunks/23-6a44497528f4b1d4.js",
-      "static/chunks/main-app-9f14a155ecf2d97e.js",
-      "static/chunks/app/studio/ad-creative/[id]/page-66626c240b9b35ae.js"
+      "static/chunks/app/page-d8791f06ef4deba5.js"
     ],
     "/studio/filming/[id]/page": [
       "static/chunks/webpack-91b2d14d0f678b80.js",
@@ -67,13 +74,6 @@
       "static/chunks/23-6a44497528f4b1d4.js",
       "static/chunks/main-app-9f14a155ecf2d97e.js",
       "static/chunks/app/studio/story/[id]/page-984baf336e736c26.js"
-    ],
-    "/studio/video/[id]/page": [
-      "static/chunks/webpack-91b2d14d0f678b80.js",
-      "static/chunks/fd9d1056-94dae3868e3dce96.js",
-      "static/chunks/23-6a44497528f4b1d4.js",
-      "static/chunks/main-app-9f14a155ecf2d97e.js",
-      "static/chunks/app/studio/video/[id]/page-97dafd7a3ecb2f5d.js"
     ],
     "/trialreel/[id]/page": [
       "static/chunks/webpack-91b2d14d0f678b80.js",

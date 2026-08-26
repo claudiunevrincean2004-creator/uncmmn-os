@@ -7,9 +7,9 @@ import { usePagedRows } from '@/lib/use-paged-rows';
 import LoadMore from './LoadMore';
 import {
   SEQUENCE_STATUSES, SEQUENCE_STATUS_COLORS,
-  isOverdue, logActivity, inDateRange, getFieldOptions, colorMap, buildAddOptionRows, shortDate,
+  isOverdue, logActivity, inDateRange, getFieldOptions, colorMap, buildAddOptionRows,
 } from '@/lib/studio';
-import { EditPillSelect, MiniSelect, UrlCell, InlineDate } from './cells';
+import { EditPillSelect, MiniSelect, UrlCell, InlineDate, openDatePicker } from './cells';
 import TableToolbar, { rowAccent, openOnRowClick, TitleCell } from './table-ui';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import SortControl from './SortControl';
@@ -219,7 +219,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
           searchPlaceholder="Search sequences…"
           count={rows.length}
           countNoun="sequence"
-          actionLabel="+ Add Sequence"
+          actionLabel="Add Sequence"
           onAction={() => { setDraft(EMPTY_DRAFT); setAddOpen(true); }}
         >
           <MiniSelect size="md" allLabel="All status" value={fStatus} options={statusPresent} onChange={setFStatus} />
@@ -241,7 +241,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
                   <th onClick={isAdmin ? () => setOptsField({ field: 'sequence_status', title: 'Status' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Status{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <th>Final</th>
                   <CustomHeaderCells props={cprops} isAdmin={isAdmin} onManage={() => setMgrOpen(true)} />
-                  <th className="st-right">Scheduled</th>
+                  <th>Scheduled</th>
                   <th style={{ textAlign: 'right' }}>{isAdmin && <AddPropertyButton onClick={() => setMgrOpen(true)} />}</th>
                 </tr>
               </thead>
@@ -256,17 +256,17 @@ export default function StorySequences({ sequences, comments, activity, dropdown
                       onClick={openOnRowClick(() => setSelectedId(s.id))}
                     >
                       <td style={{ minWidth: 240 }}>
-                        <TitleCell title={s.title} sub={shortDate(s.created_at)} onOpen={() => setSelectedId(s.id)}>
+                        <TitleCell title={s.title} onOpen={() => setSelectedId(s.id)}>
                           <CopyLinkButton type="story" id={s.id} />
                         </TitleCell>
                       </td>
                       <td><EditPillSelect size="md" field="sequence_status" value={s.status} options={statusValues} colors={statusColors} onChange={st => changeStatus(s, st)} onAddOption={addOption} allowAdd={isAdmin} /></td>
                       <td><UrlCell value={s.final_url} onCommit={u => patch(s.id, { final_url: u })} /></td>
                       <CustomRowCells row={s} props={cprops} optionsByProp={optsByProp} onPatch={patch} size="md" />
-                      <td className="st-right">
+                      <td>
                         <div className="st-datecell">
-                          {overdue && <span className="st-overdue">OVERDUE</span>}
                           <InlineDate display="chip" value={s.scheduled_date} onCommit={d => patch(s.id, { scheduled_date: d || undefined })} highlight={overdue} />
+                          {overdue && <span className="st-overdue">OVERDUE</span>}
                         </div>
                       </td>
                       <td><button className="btn-danger row-action" style={{ padding: '2px 6px' }} onClick={() => deleteSequence(s.id)} title="Delete sequence" aria-label="Delete sequence">✕</button></td>
@@ -320,7 +320,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
                 <input className="form-input" value={draft.final_url} onChange={e => setDraft(d => ({ ...d, final_url: e.target.value }))} placeholder="https://…" style={{ width: '100%', fontSize: 12 }} />
               </DraftField>
               <DraftField label="Scheduled">
-                <input className="form-input" type="date" value={draft.scheduled_date} onChange={e => setDraft(d => ({ ...d, scheduled_date: e.target.value }))} style={{ width: 160, fontSize: 12 }} />
+                <input className="form-input" type="date" value={draft.scheduled_date} onChange={e => setDraft(d => ({ ...d, scheduled_date: e.target.value }))} onClick={openDatePicker} style={{ width: 160, fontSize: 12 }} />
               </DraftField>
             </div>
 

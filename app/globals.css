@@ -374,19 +374,6 @@ html, body {
   color: var(--accent);
 }
 
-/* Muted secondary date riding inline after the title. */
-.st-sub {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-faint);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.st-right {
-  text-align: right;
-}
-
 .st-overdue {
   color: var(--neg);
   font-size: 9px;
@@ -394,13 +381,13 @@ html, body {
   white-space: nowrap;
 }
 
-/* The Deadline cell — the chip is right-aligned in the column and any row
-   marker (OVERDUE) sits to its left, so every date lines up on the same edge
-   whether or not the row carries a marker. */
+/* The Deadline cell. Left-aligned like every other column, so the chip's left
+   edge sits directly under the "DEADLINE" header; any row marker (OVERDUE)
+   follows the date rather than pushing it out of line. */
 .st-datecell {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 6px;
 }
 
@@ -463,25 +450,6 @@ html, body {
 .st-date::-webkit-datetime-edit {
   padding: 0;
   text-align: center;
-}
-
-/* The native calendar glyph doesn't belong in this chip. With it hidden the
-   whole field becomes the click target instead — InlineDate calls showPicker()
-   on click, so the calendar still opens from anywhere on the chip. */
-.st-date::-webkit-calendar-picker-indicator {
-  display: none;
-  -webkit-appearance: none;
-  appearance: none;
-  opacity: 0;
-  width: 0;
-  padding: 0;
-  margin: 0;
-}
-
-/* Firefox draws its own; hide that too. */
-.st-date::-moz-calendar-picker-indicator {
-  display: none;
-  opacity: 0;
 }
 
 /* Chrome renders "mm/dd/yyyy" placeholder segments on an empty field — keep
@@ -946,11 +914,15 @@ html, body {
   padding-top: 3px;
 }
 
-/* Property rows — hairline-divided like the table body. */
+/* Property rows — no per-row rules; the only line in the panel body is the one
+   under the title (and the section rules further down). Rhythm comes from the
+   row spacing and the aligned label column instead. */
 .panel-props {
   display: flex;
   flex-direction: column;
-  margin-bottom: 26px;
+  gap: 4px;
+  padding-top: 6px;
+  margin-bottom: 28px;
 }
 
 .panel-prop {
@@ -958,13 +930,8 @@ html, body {
   grid-template-columns: 148px minmax(0, 1fr);
   gap: 16px;
   align-items: center;
-  min-height: 46px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.panel-prop:last-child {
-  border-bottom: none;
+  min-height: 40px;
+  padding: 4px 0;
 }
 
 .panel-prop-label {
@@ -1149,6 +1116,34 @@ html, body {
   max-width: 95vw;
   max-height: 90vh;
   overflow-y: auto;
+}
+
+/* Native date fields — app-wide, not just the Studio tables.
+   The browser's calendar glyph clutters every date field we render, so it's
+   hidden everywhere. Clicking the field opens the picker instead: every date
+   input in the app carries openDatePicker (components/sub/studio/cells.tsx),
+   which calls showPicker(); typing and arrow-keys work regardless. */
+input[type='date']::-webkit-calendar-picker-indicator,
+input[type='datetime-local']::-webkit-calendar-picker-indicator,
+input[type='month']::-webkit-calendar-picker-indicator {
+  display: none;
+  -webkit-appearance: none;
+  appearance: none;
+  opacity: 0;
+  width: 0;
+  padding: 0;
+  margin: 0;
+}
+
+/* Firefox's equivalent. */
+input[type='date']::-moz-calendar-picker-indicator,
+input[type='datetime-local']::-moz-calendar-picker-indicator {
+  display: none;
+  opacity: 0;
+}
+
+input[type='date'] {
+  cursor: pointer;
 }
 
 /* Form inputs */

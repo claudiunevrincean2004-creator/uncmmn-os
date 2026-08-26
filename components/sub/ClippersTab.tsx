@@ -10,6 +10,7 @@ import { SortOption, SortDir, sortRows } from '@/lib/sort';
 import PlatformIcon from '@/components/PlatformIcon';
 import ViewsOverTime from '@/components/ViewsOverTime';
 import CopyLinkButton from '@/components/CopyLinkButton';
+import { openDatePicker } from '@/components/sub/studio/cells';
 
 const PLATFORMS = ['tiktok', 'instagram', 'youtube'];
 const PLATFORM_LABELS: Record<string, string> = { tiktok: 'TikTok', instagram: 'Instagram', youtube: 'YouTube' };
@@ -638,7 +639,7 @@ function ContentEditor({ clipperId, accounts, row, onClose, onSaved }: {
           <div style={field}><div style={lbl}>Link</div><input className="form-input" value={contentUrl} onChange={e => setContentUrl(e.target.value)} placeholder="https://…" style={{ fontSize: 12 }} /></div>
           <div style={field}><div style={lbl}>Views</div><input className="form-input" type="number" value={views} onChange={e => setViews(e.target.value)} style={{ fontSize: 12 }} /></div>
           <div style={field}><div style={lbl}>Likes</div><input className="form-input" type="number" value={likes} onChange={e => setLikes(e.target.value)} style={{ fontSize: 12 }} /></div>
-          <div style={field}><div style={lbl}>Posted</div><input className="form-input" type="date" value={postedAt} onChange={e => setPostedAt(e.target.value)} style={{ fontSize: 12, width: 160 }} /></div>
+          <div style={field}><div style={lbl}>Posted</div><input className="form-input" type="date" value={postedAt} onChange={e => setPostedAt(e.target.value)} onClick={openDatePicker} style={{ fontSize: 12, width: 160 }} /></div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
           <button className="btn-ghost" style={{ fontSize: 12, padding: '8px 14px' }} onClick={onClose}>Cancel</button>
