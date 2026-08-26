@@ -1,5 +1,6 @@
 'use client';
 import { ReactNode } from 'react';
+import ViewToggle, { type StudioView } from './ViewToggle';
 
 // ============================================================================
 // Shared shell for the four Studio tables (Video Review, Story Sequences,
@@ -58,6 +59,9 @@ interface ToolbarProps {
   search: string;
   onSearchChange: (v: string) => void;
   searchPlaceholder: string;
+  /** Table / Board switch — omit the pair to hide it. */
+  view?: StudioView;
+  onViewChange?: (v: StudioView) => void;
   /** Rows after filtering — what the count reports. */
   count: number;
   /** Singular noun; pluralised with a trailing "s". */
@@ -77,6 +81,8 @@ export default function TableToolbar({
   search,
   onSearchChange,
   searchPlaceholder,
+  view,
+  onViewChange,
   count,
   countNoun,
   actionLabel,
@@ -97,7 +103,10 @@ export default function TableToolbar({
         />
       </div>
 
-      <div className="studio-filters">{children}</div>
+      <div className="studio-filters">
+        {view && onViewChange && <ViewToggle view={view} onChange={onViewChange} />}
+        {children}
+      </div>
 
       <div className="studio-toolbar-end">
         <span className="studio-count">

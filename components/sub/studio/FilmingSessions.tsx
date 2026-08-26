@@ -8,6 +8,8 @@ import LoadMore from './LoadMore';
 import { SESSION_STATUSES, SESSION_STATUS_COLORS, SESSION_TYPES, SESSION_TYPE_COLORS, todayISO, logActivity, inDateRange, getFieldOptions, colorMap, buildAddOptionRows } from '@/lib/studio';
 import { EditPillSelect, MiniSelect, UrlCell, InlineDate, openDatePicker } from './cells';
 import TableToolbar, { rowAccent, openOnRowClick, TitleCell } from './table-ui';
+import Board, { type BoardCard } from './Board';
+import { type StudioView } from './ViewToggle';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import SortControl from './SortControl';
 import { SortOption, SortDir, sortRows } from '@/lib/sort';
@@ -61,6 +63,7 @@ interface Props {
 }
 
 export default function FilmingSessions({ sessions, comments, activity, dropdownOptions, properties, customOptions, profiles, isAdmin, openItemId, onOpened, onReload }: Props) {
+  const [view, setView] = usePersistedState<StudioView>('studio_f_view', 'table');
   const [fStatus, setFStatus] = usePersistedState<string>('studio_f_status', 'All');
   const [fType, setFType] = usePersistedState<string>('studio_f_type', 'All');
   const [search, setSearch] = useState('');
@@ -234,6 +237,19 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
 
   const selected = selectedId ? sessions.find(s => s.id === selectedId) : null;
 
+  // Board cards — the same filtered set the table shows (a board doesn't paginate).
+  const boardCards: BoardCard[] = useMemo(() => rows.map(s => ({
+    id: s.id,
+    title: s.name,
+    status: s.status,
+    pill: s.type ? { label: s.type, color: typeColors[s.type] || '#6b7280' } : null,
+    date: s.date,
+    links: [
+      { key: 'script', label: 'S', title: 'Script', url: s.script_url },
+      { key: 'footage', label: 'F', title: 'Footage', url: s.footage_link },
+    ],
+  })), [rows, typeColors]);
+
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -241,6 +257,8 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
           search={search}
           onSearchChange={setSearch}
           searchPlaceholder="Search sessions…"
+          view={view}
+          onViewChange={setView}
           count={rows.length}
           countNoun="session"
           actionLabel="Add Session"
@@ -255,6 +273,20 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
 
         {rows.length === 0 ? (
           <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>No sessions match. Add a session or adjust filters.</div>
+        ) : view === 'board' ? (
+          <Board
+            cards={boardCards}
+            statuses={statusValues}
+            statusColors={statusColors}
+            profiles={profiles}
+            selectedId={selectedId}
+            // Reuses this tab's changeStatus — activity log + Slack notify included.
+            onStatusChange={(id, status) => {
+              const s = sessions.find(x => x.id === id);
+              if (s) changeStatus(s, status);
+            }}
+            onOpen={setSelectedId}
+          />
         ) : (
           <>
           <div className="studio-panel">

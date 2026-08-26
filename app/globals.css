@@ -890,6 +890,285 @@ html, body {
   .studio-toolbar-end { width: 100%; margin-left: 0; justify-content: space-between; }
 }
 
+/* ===== Table / Board segmented switch ======================================= */
+.view-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.view-seg button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  background: none;
+  border-radius: 7px;
+  padding: 5px 11px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-faint);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+
+.view-seg button:hover { color: var(--text-dim); }
+
+.view-seg button.active {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--accent);
+}
+
+/* ===== Kanban board ========================================================
+   One column per status, scrolling sideways when a pipeline is long. Columns
+   sit a step back on --surface-2 so the cards on --surface read as the objects
+   you can pick up. Everything is a theme token or the column's own status
+   colour, so it holds in both aurora and midnight. */
+.board {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 2px 2px 10px;
+}
+
+.board-col {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 286px;
+  width: 286px;
+  min-width: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 12px;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+/* Drop target — the column the dragged card would land in. */
+.board-col.is-over {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.board-col-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px 12px;
+  min-width: 0;
+}
+
+.board-col-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--col-accent, var(--accent));
+}
+
+.board-col-name {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-col-count {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.board-col-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 64px;
+}
+
+.board-col-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 64px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.board-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 12px;
+  cursor: grab;
+  user-select: none;
+  outline: none;
+  transition: box-shadow 160ms ease, border-color 160ms ease, opacity 160ms ease;
+}
+
+.board-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  box-shadow: var(--shadow-lg);
+}
+
+.board-card:focus-visible {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-lg);
+}
+
+.board-card.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* The placeholder the lifted card leaves behind. */
+.board-card.is-dragging {
+  opacity: 0.35;
+  box-shadow: none;
+}
+
+/* The lifted card itself, rendered in the drag overlay. */
+.board-card-overlay {
+  cursor: grabbing;
+  transform: scale(1.03) rotate(1.4deg);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--accent);
+}
+
+.board-card-title {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.board-card-pill {
+  display: inline-block;
+  margin-top: 9px;
+  border-radius: 6px;
+  padding: 3px 9px;
+  font-size: 10px;
+  font-weight: 600;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-card-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 11px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-dim);
+  min-width: 0;
+}
+
+.board-card-date {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-dim);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 9px;
+  white-space: nowrap;
+}
+
+.board-card-date.is-overdue {
+  color: var(--neg);
+  border-color: color-mix(in srgb, var(--neg) 42%, transparent);
+  background: color-mix(in srgb, var(--neg) 10%, transparent);
+}
+
+.board-card-who {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* B / R / F link chips — lit when the link is set, ghosted when it isn't. */
+.board-chips {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.board-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--text-faint);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+
+.board-chip.is-set {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 38%, transparent);
+}
+
+.board-chip.is-set:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  .board-col { flex-basis: 244px; width: 244px; }
+}
+
+/* Someone who prefers less motion still gets the drag, just without the flourish. */
+@media (prefers-reduced-motion: reduce) {
+  .board-card,
+  .board-col { transition: none; }
+  .board-card-overlay { transform: none; }
+}
+
 /* ===== Quick links — same control language as the filter bar ================
    A quick link is one rounded control (radius 10, --surface, hairline border,
    12px) exactly like the filter dropdowns and the search box above it; its

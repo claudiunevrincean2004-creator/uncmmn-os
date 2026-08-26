@@ -8,6 +8,8 @@ import LoadMore from './LoadMore';
 import { AD_FORMATS, AD_STATUSES, AD_STATUS_COLORS, todayISO, logActivity, inDateRange, getFieldOptions, colorMap, buildAddOptionRows } from '@/lib/studio';
 import { EditPillSelect, MiniSelect, InlineDate, UrlCell, openDatePicker } from './cells';
 import TableToolbar, { rowAccent, openOnRowClick, TitleCell } from './table-ui';
+import Board, { type BoardCard } from './Board';
+import { type StudioView } from './ViewToggle';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import QuickLinks from './QuickLinks';
 import { UserPicker, buildPipelineMentions, resolveAssignee } from './UserPicker';
@@ -71,6 +73,7 @@ interface Props {
 }
 
 export default function AdCreative({ adCreatives, comments, activity, quickLinks, dropdownOptions, properties, customOptions, profiles, isAdmin, openItemId, onOpened, onReload, showToast }: Props) {
+  const [view, setView] = usePersistedState<StudioView>('studio_ad_view', 'table');
   const [fStatus, setFStatus] = usePersistedState<string>('studio_ad_status', 'All');
   const [fFormat, setFFormat] = usePersistedState<string>('studio_ad_format', 'All');
   const [sortKey, setSortKey] = usePersistedState<string>('studio_ad_sortkey', 'date_added');
@@ -292,6 +295,20 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
 
   const selected = selectedId ? adCreatives.find(a => a.id === selectedId) : null;
 
+  // Board cards — the same filtered set the table shows (a board doesn't paginate).
+  const boardCards: BoardCard[] = useMemo(() => rows.map(a => ({
+    id: a.id,
+    title: a.creative_id || 'Untitled',
+    status: a.status,
+    pill: a.ad_format ? { label: a.ad_format, color: formatColors[a.ad_format] || '#6b7280' } : null,
+    date: a.date_added,
+    assignedToUserId: a.assigned_to_user_id,
+    links: [
+      { key: 'source', label: 'S', title: 'Source video', url: a.source_video_url },
+      { key: 'final', label: 'F', title: 'Final', url: a.final_link },
+    ],
+  })), [rows, formatColors]);
+
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -301,6 +318,8 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
           search={search}
           onSearchChange={setSearch}
           searchPlaceholder="Search Creative ID…"
+          view={view}
+          onViewChange={setView}
           count={rows.length}
           countNoun="creative"
           actionLabel="Add Ad Creative"
@@ -315,6 +334,20 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
 
         {rows.length === 0 ? (
           <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>{fStatus !== 'All' ? `No ad creatives with status “${fStatus}”.` : 'No ad creatives yet. Add one with “+ Add Ad Creative”.'}</div>
+        ) : view === 'board' ? (
+          <Board
+            cards={boardCards}
+            statuses={statusValues}
+            statusColors={statusColors}
+            profiles={profiles}
+            selectedId={selectedId}
+            // Reuses this tab's changeStatus — activity log + Slack ping included.
+            onStatusChange={(id, status) => {
+              const a = adCreatives.find(x => x.id === id);
+              if (a) changeStatus(a, status);
+            }}
+            onOpen={setSelectedId}
+          />
         ) : (
           <>
           <div className="studio-panel">

@@ -14,6 +14,8 @@ import {
 } from '@/lib/studio';
 import { EditPillSelect, MiniSelect, UrlCell, InlineDate, openDatePicker } from './cells';
 import TableToolbar, { rowAccent, openOnRowClick, TitleCell } from './table-ui';
+import Board, { type BoardCard } from './Board';
+import { type StudioView } from './ViewToggle';
 import SortControl from './SortControl';
 import { SortOption, SortDir, sortRows } from '@/lib/sort';
 import ItemPanel, { FieldDef } from './ItemPanel';
@@ -77,6 +79,7 @@ interface Props {
 }
 
 export default function VideoReview({ videos, comments, activity, quickLinks, dropdownOptions, profiles, isAdmin, openItemId, onOpened, onReload }: Props) {
+  const [view, setView] = usePersistedState<StudioView>('studio_v_view', 'table');
   const [fStatus, setFStatus] = usePersistedState<string>('studio_v_status', 'All');
   const [fAssigned, setFAssigned] = usePersistedState<string>('studio_v_assigned', 'All');
   const [fFormat, setFFormat] = usePersistedState<string>('studio_v_format', 'All');
@@ -275,6 +278,23 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
 
   const selected = selectedId ? videos.find(v => v.id === selectedId) : null;
 
+  // Board cards. Same filtered set the table shows (a board doesn't paginate),
+  // mapped to the shared card shape.
+  const boardCards: BoardCard[] = useMemo(() => filtered.map(v => ({
+    id: v.id,
+    title: v.title,
+    status: v.status,
+    pill: v.format ? { label: v.format, color: formatColors[v.format] || '#6b7280' } : null,
+    date: v.deadline,
+    dateOverdue: isOverdue(v.deadline, v.status, DONE),
+    assignedToUserId: v.assigned_to_user_id,
+    links: [
+      { key: 'brief', label: 'B', title: 'Brief', url: v.brief_url },
+      { key: 'raw', label: 'R', title: 'Raw files', url: v.raw_files_url },
+      { key: 'final', label: 'F', title: 'Final', url: v.final_url },
+    ],
+  })), [filtered, formatColors]);
+
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -284,6 +304,8 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
           search={search}
           onSearchChange={setSearch}
           searchPlaceholder="Search videos…"
+          view={view}
+          onViewChange={setView}
           count={filtered.length}
           countNoun="video"
           actionLabel="Add Video"
@@ -299,6 +321,21 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
 
         {filtered.length === 0 ? (
           <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>No videos match. Add a video or adjust filters.</div>
+        ) : view === 'board' ? (
+          <Board
+            cards={boardCards}
+            statuses={statusValues}
+            statusColors={statusColors}
+            profiles={profiles}
+            selectedId={selectedId}
+            // Dropping a card into another column runs the SAME changeStatus the
+            // Status pill runs — activity log + Slack ping included.
+            onStatusChange={(id, status) => {
+              const v = videos.find(x => x.id === id);
+              if (v) changeStatus(v, status);
+            }}
+            onOpen={setSelectedId}
+          />
         ) : (
           <>
           <div className="studio-panel">

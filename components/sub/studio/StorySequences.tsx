@@ -11,6 +11,8 @@ import {
 } from '@/lib/studio';
 import { EditPillSelect, MiniSelect, UrlCell, InlineDate, openDatePicker } from './cells';
 import TableToolbar, { rowAccent, openOnRowClick, TitleCell } from './table-ui';
+import Board, { type BoardCard } from './Board';
+import { type StudioView } from './ViewToggle';
 import ItemPanel, { FieldDef } from './ItemPanel';
 import SortControl from './SortControl';
 import { SortOption, SortDir, sortRows } from '@/lib/sort';
@@ -63,6 +65,7 @@ interface Props {
 }
 
 export default function StorySequences({ sequences, comments, activity, dropdownOptions, properties, customOptions, profiles, isAdmin, openItemId, onOpened, onReload }: Props) {
+  const [view, setView] = usePersistedState<StudioView>('studio_s_view', 'table');
   const [fStatus, setFStatus] = usePersistedState<string>('studio_s_status', 'All');
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = usePersistedState<string>('studio_s_sortkey', 'scheduled_date');
@@ -210,6 +213,16 @@ export default function StorySequences({ sequences, comments, activity, dropdown
 
   const selected = selectedId ? sequences.find(s => s.id === selectedId) : null;
 
+  // Board cards — the same filtered set the table shows (a board doesn't paginate).
+  const boardCards: BoardCard[] = useMemo(() => rows.map(s => ({
+    id: s.id,
+    title: s.title,
+    status: s.status,
+    date: s.scheduled_date,
+    dateOverdue: isOverdue(s.scheduled_date, s.status, DONE),
+    links: [{ key: 'final', label: 'F', title: 'Final product', url: s.final_url }],
+  })), [rows]);
+
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -217,6 +230,8 @@ export default function StorySequences({ sequences, comments, activity, dropdown
           search={search}
           onSearchChange={setSearch}
           searchPlaceholder="Search sequences…"
+          view={view}
+          onViewChange={setView}
           count={rows.length}
           countNoun="sequence"
           actionLabel="Add Sequence"
@@ -230,6 +245,20 @@ export default function StorySequences({ sequences, comments, activity, dropdown
 
         {rows.length === 0 ? (
           <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>No sequences match. Add a sequence or adjust filters.</div>
+        ) : view === 'board' ? (
+          <Board
+            cards={boardCards}
+            statuses={statusValues}
+            statusColors={statusColors}
+            profiles={profiles}
+            selectedId={selectedId}
+            // Reuses this tab's changeStatus — activity log + Slack notify included.
+            onStatusChange={(id, status) => {
+              const s = sequences.find(x => x.id === id);
+              if (s) changeStatus(s, status);
+            }}
+            onOpen={setSelectedId}
+          />
         ) : (
           <>
           <div className="studio-panel">
