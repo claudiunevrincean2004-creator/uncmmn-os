@@ -220,7 +220,6 @@ export default function StorySequences({ sequences, comments, activity, dropdown
     status: s.status,
     date: s.scheduled_date,
     dateOverdue: isOverdue(s.scheduled_date, s.status, DONE),
-    links: [{ key: 'final', label: 'F', title: 'Final product', url: s.final_url }],
   })), [rows]);
 
   return (
@@ -258,6 +257,9 @@ export default function StorySequences({ sequences, comments, activity, dropdown
               if (s) changeStatus(s, status);
             }}
             onOpen={setSelectedId}
+            // No format/assignee column on this tab — only the scheduled date is
+            // editable inline, through the same patch() the table cell uses.
+            onDateChange={(id, d) => patch(id, { scheduled_date: d })}
           />
         ) : (
           <>

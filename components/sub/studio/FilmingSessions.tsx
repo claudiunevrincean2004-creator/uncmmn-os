@@ -242,13 +242,9 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
     id: s.id,
     title: s.name,
     status: s.status,
-    pill: s.type ? { label: s.type, color: typeColors[s.type] || '#6b7280' } : null,
+    format: s.type,
     date: s.date,
-    links: [
-      { key: 'script', label: 'S', title: 'Script', url: s.script_url },
-      { key: 'footage', label: 'F', title: 'Footage', url: s.footage_link },
-    ],
-  })), [rows, typeColors]);
+  })), [rows]);
 
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start' }}>
@@ -286,6 +282,17 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
               if (s) changeStatus(s, status);
             }}
             onOpen={setSelectedId}
+            // Type stands in for "format" on this tab; both editors call the
+            // same patch() the table cells call.
+            formatField={{
+              field: 'session_type',
+              options: typeValues,
+              colors: typeColors,
+              allowAdd: isAdmin,
+              onAddOption: addOption,
+              onChange: (id, t) => patch(id, { type: t }),
+            }}
+            onDateChange={(id, d) => patch(id, { date: d })}
           />
         ) : (
           <>

@@ -300,14 +300,10 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
     id: a.id,
     title: a.creative_id || 'Untitled',
     status: a.status,
-    pill: a.ad_format ? { label: a.ad_format, color: formatColors[a.ad_format] || '#6b7280' } : null,
+    format: a.ad_format,
     date: a.date_added,
     assignedToUserId: a.assigned_to_user_id,
-    links: [
-      { key: 'source', label: 'S', title: 'Source video', url: a.source_video_url },
-      { key: 'final', label: 'F', title: 'Final', url: a.final_link },
-    ],
-  })), [rows, formatColors]);
+  })), [rows]);
 
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start' }}>
@@ -347,6 +343,17 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
               if (a) changeStatus(a, status);
             }}
             onOpen={setSelectedId}
+            // Inline editors call the same patch() the table cells call.
+            formatField={{
+              field: 'ad_format',
+              options: formatValues,
+              colors: formatColors,
+              allowAdd: isAdmin,
+              onAddOption: addOption,
+              onChange: (id, f) => patch(id, { ad_format: f }),
+            }}
+            onAssigneeChange={(id, uid) => patch(id, { assigned_to_user_id: uid })}
+            onDateChange={(id, d) => patch(id, { date_added: d })}
           />
         ) : (
           <>

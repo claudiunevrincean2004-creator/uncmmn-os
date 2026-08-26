@@ -284,16 +284,11 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
     id: v.id,
     title: v.title,
     status: v.status,
-    pill: v.format ? { label: v.format, color: formatColors[v.format] || '#6b7280' } : null,
+    format: v.format,
     date: v.deadline,
     dateOverdue: isOverdue(v.deadline, v.status, DONE),
     assignedToUserId: v.assigned_to_user_id,
-    links: [
-      { key: 'brief', label: 'B', title: 'Brief', url: v.brief_url },
-      { key: 'raw', label: 'R', title: 'Raw files', url: v.raw_files_url },
-      { key: 'final', label: 'F', title: 'Final', url: v.final_url },
-    ],
-  })), [filtered, formatColors]);
+  })), [filtered]);
 
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start' }}>
@@ -335,6 +330,18 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
               if (v) changeStatus(v, status);
             }}
             onOpen={setSelectedId}
+            // The inline card editors call the very same patch() the table
+            // cells call — one write path, so realtime and Slack behave alike.
+            formatField={{
+              field: 'video_format',
+              options: formatValues,
+              colors: formatColors,
+              allowAdd: isAdmin,
+              onAddOption: addOption,
+              onChange: (id, f) => patch(id, { format: f }),
+            }}
+            onAssigneeChange={(id, uid) => patch(id, { assigned_to_user_id: uid })}
+            onDateChange={(id, d) => patch(id, { deadline: d })}
           />
         ) : (
           <>

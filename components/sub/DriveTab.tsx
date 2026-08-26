@@ -126,62 +126,64 @@ export default function DriveTab({ client, driveFolders, onReload }: Props) {
 
   return (
     <div>
-      {/* Toolbar — count on the left, then search · category · view · add */}
+      {/* Toolbar — one row: count · search · category · view · add. A single
+          flex context (no nested wrapping group), so the controls stay on one
+          line and shrink together instead of stacking. */}
       <div className="assets-toolbar">
         <div className="assets-count">
           <strong>{clientFolders.length}</strong> folder{clientFolders.length === 1 ? '' : 's'} linked
         </div>
-        <div className="assets-controls">
-          <div className="studio-search">
-            <span className="studio-search-icon" aria-hidden>⌕</span>
-            <input
-              className="form-input"
-              type="search"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search folders…"
-              aria-label="Search folders"
-            />
-          </div>
 
-          <select
-            className="form-input assets-select"
-            value={fCategory}
-            onChange={e => setFCategory(e.target.value)}
-            aria-label="Filter by category"
-          >
-            <option value="All">All categories</option>
-            {categories.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+        <div className="studio-search">
+          <span className="studio-search-icon" aria-hidden>⌕</span>
+          <input
+            className="form-input"
+            type="search"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search folders…"
+            aria-label="Search folders"
+          />
+        </div>
 
-          <div className="view-seg" role="group" aria-label="View">
-            <button
-              type="button"
-              className={view === 'grid' ? 'active' : undefined}
-              aria-pressed={view === 'grid'}
-              onClick={() => setView('grid')}
-              title="Grid view"
-            >
-              <Icon name="grid" size={14} />Grid
-            </button>
-            <button
-              type="button"
-              className={view === 'list' ? 'active' : undefined}
-              aria-pressed={view === 'list'}
-              onClick={() => setView('list')}
-              title="List view"
-            >
-              <Icon name="list" size={14} />List
-            </button>
-          </div>
+        <select
+          className="form-input assets-select"
+          value={fCategory}
+          onChange={e => setFCategory(e.target.value)}
+          aria-label="Filter by category"
+        >
+          <option value="All">All categories</option>
+          {categories.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
 
+        <div className="view-seg" role="group" aria-label="View">
           <button
-            className="btn-primary assets-add"
-            onClick={() => { setEditFolder(null); setShowModal(true); }}
+            type="button"
+            className={view === 'grid' ? 'active' : undefined}
+            aria-pressed={view === 'grid'}
+            onClick={() => setView('grid')}
+            title="Grid view"
           >
-            <span aria-hidden style={{ fontSize: 13, lineHeight: 1 }}>+</span>Add Folder
+            <Icon name="grid" size={14} />Grid
+          </button>
+          <button
+            type="button"
+            className={view === 'list' ? 'active' : undefined}
+            aria-pressed={view === 'list'}
+            onClick={() => setView('list')}
+            title="List view"
+          >
+            <Icon name="list" size={14} />List
           </button>
         </div>
+
+        {/* Pushed to the right edge of the row. */}
+        <button
+          className="btn-primary assets-add"
+          onClick={() => { setEditFolder(null); setShowModal(true); }}
+        >
+          <span aria-hidden style={{ fontSize: 13, lineHeight: 1 }}>+</span>Add Folder
+        </button>
       </div>
 
       {clientFolders.length === 0 ? (

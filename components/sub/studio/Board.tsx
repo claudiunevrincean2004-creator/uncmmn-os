@@ -12,7 +12,8 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { Profile } from '@/lib/types';
 import { pillStyle, shortDate } from '@/lib/studio';
-import { AssigneeTag, resolveAssignee } from './UserPicker';
+import { AssigneeTag, resolveAssignee, UserPicker } from './UserPicker';
+import { EditPillSelect, InlineDate } from './cells';
 
 // ============================================================================
 // Kanban board shared by all four Studio tabs. One column per status, in the
@@ -35,15 +36,27 @@ export interface BoardCard {
   id: string;
   title: string;
   status: string;
-  /** Format / type chip, tinted with its own colour. */
-  pill?: { label: string; color: string } | null;
+  /** Raw format / type value; the board renders it as an editable pill. */
+  format?: string | null;
   /** Deadline / scheduled date / date added, whichever the tab shows. */
   date?: string | null;
   /** Draws the date in --neg (past deadline). */
   dateOverdue?: boolean;
   assignedToUserId?: string | null;
-  /** Compact link chips — one letter each, e.g. B/R/F for Brief/Raw/Final. */
-  links?: { key: string; label: string; title: string; url?: string | null }[];
+}
+
+/**
+ * The tab's format/type dropdown, wired to the SAME patch() the table cell uses.
+ * Omit on a tab that has no such column (Story Sequences).
+ */
+export interface BoardFormatField {
+  /** Dropdown-option key, e.g. 'video_format' — enables "+ Add new…". */
+  field: string;
+  options: string[];
+  colors: Record<string, string>;
+  allowAdd?: boolean;
+  onAddOption?: (field: string, value: string) => void;
+  onChange: (id: string, value: string) => void;
 }
 
 interface Props {
@@ -56,63 +69,114 @@ interface Props {
   /** The tab's existing changeStatus, looked up by id. */
   onStatusChange: (id: string, status: string) => void;
   onOpen: (id: string) => void;
+  /** Inline editors. Each is the tab's own patch handler — pass none to render
+   *  that control as read-only text instead. */
+  formatField?: BoardFormatField;
+  onAssigneeChange?: (id: string, userId: string | null) => void;
+  onDateChange?: (id: string, value?: string) => void;
 }
 
-function LinkChips({ links }: { links: NonNullable<BoardCard['links']> }) {
-  return (
-    <span className="board-chips">
-      {links.map(l => (
-        l.url
-          ? (
-            <a
-              key={l.key}
-              className="board-chip is-set"
-              href={l.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              title={`${l.title} — ${l.url}`}
-              onClick={e => e.stopPropagation()}
-              onMouseDown={e => e.stopPropagation()}
-            >{l.label}</a>
-          )
-          : <span key={l.key} className="board-chip" title={`${l.title} — not set`}>{l.label}</span>
-      ))}
-    </span>
-  );
-}
+/** Editors sit inside a draggable, clickable card, so every pointer event they
+ *  see has to stop there: bubbling would start a drag (the sensors listen on the
+ *  card root) or open the side panel. */
+const swallow = {
+  onClick: (e: React.SyntheticEvent) => e.stopPropagation(),
+  onMouseDown: (e: React.SyntheticEvent) => e.stopPropagation(),
+  onTouchStart: (e: React.SyntheticEvent) => e.stopPropagation(),
+  onKeyDown: (e: React.SyntheticEvent) => e.stopPropagation(),
+};
 
-/** The card's visual body — shared by the in-column card and the drag overlay. */
-function CardBody({ card, profiles }: { card: BoardCard; profiles: Profile[] }) {
-  const assignee = resolveAssignee(card.assignedToUserId, profiles);
-  const hasMeta = !!card.date || !!card.assignedToUserId || !!card.links?.length;
+/**
+ * The card's body. `interactive` renders the live inline editors; the drag
+ * overlay renders the same content as flat, non-interactive chips so the lifted
+ * card is a snapshot rather than a second set of live dropdowns.
+ */
+function CardBody({
+  card, profiles, interactive, formatField, onAssigneeChange, onDateChange,
+}: {
+  card: BoardCard;
+  profiles: Profile[];
+  interactive: boolean;
+  formatField?: BoardFormatField;
+  onAssigneeChange?: (id: string, userId: string | null) => void;
+  onDateChange?: (id: string, value?: string) => void;
+}) {
+  const showFormat = !!formatField || !!card.format;
+  const showDate = !!onDateChange || !!card.date;
+  const showWho = !!onAssigneeChange || !!card.assignedToUserId;
+
   return (
     <>
       <div className="board-card-title">{card.title || 'Untitled'}</div>
-      {card.pill && (
-        <span className="board-card-pill" style={pillStyle(card.pill.color)}>{card.pill.label}</span>
+
+      {showFormat && (
+        <div className="board-card-format" {...(interactive ? swallow : {})}>
+          {interactive && formatField ? (
+            <EditPillSelect
+              size="md"
+              field={formatField.field}
+              value={card.format || ''}
+              options={formatField.options}
+              colors={formatField.colors}
+              onChange={v => formatField.onChange(card.id, v)}
+              onAddOption={formatField.onAddOption}
+              allowAdd={formatField.allowAdd}
+              allowEmpty
+            />
+          ) : card.format ? (
+            <span className="board-card-pill" style={pillStyle(formatField?.colors[card.format] || '#6b7280')}>{card.format}</span>
+          ) : null}
+        </div>
       )}
-      {hasMeta && (
+
+      {(showDate || showWho) && (
         <div className="board-card-meta">
-          {card.date && (
-            <span className={card.dateOverdue ? 'board-card-date is-overdue' : 'board-card-date'}>
-              {shortDate(card.date)}
+          {showDate && (
+            <span className="board-card-cell" {...(interactive ? swallow : {})}>
+              {interactive && onDateChange ? (
+                <InlineDate
+                  display="chip"
+                  value={card.date ?? undefined}
+                  highlight={card.dateOverdue}
+                  onCommit={d => onDateChange(card.id, d || undefined)}
+                />
+              ) : card.date ? (
+                <span className={card.dateOverdue ? 'board-card-date is-overdue' : 'board-card-date'}>{shortDate(card.date)}</span>
+              ) : null}
             </span>
           )}
-          <span className="board-card-who"><AssigneeTag name={assignee} size={18} /></span>
-          {!!card.links?.length && <LinkChips links={card.links} />}
+
+          {showWho && (
+            <span className="board-card-cell board-card-who" {...(interactive ? swallow : {})}>
+              {interactive && onAssigneeChange ? (
+                <UserPicker
+                  size="md"
+                  value={card.assignedToUserId ?? undefined}
+                  profiles={profiles}
+                  onChange={uid => onAssigneeChange(card.id, uid || null)}
+                />
+              ) : (
+                <AssigneeTag name={resolveAssignee(card.assignedToUserId, profiles)} size={18} />
+              )}
+            </span>
+          )}
         </div>
       )}
     </>
   );
 }
 
+/** The inline-editor handlers, passed straight through to CardBody. */
+type Editors = Pick<Props, 'formatField' | 'onAssigneeChange' | 'onDateChange'>;
+
 function SortableCard({
-  card, profiles, selected, onOpen,
+  card, profiles, selected, onOpen, editors,
 }: {
   card: BoardCard;
   profiles: Profile[];
   selected: boolean;
   onOpen: (id: string) => void;
+  editors: Editors;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
   return (
@@ -122,17 +186,18 @@ function SortableCard({
       style={{ transform: CSS.Translate.toString(transform), transition }}
       // A click that never became a drag (the sensors need 6px / a long press
       // first) still lands here and opens the same side panel the table rows do.
+      // The inline editors swallow their own events, so they never reach this.
       onClick={() => onOpen(card.id)}
       {...attributes}
       {...listeners}
     >
-      <CardBody card={card} profiles={profiles} />
+      <CardBody card={card} profiles={profiles} interactive {...editors} />
     </div>
   );
 }
 
 function Column({
-  status, color, cards, profiles, selectedId, isOver, onOpen,
+  status, color, cards, profiles, selectedId, isOver, onOpen, editors,
 }: {
   status: string;
   color: string;
@@ -141,6 +206,7 @@ function Column({
   selectedId?: string | null;
   isOver: boolean;
   onOpen: (id: string) => void;
+  editors: Editors;
 }) {
   const { setNodeRef } = useDroppable({ id: `${COL}${status}` });
   return (
@@ -153,7 +219,7 @@ function Column({
       <SortableContext items={cards.map(c => c.id)} strategy={verticalListSortingStrategy}>
         <div className="board-col-body" ref={setNodeRef}>
           {cards.map(c => (
-            <SortableCard key={c.id} card={c} profiles={profiles} selected={selectedId === c.id} onOpen={onOpen} />
+            <SortableCard key={c.id} card={c} profiles={profiles} selected={selectedId === c.id} onOpen={onOpen} editors={editors} />
           ))}
           {cards.length === 0 && <div className="board-col-empty">Drop here</div>}
         </div>
@@ -164,7 +230,9 @@ function Column({
 
 export default function Board({
   cards, statuses, statusColors, profiles, selectedId, onStatusChange, onOpen,
+  formatField, onAssigneeChange, onDateChange,
 }: Props) {
+  const editors: Editors = { formatField, onAssigneeChange, onDateChange };
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overStatus, setOverStatus] = useState<string | null>(null);
   // Where a just-dropped card should sit until the write lands and the fresh row
@@ -287,6 +355,7 @@ export default function Board({
             selectedId={selectedId}
             isOver={!!activeId && overStatus === col.status}
             onOpen={onOpen}
+            editors={editors}
           />
         ))}
       </div>
@@ -296,7 +365,7 @@ export default function Board({
       <DragOverlay dropAnimation={{ duration: 180, easing: 'cubic-bezier(0.2, 0, 0, 1)' }}>
         {activeCard && (
           <div className="board-card board-card-overlay">
-            <CardBody card={activeCard} profiles={profiles} />
+            <CardBody card={activeCard} profiles={profiles} interactive={false} formatField={formatField} />
           </div>
         )}
       </DragOverlay>

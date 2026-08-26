@@ -933,10 +933,13 @@ html, body {
    NO file count or size: we don't track either, and a placeholder would read as
    real data. Every colour is a theme token or the category's own, so this holds
    in both aurora and midnight. */
+/* One flat row — count, search, category, view, add — the same shape as the
+   Studio toolbar. Everything lives in a single flex context so the controls
+   share one line and shrink together instead of stacking into a column. */
 .assets-toolbar {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   flex-wrap: wrap;
   margin-bottom: 20px;
 }
@@ -945,6 +948,8 @@ html, body {
   font-size: 12px;
   color: var(--text-faint);
   white-space: nowrap;
+  margin-right: 4px;
+  flex-shrink: 0;
 }
 
 .assets-count strong {
@@ -955,13 +960,8 @@ html, body {
   margin-right: 2px;
 }
 
-.assets-controls {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-left: auto;
-}
+/* The add button anchors the right edge; the search takes up the slack. */
+.assets-add { margin-left: auto; }
 
 .assets-select {
   width: auto;
@@ -979,6 +979,13 @@ html, body {
   font-size: 12px;
   padding: 8px 16px;
   white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* The toolbar's search shrinks before anything else does. */
+.assets-toolbar .studio-search {
+  flex: 0 1 240px;
+  min-width: 150px;
 }
 
 .assets-groups {
@@ -1186,9 +1193,14 @@ html, body {
 .asset-row:last-child { border-bottom: none; }
 .asset-row:hover { background: var(--surface-2); }
 
+/* Too narrow for one line: the count takes its own row and the controls wrap
+   beneath it, still left-to-right, with Add holding the right edge. */
+@media (max-width: 860px) {
+  .assets-count { width: 100%; margin-right: 0; }
+  .assets-toolbar .studio-search { flex: 1 1 180px; }
+}
+
 @media (max-width: 720px) {
-  .assets-controls { margin-left: 0; width: 100%; }
-  .studio-search { flex: 1 1 100%; }
   .asset-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
   /* The row's timestamp is the first thing to go when space runs out. */
   .asset-row { padding: 12px 14px; gap: 10px; }
@@ -1344,17 +1356,23 @@ html, body {
   word-break: break-word;
 }
 
+/* Flat pill — only the drag overlay's snapshot uses this; the live card renders
+   the real EditPillSelect in its place. */
 .board-card-pill {
   display: inline-block;
-  margin-top: 9px;
   border-radius: 6px;
-  padding: 3px 9px;
-  font-size: 10px;
+  padding: 4px 10px;
+  font-size: 11px;
   font-weight: 600;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.board-card-format {
+  margin-top: 10px;
+  min-width: 0;
 }
 
 .board-card-meta {
@@ -1368,6 +1386,15 @@ html, body {
   font-size: 11px;
   color: var(--text-dim);
   min-width: 0;
+}
+
+/* Each inline control sits in its own cell so a dropdown opening can't nudge the
+   card's layout. Default cursor: these are editors, not part of the drag handle. */
+.board-card-cell {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  cursor: default;
 }
 
 .board-card-date {
@@ -1387,49 +1414,20 @@ html, body {
   background: color-mix(in srgb, var(--neg) 10%, transparent);
 }
 
+/* The assignee sits at the right edge of the meta row and takes what's left. */
 .board-card-who {
+  margin-left: auto;
   min-width: 0;
   overflow: hidden;
   font-size: 11px;
   color: var(--text-dim);
 }
 
-/* B / R / F link chips — lit when the link is set, ghosted when it isn't. */
-.board-chips {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-
-.board-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 6px;
-  font-size: 10px;
-  font-weight: 700;
-  text-decoration: none;
-  color: var(--text-faint);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
-}
-
-.board-chip.is-set {
-  color: var(--accent);
-  background: var(--accent-soft);
-  border-color: color-mix(in srgb, var(--accent) 38%, transparent);
-}
-
-.board-chip.is-set:hover {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
+/* Compact the shared controls to card scale — a board column is narrower than a
+   table cell, and three editors have to share one line. */
+.board-card .st-date { width: 100px; height: 24px; line-height: 22px; font-size: 10px; }
+.board-card .assignee-trigger { max-width: 132px; }
+.board-card select { max-width: 100%; }
 
 @media (max-width: 640px) {
   .board-col { flex-basis: 244px; width: 244px; }
