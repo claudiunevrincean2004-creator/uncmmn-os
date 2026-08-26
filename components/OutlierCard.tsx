@@ -76,9 +76,15 @@ function loadEmbedScript(kind: EmbedKind): Promise<void> {
  * missing, from another platform, or a shortlink whose id we can't read without
  * following a redirect (vm.tiktok.com) — those cards simply show no preview
  * affordance rather than offering one that can't work.
+ *
+ * post_url FIRST, THEN drive_link — the same resolution the card's click-through
+ * uses. In practice post_url is empty on every row and the real TikTok permalink
+ * lives in drive_link (that column long predates post_url and became the general
+ * "where does this live" field). A genuine Drive URL in there just fails the
+ * platform match below and yields null, which is the right answer anyway.
  */
 export function embedTargetFor(post: Post): EmbedTarget | null {
-  const raw = (post.post_url || '').trim();
+  const raw = (post.post_url || post.drive_link || '').trim();
   if (!/^https?:\/\//i.test(raw)) return null;
 
   let host = '';
