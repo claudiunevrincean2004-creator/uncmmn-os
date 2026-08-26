@@ -248,8 +248,8 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
         >
           <MiniSelect size="md" allLabel="All status" value={fStatus} options={statusPresent} onChange={setFStatus} />
           <MiniSelect size="md" allLabel="All types" value={fType} options={['All', ...typeValues]} onChange={setFType} />
-          <SortControl options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
-          <FilterField label="Date"><DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
+          <SortControl size="md" options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
+          <FilterField label="Date"><DateRangePicker size="md" from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
           <CustomFilterControls props={cprops} optionsByProp={optsByProp} filters={custFilters} setFilters={setCustFilters} />
         </TableToolbar>
 
@@ -268,7 +268,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                   <th>Script</th>
                   <th>Footage</th>
                   <CustomHeaderCells props={cprops} isAdmin={isAdmin} onManage={() => setMgrOpen(true)} />
-                  <th>Date</th>
+                  <th className="st-center">Date</th>
                   <th style={{ textAlign: 'right' }}>{isAdmin && <AddPropertyButton onClick={() => setMgrOpen(true)} />}</th>
                 </tr>
               </thead>
@@ -293,7 +293,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                       <td><UrlCell value={s.script_url} onCommit={u => patch(s.id, { script_url: u })} /></td>
                       <td><UrlCell value={s.footage_link} onCommit={u => patch(s.id, { footage_link: u })} /></td>
                       <CustomRowCells row={s} props={cprops} optionsByProp={optsByProp} onPatch={patch} size="md" />
-                      <td>
+                      <td className="st-center">
                         <div className="st-datecell">
                           <InlineDate display="chip" value={s.date} onCommit={d => patch(s.id, { date: d || undefined })} />
                         </div>

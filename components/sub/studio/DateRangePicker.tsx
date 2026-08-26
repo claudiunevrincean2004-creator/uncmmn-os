@@ -57,12 +57,17 @@ function labelFor(from: string, to: string, presets: Preset[]): string {
   return 'All time';
 }
 
-export default function DateRangePicker({ from, to, onChange, align = 'left' }: {
+// `size` is presentation only, matching MiniSelect: 'sm' is the dense legacy
+// trigger, 'md' the roomier one the Studio filter bars use so every control in
+// that row is the same height and weight.
+export default function DateRangePicker({ from, to, onChange, align = 'left', size = 'sm' }: {
   from: string;
   to: string;
   onChange: (from: string, to: string) => void;
   align?: 'left' | 'right';
+  size?: 'sm' | 'md';
 }) {
+  const md = size === 'md';
   const [open, setOpen] = useState(false);
   const [selecting, setSelecting] = useState<Date | null>(null); // pending start click
   const [hover, setHover] = useState<Date | null>(null);
@@ -111,7 +116,21 @@ export default function DateRangePicker({ from, to, onChange, align = 'left' }: 
       <button
         onClick={() => setOpen(o => !o)}
         className="form-input"
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '4px 9px', cursor: 'pointer', whiteSpace: 'nowrap', color: from || to ? 'var(--text)' : 'var(--text-dim)' }}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: md ? 8 : 6,
+          fontSize: md ? 12 : 11,
+          padding: md ? '8px 12px' : '4px 9px',
+          borderRadius: md ? 10 : undefined,
+          minWidth: md ? 120 : undefined,
+          width: 'auto',
+          background: md ? 'var(--surface)' : undefined,
+          cursor: 'pointer',
+          whiteSpace: 'nowrap',
+          color: from || to ? 'var(--text)' : 'var(--text-dim)',
+        }}
         title="Filter by date range"
       >
         <span>{labelFor(from, to, presets)}</span>

@@ -223,8 +223,8 @@ export default function StorySequences({ sequences, comments, activity, dropdown
           onAction={() => { setDraft(EMPTY_DRAFT); setAddOpen(true); }}
         >
           <MiniSelect size="md" allLabel="All status" value={fStatus} options={statusPresent} onChange={setFStatus} />
-          <SortControl options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
-          <FilterField label="Date"><DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
+          <SortControl size="md" options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
+          <FilterField label="Date"><DateRangePicker size="md" from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
           <CustomFilterControls props={cprops} optionsByProp={optsByProp} filters={custFilters} setFilters={setCustFilters} />
         </TableToolbar>
 
@@ -241,7 +241,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
                   <th onClick={isAdmin ? () => setOptsField({ field: 'sequence_status', title: 'Status' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Status{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <th>Final</th>
                   <CustomHeaderCells props={cprops} isAdmin={isAdmin} onManage={() => setMgrOpen(true)} />
-                  <th>Scheduled</th>
+                  <th className="st-center">Scheduled</th>
                   <th style={{ textAlign: 'right' }}>{isAdmin && <AddPropertyButton onClick={() => setMgrOpen(true)} />}</th>
                 </tr>
               </thead>
@@ -263,7 +263,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
                       <td><EditPillSelect size="md" field="sequence_status" value={s.status} options={statusValues} colors={statusColors} onChange={st => changeStatus(s, st)} onAddOption={addOption} allowAdd={isAdmin} /></td>
                       <td><UrlCell value={s.final_url} onCommit={u => patch(s.id, { final_url: u })} /></td>
                       <CustomRowCells row={s} props={cprops} optionsByProp={optsByProp} onPatch={patch} size="md" />
-                      <td>
+                      <td className="st-center">
                         <div className="st-datecell">
                           <InlineDate display="chip" value={s.scheduled_date} onCommit={d => patch(s.id, { scheduled_date: d || undefined })} highlight={overdue} />
                           {overdue && <span className="st-overdue">OVERDUE</span>}

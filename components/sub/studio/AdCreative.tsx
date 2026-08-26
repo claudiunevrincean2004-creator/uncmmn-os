@@ -308,8 +308,8 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
         >
           <MiniSelect size="md" allLabel="All status" value={fStatus} options={statusPresent} onChange={setFStatus} />
           <MiniSelect size="md" allLabel="All formats" value={fFormat} options={formatPresent} onChange={setFFormat} />
-          <SortControl options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
-          <FilterField label="Date"><DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
+          <SortControl size="md" options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
+          <FilterField label="Date"><DateRangePicker size="md" from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
           <CustomFilterControls props={cprops} optionsByProp={optsByProp} filters={custFilters} setFilters={setCustFilters} />
         </TableToolbar>
 
@@ -330,7 +330,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                   <th>Final</th>
                   <th>Iterate</th>
                   <CustomHeaderCells props={cprops} isAdmin={isAdmin} onManage={() => setMgrOpen(true)} />
-                  <th>Date Added</th>
+                  <th className="st-center">Date Added</th>
                   <th style={{ textAlign: 'right' }}>{isAdmin && <AddPropertyButton onClick={() => setMgrOpen(true)} />}</th>
                 </tr>
               </thead>
@@ -356,7 +356,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                       <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px', color: 'var(--accent)' }} onClick={() => handleIterate(a)} title="Trigger iteration">↻ Iterate</button>
                     </td>
                     <CustomRowCells row={a} props={cprops} optionsByProp={optsByProp} onPatch={patch} size="md" />
-                    <td>
+                    <td className="st-center">
                       <div className="st-datecell">
                         <InlineDate display="chip" value={a.date_added} onCommit={d => patch(a.id, { date_added: d || undefined })} />
                       </div>

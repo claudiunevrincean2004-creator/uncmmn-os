@@ -5,7 +5,7 @@ import { StudioComment, StudioActivity, Profile, CommentReaction } from '@/lib/t
 import { formatActivityTime } from '@/lib/studio';
 import { useDismiss } from '@/lib/use-dismiss';
 import { nextChannelName } from '@/lib/use-realtime';
-import { InlineText, MiniSelect, PillSelect, EditSelect, EditPillSelect, InlineDate, InlineNumber, MaybeUrl, MaybeUrlCell, UrlCell, isHttpUrl, shortUrl } from './cells';
+import { InlineText, EditableText, MiniSelect, PillSelect, EditSelect, EditPillSelect, InlineDate, InlineNumber, MaybeUrl, MaybeUrlCell, UrlCell, isHttpUrl, shortUrl } from './cells';
 import { UserPicker, profileName } from './UserPicker';
 import Avatar from '@/components/Avatar';
 import MentionTextarea from '@/components/MentionTextarea';
@@ -71,7 +71,10 @@ function FieldControl({ field, values, onChangeField, onAddOption, profiles }: {
     case 'text':
       return <InlineText value={value} onCommit={v => onChangeField(field.key, v)} placeholder={field.placeholder} style={{ width: '100%' }} />;
     case 'textarea':
-      return <InlineText value={value} onCommit={v => onChangeField(field.key, v)} placeholder={field.placeholder} multiline style={{ width: '100%' }} />;
+      // Title / Desc and friends read as plain text until you click to edit —
+      // the same resting calm as Revisions or a link field, rather than an
+      // always-open box. Multi-line, so Enter is a newline and Save commits.
+      return <EditableText value={value} onCommit={v => onChangeField(field.key, v)} placeholder={field.placeholder} />;
     case 'number':
       return <InlineNumber value={Number(value) || 0} onCommit={v => onChangeField(field.key, v)} width={80} />;
     case 'date':

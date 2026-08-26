@@ -381,13 +381,19 @@ html, body {
   white-space: nowrap;
 }
 
-/* The Deadline cell. Left-aligned like every other column, so the chip's left
-   edge sits directly under the "DEADLINE" header; any row marker (OVERDUE)
-   follows the date rather than pushing it out of line. */
+/* Centred columns (Deadline, Revisions) — the chip and the count badge both
+   centre their own contents, so the header centres over them to match. Applied
+   to the th AND the td so the two can't drift apart. */
+.st-center {
+  text-align: center;
+}
+
+/* The Deadline cell: the date chip centred in its column, with any row marker
+   (OVERDUE) riding alongside it. */
 .st-datecell {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 6px;
 }
 
@@ -544,6 +550,78 @@ html, body {
 .link-field .link-empty {
   color: var(--text-faint);
   font-size: inherit;
+}
+
+/* ===== Display-then-edit text fields (detail panels) ========================
+   At rest a Title / Desc reads as plain text on a chromeless row, with a ✎ that
+   surfaces on hover; clicking anywhere on it opens the editor below. */
+.field-display {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  box-sizing: border-box;
+  min-height: 30px;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  min-width: 0;
+  cursor: text;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.field-display:hover,
+.field-display:focus-visible {
+  background: var(--surface-2);
+  border-color: var(--border);
+  outline: none;
+}
+
+.field-text,
+.field-empty {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.field-text { color: var(--text); }
+.field-empty { color: var(--text-faint); }
+
+.field-edit {
+  flex-shrink: 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-faint);
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.field-display:hover .field-edit,
+.field-display:focus-visible .field-edit {
+  opacity: 1;
+}
+
+/* No hover on touch — the field needs its outline and pencil at rest. */
+@media (hover: none) {
+  .field-display { border-color: var(--border); }
+  .field-edit { opacity: 1; }
+}
+
+/* Open editor: the textarea with Cancel / Save beneath it, right-aligned like
+   the comment composer. */
+.field-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field-editor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 /* The expanded editor — same footprint as the resting field so nothing in the

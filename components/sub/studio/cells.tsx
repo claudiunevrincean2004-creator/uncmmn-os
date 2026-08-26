@@ -77,6 +77,74 @@ export function pillShape(size: 'sm' | 'md'): React.CSSProperties {
   };
 }
 
+// Display-then-edit text field for the detail panels. At rest it's plain read-only
+// text (line breaks preserved) with a ✎ beside it; clicking either the text or the
+// ✎ opens a textarea. Because the value can be a multi-line description, Enter
+// inserts a newline rather than saving — commit is Save, or clicking away
+// (save-on-blur); Escape/Cancel reverts.
+export function EditableText({
+  value,
+  onCommit,
+  placeholder,
+}: {
+  value?: string;
+  onCommit: (v: string) => void;
+  placeholder?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [v, setV] = useState(value ?? '');
+  useEffect(() => { if (!editing) setV(value ?? ''); }, [value, editing]);
+  // Set by Escape/Cancel so the blur they trigger doesn't commit the change.
+  const skipCommit = useRef(false);
+
+  function commit() {
+    if (skipCommit.current) { skipCommit.current = false; setV(value ?? ''); }
+    else if ((v ?? '') !== (value ?? '')) onCommit(v.trim());
+    setEditing(false);
+  }
+
+  function cancel() {
+    skipCommit.current = true;
+    setV(value ?? '');
+    setEditing(false);
+  }
+
+  if (!editing) {
+    return (
+      <div className="field-display" role="button" tabIndex={0}
+        title="Click to edit"
+        onClick={() => setEditing(true)}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditing(true); } }}
+      >
+        <span className={value ? 'field-text' : 'field-empty'}>{value || placeholder || '—'}</span>
+        <span className="field-edit" aria-hidden>✎</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="field-editor">
+      <textarea
+        autoFocus
+        className="form-input"
+        rows={3}
+        value={v}
+        placeholder={placeholder}
+        style={{ display: 'block', width: '100%', resize: 'vertical', fontSize: 12, lineHeight: 1.45 }}
+        onChange={e => setV(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); cancel(); } }}
+        onBlur={commit}
+      />
+      <div className="field-editor-actions">
+        {/* preventDefault on mousedown keeps focus in the textarea, so onBlur's
+            own commit never races these two. */}
+        <button className="btn-ghost" style={{ fontSize: 10, padding: '5px 12px' }} onMouseDown={e => { e.preventDefault(); cancel(); }}>Cancel</button>
+        <button className="btn-primary" style={{ fontSize: 10, padding: '5px 12px' }} onMouseDown={e => e.preventDefault()} onClick={commit}>Save</button>
+      </div>
+    </div>
+  );
+}
+
 // A select styled as a colored pill — click opens the dropdown to change.
 export function PillSelect({
   value,

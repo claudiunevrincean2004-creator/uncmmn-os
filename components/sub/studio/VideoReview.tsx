@@ -293,8 +293,8 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
           <MiniSelect size="md" allLabel="Everyone" value={fAssigned} options={assignedPresent} onChange={setFAssigned} />
           <MiniSelect size="md" allLabel="All formats" value={fFormat} options={formatPresent} onChange={setFFormat} />
           <MiniSelect size="md" allLabel="All priorities" value={fPriority} options={priorityPresent} onChange={setFPriority} />
-          <SortControl options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
-          <FilterField label="Date"><DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
+          <SortControl size="md" options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
+          <FilterField label="Date"><DateRangePicker size="md" from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
         </TableToolbar>
 
         {filtered.length === 0 ? (
@@ -313,8 +313,8 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                   <th>Brief</th>
                   <th>Raw Files</th>
                   <th>Final</th>
-                  <th>Deadline</th>
-                  <th>Revisions</th>
+                  <th className="st-center">Deadline</th>
+                  <th className="st-center">Revisions</th>
                   <th></th>
                 </tr>
               </thead>
@@ -342,13 +342,13 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                       <td><UrlCell value={v.brief_url} onCommit={u => patch(v.id, { brief_url: u })} /></td>
                       <td><UrlCell value={v.raw_files_url} onCommit={u => patch(v.id, { raw_files_url: u })} /></td>
                       <td><UrlCell value={v.final_url} onCommit={u => patch(v.id, { final_url: u })} /></td>
-                      <td>
+                      <td className="st-center">
                         <div className="st-datecell">
                           <InlineDate display="chip" value={v.deadline} onCommit={d => patch(v.id, { deadline: d || undefined })} highlight={overdue} />
                           {overdue && <span className="st-overdue">OVERDUE</span>}
                         </div>
                       </td>
-                      <td>
+                      <td className="st-center">
                         <span
                           className={v.revision_count > 0 ? 'st-rev' : 'st-rev is-zero'}
                           title={v.revision_count > 0 ? `${v.revision_count} revision round(s)` : 'No revisions'}
