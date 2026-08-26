@@ -128,6 +128,8 @@ function FieldControl({ field, values, onChangeField, onAddOption, profiles }: {
 
 export default function ItemPanel({ itemType, linkType, itemId, title, fields, values, onChangeField, onAddOption, comments, activity, profiles = [], isAdmin = false, onReload, onClose }: Props) {
   const [newComment, setNewComment] = useState('');
+  // Whether the new-comment box is focused — drives whether Add is on screen.
+  const [composerActive, setComposerActive] = useState(false);
   const [saving, setSaving] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -573,19 +575,26 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
         <div className="panel-section-title">
           Comments {itemComments.length > 0 && <span>· {itemComments.length}</span>}
         </div>
+        {/* Idle, this is just the placeholder box — Add only appears once the
+            composer is in use. Text keeps it visible after blur, so the button
+            is never yanked out from under the click that's about to land. */}
         <div className="panel-composer">
           <MentionTextarea
             value={newComment}
             onChange={setNewComment}
             profiles={profiles}
             onSubmit={addComment}
+            onFocus={() => setComposerActive(true)}
+            onBlur={() => setComposerActive(false)}
             placeholder="Leave a comment… (@ to mention, Enter to send, Shift+Enter for a new line)"
           />
-          <div className="panel-composer-actions">
-            <button className="btn-primary" style={{ fontSize: 11, padding: '6px 14px' }} onClick={addComment} disabled={saving || !newComment.trim()}>
-              {saving ? '…' : 'Add'}
-            </button>
-          </div>
+          {(composerActive || newComment.trim().length > 0) && (
+            <div className="panel-composer-actions is-revealed">
+              <button className="btn-primary" style={{ fontSize: 11, padding: '6px 14px' }} onClick={addComment} disabled={saving || !newComment.trim()}>
+                {saving ? '…' : 'Add'}
+              </button>
+            </div>
+          )}
         </div>
         {itemComments.length === 0 ? (
           <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>No comments yet.</div>

@@ -520,23 +520,55 @@ export function InlineDate({
   onCommit,
   highlight,
   display = 'input',
+  shortLabel,
 }: {
   value?: string;
   onCommit: (v: string) => void;
   highlight?: boolean;
   display?: 'input' | 'text' | 'chip';
+  /** Chip only: rest as "Aug 26" instead of the browser's mm/dd/yyyy, swapping
+   *  in the real date input on click. Used on the board, where a card has to be
+   *  scannable at a glance. */
+  shortLabel?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
+  const dateRef = useRef<HTMLInputElement>(null);
+
+  // Entering short-label edit mode: focus the field and try to pop the calendar
+  // straight open. The click that got us here still counts as user activation
+  // for a moment, so showPicker() usually lands; when it doesn't, the field is
+  // focused and types/arrow-keys as normal.
+  useEffect(() => {
+    if (!editing || !shortLabel) return;
+    const el = dateRef.current as (HTMLInputElement & { showPicker?: () => void }) | null;
+    if (!el) return;
+    el.focus();
+    try { el.showPicker?.(); } catch { /* not supported here — typing still works */ }
+  }, [editing, shortLabel]);
 
   if (display === 'chip') {
+    if (shortLabel && !editing) {
+      return (
+        <button
+          type="button"
+          className={`st-date${highlight ? ' is-overdue' : ''}${value ? '' : ' is-empty'}`}
+          title={value ? 'Change date' : 'Set date'}
+          onClick={() => setEditing(true)}
+        >
+          {value ? shortDate(value) : 'Set date'}
+        </button>
+      );
+    }
     return (
       <input
+        ref={dateRef}
         className={`st-date${highlight ? ' is-overdue' : ''}${value ? '' : ' is-empty'}`}
         type="date"
         title={value ? 'Change date' : 'Set date'}
         value={value ? value.slice(0, 10) : ''}
         onChange={e => onCommit(e.target.value)}
         onClick={openDatePicker}
+        onBlur={shortLabel ? () => setEditing(false) : undefined}
       />
     );
   }

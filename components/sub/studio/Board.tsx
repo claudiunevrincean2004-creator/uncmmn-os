@@ -136,6 +136,9 @@ function CardBody({
               {interactive && onDateChange ? (
                 <InlineDate
                   display="chip"
+                  // "Aug 26" at rest — a card has to be scannable; the real date
+                  // input swaps in on click.
+                  shortLabel
                   value={card.date ?? undefined}
                   highlight={card.dateOverdue}
                   onCommit={d => onDateChange(card.id, d || undefined)}

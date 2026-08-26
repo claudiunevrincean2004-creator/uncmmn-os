@@ -126,14 +126,14 @@ export default function DriveTab({ client, driveFolders, onReload }: Props) {
 
   return (
     <div>
-      {/* Toolbar — one row: count · search · category · view · add. A single
-          flex context (no nested wrapping group), so the controls stay on one
-          line and shrink together instead of stacking. */}
-      <div className="assets-toolbar">
-        <div className="assets-count">
-          <strong>{clientFolders.length}</strong> folder{clientFolders.length === 1 ? '' : 's'} linked
-        </div>
+      <div className="assets-count">
+        <strong>{clientFolders.length}</strong> folder{clientFolders.length === 1 ? '' : 's'} linked
+      </div>
 
+      {/* Filter row — search · category · view, with Add holding the right edge.
+          One flex context, so the controls share a line and shrink together
+          instead of stacking. */}
+      <div className="assets-toolbar">
         <div className="studio-search">
           <span className="studio-search-icon" aria-hidden>⌕</span>
           <input

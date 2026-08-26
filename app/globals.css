@@ -430,6 +430,10 @@ html, body {
   cursor: pointer;
   outline: none;
   text-align: center;
+  /* The short-label form renders as a <button>, so guard against overflow. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
 }
 
@@ -933,23 +937,23 @@ html, body {
    NO file count or size: we don't track either, and a placeholder would read as
    real data. Every colour is a theme token or the category's own, so this holds
    in both aurora and midnight. */
-/* One flat row — count, search, category, view, add — the same shape as the
-   Studio toolbar. Everything lives in a single flex context so the controls
-   share one line and shrink together instead of stacking into a column. */
+/* One flat row — search, category, view, add — the same shape as the Studio
+   toolbar. Everything lives in a single flex context so the controls share one
+   line and shrink together instead of stacking into a column. */
 .assets-toolbar {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  margin-bottom: 20px;
+  margin-bottom: 22px;
 }
 
+/* Sits above the filter row, with room to breathe between the two. */
 .assets-count {
   font-size: 12px;
   color: var(--text-faint);
   white-space: nowrap;
-  margin-right: 4px;
-  flex-shrink: 0;
+  margin-bottom: 16px;
 }
 
 .assets-count strong {
@@ -963,13 +967,19 @@ html, body {
 /* The add button anchors the right edge; the search takes up the slack. */
 .assets-add { margin-left: auto; }
 
-.assets-select {
+/* Sized to its content ("All categories"), never the full row. The `select`
+   qualifier matters: .form-input sets width:100% and is declared later in this
+   file, so a lone .assets-select would lose to it and stretch the whole width —
+   which is what pushed the rest of the row onto its own lines. */
+.assets-toolbar select.assets-select {
   width: auto;
-  min-width: 150px;
+  min-width: 0;
+  max-width: 200px;
   padding: 8px 12px;
   font-size: 12px;
   border-radius: 10px;
   background: var(--surface);
+  flex-shrink: 0;
 }
 
 .assets-add {
@@ -1193,11 +1203,10 @@ html, body {
 .asset-row:last-child { border-bottom: none; }
 .asset-row:hover { background: var(--surface-2); }
 
-/* Too narrow for one line: the count takes its own row and the controls wrap
-   beneath it, still left-to-right, with Add holding the right edge. */
+/* Too narrow for one line: the search gives up the most ground first, and the
+   controls wrap beneath it left-to-right with Add still holding the right edge. */
 @media (max-width: 860px) {
-  .assets-count { width: 100%; margin-right: 0; }
-  .assets-toolbar .studio-search { flex: 1 1 180px; }
+  .assets-toolbar .studio-search { flex: 1 1 170px; }
 }
 
 @media (max-width: 720px) {
@@ -1670,6 +1679,21 @@ html, body {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* Add slides in under the box the moment the composer is used, rather than
+   sitting there orphaned beneath an empty placeholder. */
+.panel-composer-actions.is-revealed {
+  animation: composerActionsIn 150ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+@keyframes composerActionsIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel-composer-actions.is-revealed { animation: none; }
 }
 
 /* Narrow panel: labels stack above their values rather than squeezing them. */

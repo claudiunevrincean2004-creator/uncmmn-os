@@ -18,7 +18,7 @@ import Avatar from '@/components/Avatar';
 const TRIGGER = /(^|\s)@([^\s@]{0,30})$/;
 
 export default function MentionTextarea({
-  value, onChange, profiles, onSubmit, placeholder, rows = 2, autoFocus, style,
+  value, onChange, profiles, onSubmit, placeholder, rows = 2, autoFocus, style, onFocus, onBlur,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -28,6 +28,9 @@ export default function MentionTextarea({
   rows?: number;
   autoFocus?: boolean;
   style?: CSSProperties;
+  /** Lets a composer reveal its actions only while the box is in use. */
+  onFocus?: () => void;
+  onBlur?: () => void;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   // Caret offset of the "@" being completed; null when the picker is closed.
@@ -101,7 +104,11 @@ export default function MentionTextarea({
         style={{ display: 'block', resize: 'vertical', fontSize: 12, lineHeight: 1.4, width: '100%', ...style }}
         onChange={e => sync(e.target.value, e.target.selectionStart ?? e.target.value.length)}
         onKeyUp={e => sync(e.currentTarget.value, e.currentTarget.selectionStart ?? 0)}
-        onBlur={() => setTimeout(() => setAt(null), 120)} // let a click on a row land first
+        onFocus={onFocus}
+        onBlur={() => {
+          setTimeout(() => setAt(null), 120); // let a click on a row land first
+          onBlur?.();
+        }}
         onKeyDown={onKeyDown}
       />
       {open && (
