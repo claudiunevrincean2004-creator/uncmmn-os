@@ -100,6 +100,42 @@ function platformOf(url: string): { code: string; color: string; domain: string 
     : { code: domain.slice(0, 2).toUpperCase() || '—', color: '#6b7280', domain };
 }
 
+/**
+ * "Open the original" button, shared by the grid and kanban cards.
+ *
+ * It lives inside two hostile parents at once, and each needs a different event
+ * stopped:
+ *   • the card opens the detail panel on click  → stopPropagation on click
+ *   • the kanban card is a dnd-kit draggable, whose listeners sit on the card
+ *     root as onMouseDown / onTouchStart / onKeyDown (MouseSensor, TouchSensor,
+ *     KeyboardSensor — see Board.tsx) → stop all three so pressing the button
+ *     never starts a drag. pointerdown is stopped too, harmless today and
+ *     correct if the board ever swaps in PointerSensor.
+ * Only propagation is stopped, never the default, so the anchor still navigates
+ * on click and on Enter.
+ */
+function OpenSourceLink({ url, compact }: { url: string; compact?: boolean }) {
+  const { domain } = platformOf(url);
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+  return (
+    <a
+      className="idea-open"
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={`Open on ${domain} (new tab)`}
+      onClick={stop}
+      onMouseDown={stop}
+      onPointerDown={stop}
+      onTouchStart={stop}
+      onKeyDown={stop}
+    >
+      <span aria-hidden>↗</span>
+      <span className="idea-open-label">{compact ? 'Open' : domain}</span>
+    </a>
+  );
+}
+
 /** Favicon-style monogram + domain, e.g. "IG instagram.com". */
 function SourceChip({ url }: { url: string }) {
   const { code, color, domain } = platformOf(url);
@@ -608,16 +644,8 @@ function IdeaCard({
 
       <div className="idea-foot">
         <span className="idea-saved">{item.created_at ? `Saved ${shortDate(item.created_at)}` : ''}</span>
-        {sourceIsUrl && (
-          <a
-            className="idea-open"
-            href={source}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={source}
-            onClick={e => e.stopPropagation()}
-          >↗</a>
-        )}
+        {/* No source URL → no button at all, rather than a dead control. */}
+        {sourceIsUrl && <OpenSourceLink url={source} />}
       </div>
     </div>
   );
@@ -639,7 +667,10 @@ function KanbanCardBody({ item }: { item: ResearchItem }) {
       </div>
       <div className="idea-title is-compact">{item.title || 'Untitled'}</div>
       {item.note && <div className="idea-note is-block">{item.note}</div>}
-      <div className="idea-saved is-foot">{item.created_at ? `Saved ${shortDate(item.created_at)}` : ''}</div>
+      <div className="idea-foot is-compact">
+        <span className="idea-saved">{item.created_at ? `Saved ${shortDate(item.created_at)}` : ''}</span>
+        {isUrl(source) && <OpenSourceLink url={source} compact />}
+      </div>
     </>
   );
 }
