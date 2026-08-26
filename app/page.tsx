@@ -50,7 +50,7 @@ const PAGE_LABELS: Record<MainPage, string> = {
 const PAGE_SUBTITLES: Record<MainPage, string> = {
   dashboard: 'Performance at a glance',
   content: 'Posts & analytics',
-  research: 'Ideas & references',
+  research: 'Ideas & references · your swipe file for what to make next',
   drive: 'Files & folders · your linked Drive workspaces',
   studio: 'Review & production',
   trialreels: 'Recreate high-converting reels',
@@ -641,7 +641,15 @@ export default function Home() {
           )}
           {client && mainPage === 'research' && (
             <div style={{ padding: '16px 24px' }}>
-              <ResearchTab client={client} items={researchItems} onReload={loadData} />
+              <ResearchTab
+                client={client}
+                items={researchItems}
+                comments={studioComments}
+                activity={studioActivity}
+                profiles={studioProfiles}
+                isAdmin={role === 'admin'}
+                onReload={loadData}
+              />
             </div>
           )}
           {client && mainPage === 'drive' && (

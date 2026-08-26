@@ -152,12 +152,15 @@ export function PillSelect({
   colors,
   onChange,
   size = 'md',
+  labels,
 }: {
   value: string;
   options: string[];
   colors: Record<string, string>;
   onChange: (v: string) => void;
   size?: 'sm' | 'md';
+  /** Display text per stored value, where the two differ ('progress' → "In Progress"). */
+  labels?: Record<string, string>;
 }) {
   const color = colors[value] || '#6b7280';
   return (
@@ -168,7 +171,7 @@ export function PillSelect({
       title="Click to change"
     >
       {options.map(o => (
-        <option key={o} value={o} style={{ background: 'var(--surface-2)', color: 'var(--text)', fontWeight: 600 }}>{o}</option>
+        <option key={o} value={o} style={{ background: 'var(--surface-2)', color: 'var(--text)', fontWeight: 600 }}>{labels?.[o] ?? o}</option>
       ))}
     </select>
   );

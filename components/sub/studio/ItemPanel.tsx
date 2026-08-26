@@ -38,6 +38,9 @@ export interface FieldDef {
   type: 'text' | 'textarea' | 'select' | 'pill' | 'url' | 'maybe-url' | 'date' | 'number' | 'readonly' | 'readonly-multiline' | 'readonly-url' | 'readonly-url-short' | 'readonly-maybe-url' | 'user';
   options?: string[];
   colors?: Record<string, string>;
+  /** Display text per stored option value, for fields whose DB values aren't
+   *  presentable (research status: 'progress' → "In Progress"). */
+  optionLabels?: Record<string, string>;
   placeholder?: string;
   field?: string; // dropdown-option key — enables "+ Add new…" for select/pill
   allowAdd?: boolean; // false → admin-managed options only (no inline add)
@@ -50,9 +53,13 @@ interface Props {
   // this is NOT the deep-link route type: Filming Sessions file their comments
   // under "session" but link at /studio/filming/<id>. Hence linkType, separately.
   itemType: string;
-  linkType: ItemType;
+  /** Omit on a surface with no deep-link route of its own (Research) — the
+   *  copy-link control is simply not rendered. */
+  linkType?: ItemType;
   itemId: string;
   title: string;
+  /** Heading for the comments block — "Notes" on Research, say. */
+  commentsLabel?: string;
   fields: FieldDef[];
   values: Record<string, any>;
   onChangeField: (key: string, value: any) => void;
@@ -90,7 +97,7 @@ function FieldControl({ field, values, onChangeField, onAddOption, profiles }: {
     case 'pill':
       return field.field
         ? <EditPillSelect size="md" field={field.field} value={value || ''} options={field.options || []} colors={field.colors || {}} onChange={v => onChangeField(field.key, v)} onAddOption={onAddOption} allowAdd={field.allowAdd} allowEmpty={field.allowEmpty} />
-        : <PillSelect size="md" value={value} options={field.options || []} colors={field.colors || {}} onChange={v => onChangeField(field.key, v)} />;
+        : <PillSelect size="md" value={value} options={field.options || []} colors={field.colors || {}} labels={field.optionLabels} onChange={v => onChangeField(field.key, v)} />;
     case 'url':
       // Same renderer the main tables use: the resting state is the clickable,
       // truncated url (opens in a new tab), and clicking the field around it
@@ -126,7 +133,7 @@ function FieldControl({ field, values, onChangeField, onAddOption, profiles }: {
   }
 }
 
-export default function ItemPanel({ itemType, linkType, itemId, title, fields, values, onChangeField, onAddOption, comments, activity, profiles = [], isAdmin = false, onReload, onClose }: Props) {
+export default function ItemPanel({ itemType, linkType, itemId, title, commentsLabel = 'Comments', fields, values, onChangeField, onAddOption, comments, activity, profiles = [], isAdmin = false, onReload, onClose }: Props) {
   const [newComment, setNewComment] = useState('');
   // Whether the new-comment box is focused — drives whether Add is on screen.
   const [composerActive, setComposerActive] = useState(false);
@@ -544,7 +551,7 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
       <div className="panel-head">
         <div className="panel-title">{title || 'Untitled'}</div>
         <div className="panel-head-actions">
-          <CopyLinkButton type={linkType} id={itemId} variant="panel" />
+          {linkType && <CopyLinkButton type={linkType} id={itemId} variant="panel" />}
           <button
             onClick={onClose}
             style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0, flexShrink: 0 }}
@@ -573,7 +580,7 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
       {/* Comments */}
       <div className="panel-section">
         <div className="panel-section-title">
-          Comments {itemComments.length > 0 && <span>· {itemComments.length}</span>}
+          {commentsLabel} {itemComments.length > 0 && <span>· {itemComments.length}</span>}
         </div>
         {/* Idle, this is just the placeholder box — Add only appears once the
             composer is in use. Text keeps it visible after blur, so the button

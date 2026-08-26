@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   DndContext, DragOverlay, KeyboardSensor, MouseSensor, TouchSensor,
   closestCorners, useDroppable, useSensor, useSensors,
@@ -43,6 +43,8 @@ export interface BoardCard {
   /** Draws the date in --neg (past deadline). */
   dateOverdue?: boolean;
   assignedToUserId?: string | null;
+  /** Arbitrary payload for a board that supplies its own `renderCard`. */
+  data?: unknown;
 }
 
 /**
@@ -64,8 +66,13 @@ interface Props {
   /** Pipeline order. Any status present on a card but missing here is appended. */
   statuses: string[];
   statusColors: Record<string, string>;
+  /** Column heading per status, where the stored value isn't presentable. */
+  statusLabels?: Record<string, string>;
   profiles: Profile[];
   selectedId?: string | null;
+  /** Replaces the default Studio card body entirely — the board still owns the
+   *  columns, dragging and ordering. Research uses this for its own card. */
+  renderCard?: (card: BoardCard) => ReactNode;
   /** The tab's existing changeStatus, looked up by id. */
   onStatusChange: (id: string, status: string) => void;
   onOpen: (id: string) => void;
@@ -169,8 +176,8 @@ function CardBody({
   );
 }
 
-/** The inline-editor handlers, passed straight through to CardBody. */
-type Editors = Pick<Props, 'formatField' | 'onAssigneeChange' | 'onDateChange'>;
+/** The inline-editor handlers and any custom renderer, passed through to the card. */
+type Editors = Pick<Props, 'formatField' | 'onAssigneeChange' | 'onDateChange' | 'renderCard'>;
 
 function SortableCard({
   card, profiles, selected, onOpen, editors,
@@ -181,6 +188,7 @@ function SortableCard({
   onOpen: (id: string) => void;
   editors: Editors;
 }) {
+  const { renderCard, ...inlineEditors } = editors;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
   return (
     <div
@@ -194,15 +202,16 @@ function SortableCard({
       {...attributes}
       {...listeners}
     >
-      <CardBody card={card} profiles={profiles} interactive {...editors} />
+      {renderCard ? renderCard(card) : <CardBody card={card} profiles={profiles} interactive {...inlineEditors} />}
     </div>
   );
 }
 
 function Column({
-  status, color, cards, profiles, selectedId, isOver, onOpen, editors,
+  status, label, color, cards, profiles, selectedId, isOver, onOpen, editors,
 }: {
   status: string;
+  label: string;
   color: string;
   cards: BoardCard[];
   profiles: Profile[];
@@ -216,7 +225,7 @@ function Column({
     <div className={`board-col${isOver ? ' is-over' : ''}`} style={{ '--col-accent': color } as React.CSSProperties}>
       <div className="board-col-head">
         <span className="board-col-dot" />
-        <span className="board-col-name">{status}</span>
+        <span className="board-col-name">{label}</span>
         <span className="board-col-count">{cards.length}</span>
       </div>
       <SortableContext items={cards.map(c => c.id)} strategy={verticalListSortingStrategy}>
@@ -232,10 +241,10 @@ function Column({
 }
 
 export default function Board({
-  cards, statuses, statusColors, profiles, selectedId, onStatusChange, onOpen,
-  formatField, onAssigneeChange, onDateChange,
+  cards, statuses, statusColors, statusLabels, profiles, selectedId, onStatusChange, onOpen,
+  formatField, onAssigneeChange, onDateChange, renderCard,
 }: Props) {
-  const editors: Editors = { formatField, onAssigneeChange, onDateChange };
+  const editors: Editors = { formatField, onAssigneeChange, onDateChange, renderCard };
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overStatus, setOverStatus] = useState<string | null>(null);
   // Where a just-dropped card should sit until the write lands and the fresh row
@@ -352,6 +361,7 @@ export default function Board({
           <Column
             key={col.status}
             status={col.status}
+            label={statusLabels?.[col.status] ?? col.status}
             color={col.color}
             cards={col.cards}
             profiles={profiles}
@@ -368,7 +378,9 @@ export default function Board({
       <DragOverlay dropAnimation={{ duration: 180, easing: 'cubic-bezier(0.2, 0, 0, 1)' }}>
         {activeCard && (
           <div className="board-card board-card-overlay">
-            <CardBody card={activeCard} profiles={profiles} interactive={false} formatField={formatField} />
+            {renderCard
+              ? renderCard(activeCard)
+              : <CardBody card={activeCard} profiles={profiles} interactive={false} formatField={formatField} />}
           </div>
         )}
       </DragOverlay>

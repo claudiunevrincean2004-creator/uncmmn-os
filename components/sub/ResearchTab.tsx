@@ -1,42 +1,93 @@
 'use client';
 import { useState, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Client, ResearchItem, ResearchStatus } from '@/lib/types';
+import { Client, ResearchItem, ResearchStatus, StudioComment, StudioActivity, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
+import { logActivity, shortDate } from '@/lib/studio';
+import Icon from '@/components/Icon';
+import Board, { type BoardCard } from './studio/Board';
+import ItemPanel, { type FieldDef } from './studio/ItemPanel';
 
 interface Props {
   client: Client;
   items: ResearchItem[];
+  comments: StudioComment[];
+  activity: StudioActivity[];
+  profiles: Profile[];
+  isAdmin?: boolean;
   onReload: () => void;
 }
 
 type View = 'grid' | 'kanban';
 
-const REASONS = ['Hook', 'Editing Style', 'Format', 'Concept', 'Caption', 'Song / Audio', 'Trend', 'Transition', 'Other'];
+// studio_comments.item_type for a research note. Deliberately NOT registered in
+// lib/inbox.ts's INBOX_SOURCES — notes are private working scratch on an idea,
+// not team traffic, so they don't light the Inbox badge. Add an entry there if
+// that ever changes.
+const ITEM_TYPE = 'research';
 
-// Status display: internal value → user-facing label
+// Why an idea was worth saving. Legacy values from older rows ("Editing Style",
+// "Song / Audio") still display fine — reasonColor() falls back to a hash.
+const REASONS = ['Hook', 'Sound', 'Format', 'Visual', 'Pacing', 'Concept', 'Trend', 'Caption', 'Other'];
+
+const REASON_COLORS: Record<string, string> = {
+  hook: '#6366f1',
+  sound: '#0ea5e9',
+  format: '#f59e0b',
+  visual: '#8b5cf6',
+  pacing: '#10b981',
+  concept: '#ec4899',
+  trend: '#14b8a6',
+  caption: '#3b82f6',
+  other: '#6b7280',
+  // Legacy reason values, kept so old rows keep a stable colour.
+  'editing style': '#8b5cf6',
+  'song / audio': '#0ea5e9',
+  transition: '#14b8a6',
+};
+const REASON_PALETTE = ['#6366f1', '#0ea5e9', '#f59e0b', '#8b5cf6', '#10b981', '#ec4899', '#14b8a6', '#3b82f6'];
+
+function reasonColor(reason?: string): string {
+  const key = (reason || 'other').trim().toLowerCase();
+  const known = REASON_COLORS[key];
+  if (known) return known;
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return REASON_PALETTE[h % REASON_PALETTE.length];
+}
+
+const STATUS_ORDER: ResearchStatus[] = ['unused', 'progress', 'used'];
 const STATUS_LABELS: Record<ResearchStatus, string> = {
   unused: 'Unused',
-  progress: 'Saved',
+  progress: 'In Progress',
   used: 'Used',
 };
-
-const STATUS_COLORS: Record<ResearchStatus, { color: string; bg: string; border: string }> = {
-  unused: { color: 'var(--text-dim)', bg: 'var(--border)', border: 'var(--border)' },
-  progress: { color: '#3b82f6', bg: '#3b82f615', border: '#3b82f640' },
-  used: { color: '#10b981', bg: '#10b98115', border: '#10b98140' },
+const STATUS_COLORS: Record<ResearchStatus, string> = {
+  unused: '#6366f1',
+  progress: '#f59e0b',
+  used: '#10b981',
 };
-
+// The "→ Use" button walks an idea along the pipeline.
 const NEXT_STATUS: Record<ResearchStatus, ResearchStatus> = {
   unused: 'progress',
   progress: 'used',
   used: 'unused',
 };
 
-const KANBAN_ORDER: ResearchStatus[] = ['unused', 'progress', 'used'];
+// Known platforms get their monogram and brand tint; anything else falls back to
+// the first two letters of its domain.
+const PLATFORMS: { match: RegExp; code: string; color: string }[] = [
+  { match: /instagram\./i, code: 'IG', color: '#e1306c' },
+  { match: /tiktok\./i, code: 'TT', color: '#14b8a6' },
+  { match: /(youtube\.|youtu\.be)/i, code: 'YT', color: '#ef4444' },
+  { match: /(twitter\.|x\.com)/i, code: 'X', color: '#6b7280' },
+  { match: /facebook\./i, code: 'FB', color: '#3b82f6' },
+  { match: /linkedin\./i, code: 'IN', color: '#0ea5e9' },
+  { match: /reddit\./i, code: 'RD', color: '#f59e0b' },
+];
 
 function isUrl(s: string): boolean {
-  return s.startsWith('http://') || s.startsWith('https://');
+  return /^https?:\/\//i.test(s.trim());
 }
 
 function safeDomain(url: string): string {
@@ -47,36 +98,58 @@ function safeDomain(url: string): string {
   }
 }
 
-export default function ResearchTab({ client, items, onReload }: Props) {
+function platformOf(url: string): { code: string; color: string; domain: string } {
+  const domain = safeDomain(url);
+  const hit = PLATFORMS.find(p => p.match.test(domain));
+  return hit
+    ? { code: hit.code, color: hit.color, domain }
+    : { code: domain.slice(0, 2).toUpperCase() || '—', color: '#6b7280', domain };
+}
+
+/** Favicon-style monogram + domain, e.g. "IG instagram.com". */
+function SourceChip({ url }: { url: string }) {
+  const { code, color, domain } = platformOf(url);
+  return (
+    <span className="idea-source" style={{ '--src-color': color } as React.CSSProperties}>
+      <span className="idea-source-mark">{code}</span>
+      <span className="idea-source-domain">{domain}</span>
+    </span>
+  );
+}
+
+export default function ResearchTab({ client, items, comments, activity, profiles, isAdmin = false, onReload }: Props) {
   const clientItems = useMemo(() => items.filter(i => i.client_id === client.id), [items, client.id]);
 
-  // Form state (used for both Add and Edit)
+  // Add form
   const [formOpen, setFormOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [note, setNote] = useState('');
   const [reason, setReason] = useState(REASONS[0]);
-  const [newHot, setNewHot] = useState(false);
   const [saving, setSaving] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   // Filters / view
   const [view, setView] = usePersistedState<View>('research_view_mode', 'grid');
   const [query, setQuery] = useState('');
-  const [reasonFilter, setReasonFilter] = useState<string>('All');
+  const [reasonFilter, setReasonFilter] = usePersistedState<string>('research_reason', 'All');
+  const [statusFilter, setStatusFilter] = usePersistedState<string>('research_status', 'All');
 
-  // Per-card UI state
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-
-  // Toast
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
+  // Every reason actually in use, so legacy values stay reachable in the filter.
+  const reasonOptions = useMemo(
+    () => Array.from(new Set([...REASONS, ...clientItems.map(i => i.reason).filter(Boolean) as string[]])),
+    [clientItems],
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return clientItems
       .filter(i => {
         if (reasonFilter !== 'All' && i.reason !== reasonFilter) return false;
+        if (statusFilter !== 'All' && i.status !== statusFilter) return false;
         if (q) {
           const hay = `${i.title || ''} ${i.content || ''} ${i.note || ''} ${i.reason || ''}`.toLowerCase();
           if (!hay.includes(q)) return false;
@@ -84,602 +157,364 @@ export default function ResearchTab({ client, items, onReload }: Props) {
         return true;
       })
       .sort((a, b) => {
-        const aPriority = a.hot && a.status === 'unused' ? 1 : 0;
-        const bPriority = b.hot && b.status === 'unused' ? 1 : 0;
-        if (aPriority !== bPriority) return bPriority - aPriority;
+        // A hot idea still waiting to be used floats to the top.
+        const aP = a.hot && a.status === 'unused' ? 1 : 0;
+        const bP = b.hot && b.status === 'unused' ? 1 : 0;
+        if (aP !== bP) return bP - aP;
         return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       });
-  }, [clientItems, query, reasonFilter]);
+  }, [clientItems, query, reasonFilter, statusFilter]);
+
+  // Counts for the stat row — off the FULL set, not the filtered one.
+  const stats = useMemo(() => ({
+    total: clientItems.length,
+    unused: clientItems.filter(i => i.status === 'unused').length,
+    progress: clientItems.filter(i => i.status === 'progress').length,
+    used: clientItems.filter(i => i.status === 'used').length,
+  }), [clientItems]);
 
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(null), 1800);
   }
 
-  function resetForm() {
-    setTitle('');
-    setContent('');
-    setNote('');
-    setReason(REASONS[0]);
-    setNewHot(false);
-    setEditingId(null);
-  }
-
   function openAddForm() {
-    resetForm();
-    setFormOpen(true);
-    setTimeout(() => titleInputRef.current?.focus(), 0);
-  }
-
-  function openEditForm(item: ResearchItem) {
-    setEditingId(item.id);
-    setTitle(item.title || '');
-    setContent(item.content || '');
-    setNote(item.note || '');
-    setReason(item.reason || REASONS[0]);
-    setNewHot(item.hot);
+    setTitle(''); setContent(''); setNote(''); setReason(REASONS[0]);
     setFormOpen(true);
     setTimeout(() => titleInputRef.current?.focus(), 0);
   }
 
   function closeForm() {
     setFormOpen(false);
-    resetForm();
+    setTitle(''); setContent(''); setNote(''); setReason(REASONS[0]);
   }
 
   async function saveItem() {
-    const trimmedTitle = title.trim();
-    const trimmedContent = content.trim();
-    if (!trimmedTitle || saving) return;
+    const t = title.trim();
+    if (!t || saving) return;
     setSaving(true);
-    const payload = {
-      title: trimmedTitle,
-      content: trimmedContent || null,
+    const { error } = await supabase.from('research_items').insert([{
+      title: t,
+      content: content.trim() || null,
       note: note.trim() || null,
       reason,
-      hot: newHot,
-    };
-    if (editingId) {
-      const { error: err } = await supabase.from('research_items').update(payload).eq('id', editingId);
-      setSaving(false);
-      if (err) { showToast('Update failed'); return; }
-      closeForm();
-      onReload();
-      showToast('Updated');
-    } else {
-      const { error: err } = await supabase.from('research_items').insert([{ ...payload, client_id: client.id, status: 'unused' }]);
-      setSaving(false);
-      if (err) { showToast('Save failed'); return; }
-      closeForm();
-      onReload();
-      showToast('Saved');
+      hot: false,
+      client_id: client.id,
+      status: 'unused',
+    }]);
+    setSaving(false);
+    if (error) { showToast('Save failed'); return; }
+    closeForm();
+    onReload();
+    showToast('Saved');
+  }
+
+  // ONE write path for every field, shared by the side panel, the "→ Use"
+  // button and the kanban drop — so nothing can drift out of step.
+  async function patch(id: string, p: Partial<ResearchItem>) {
+    const { error } = await supabase.from('research_items').update(p).eq('id', id);
+    if (error) {
+      console.error('[ResearchTab] failed to update idea', { id, patch: p, error });
+      alert(`Couldn't save change: ${error.message}`);
     }
+    onReload();
+  }
+
+  /** Status change with its activity-log entry — the panel, Use and drag all use this. */
+  async function changeStatus(item: ResearchItem, status: ResearchStatus) {
+    if (status === item.status) return;
+    await logActivity(ITEM_TYPE, item.id, 'Status changed', STATUS_LABELS[item.status], STATUS_LABELS[status]);
+    await patch(item.id, { status });
   }
 
   async function deleteItem(id: string) {
     if (!confirm('Delete this idea?')) return;
     await supabase.from('research_items').delete().eq('id', id);
-    if (editingId === id) closeForm();
+    if (selectedId === id) setSelectedId(null);
     onReload();
   }
 
-  async function cycleStatus(id: string, current: ResearchStatus) {
-    const next = NEXT_STATUS[current];
-    await supabase.from('research_items').update({ status: next }).eq('id', id);
-    onReload();
-  }
+  const selected = selectedId ? clientItems.find(i => i.id === selectedId) ?? null : null;
 
-  function toggleExpanded(id: string) {
-    setExpanded(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }
+  const fields: FieldDef[] = useMemo(() => [
+    { key: 'title', label: 'Title', type: 'textarea', placeholder: 'Short, distinctive name' },
+    { key: 'content', label: 'Source', type: 'maybe-url' },
+    { key: 'reason', label: 'Reason', type: 'select', options: reasonOptions },
+    {
+      key: 'status',
+      label: 'Status',
+      type: 'pill',
+      options: STATUS_ORDER,
+      colors: STATUS_COLORS,
+      optionLabels: STATUS_LABELS,
+    },
+    { key: 'note', label: 'Note', type: 'textarea', placeholder: 'Why is this worth keeping?' },
+    { key: 'saved', label: 'Saved', type: 'readonly' },
+  ], [reasonOptions]);
 
-  const totalCount = clientItems.length;
+  const boardCards: BoardCard[] = useMemo(
+    () => filtered.map(i => ({ id: i.id, title: i.title, status: i.status, data: i })),
+    [filtered],
+  );
 
-  // Empty state — no ideas at all yet
-  if (totalCount === 0 && !formOpen) {
-    return (
-      <div>
-        <EmptyState onAdd={openAddForm} />
-        {toast && <Toast msg={toast} />}
-      </div>
-    );
-  }
+  const statCards = [
+    { label: 'Total Ideas', value: stats.total, color: '#6366f1', icon: 'stack' as const },
+    { label: 'Unused', value: stats.unused, color: STATUS_COLORS.unused, icon: 'search' as const },
+    { label: 'In Progress', value: stats.progress, color: STATUS_COLORS.progress, icon: 'revision' as const },
+    { label: 'Used', value: stats.used, color: STATUS_COLORS.used, icon: 'check' as const },
+  ];
 
   return (
-    <div>
-      {/* Toolbar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>
-          {totalCount} idea{totalCount === 1 ? '' : 's'}
-          {filtered.length !== totalCount && <span style={{ color: 'var(--text-faint)', marginLeft: 6 }}>· {filtered.length} shown</span>}
-        </span>
-
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <input
-            className="form-input"
-            placeholder="Search ideas…"
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            style={{ width: 180, fontSize: 11, padding: '5px 9px' }}
-          />
-          <select
-            className="form-input"
-            value={reasonFilter}
-            onChange={e => setReasonFilter(e.target.value)}
-            style={{ width: 'auto', fontSize: 11, padding: '5px 9px' }}
-          >
-            <option value="All">All reasons</option>
-            {REASONS.map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
-          <ViewToggle view={view} onChange={setView} />
-          <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px' }} onClick={openAddForm}>
-            + Add Idea
-          </button>
-        </div>
-      </div>
-
-      {/* Form (collapsible, shared between Add and Edit) */}
-      {formOpen && (
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12, marginBottom: 14 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
-              {editingId ? 'Edit idea' : 'New idea'}
-            </span>
-            <button
-              onClick={closeForm}
-              style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 14, padding: 0, lineHeight: 1 }}
-              title="Cancel"
-            >
-              ✕
-            </button>
-          </div>
-          <input
-            ref={titleInputRef}
-            className="form-input"
-            placeholder="Title (required) — short, distinctive name"
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') saveItem(); }}
-            style={{ fontSize: 13, fontWeight: 600 }}
-          />
-          <textarea
-            className="form-input"
-            placeholder="Content / URL or idea text (optional) — Cmd+Enter to save"
-            value={content}
-            onChange={e => setContent(e.target.value)}
-            onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') saveItem(); }}
-            style={{ minHeight: 60, resize: 'vertical', fontSize: 12, lineHeight: 1.4 }}
-          />
-          <input
-            className="form-input"
-            placeholder="Note (optional) — why is this worth keeping?"
-            value={note}
-            onChange={e => setNote(e.target.value)}
-            style={{ fontSize: 11 }}
-          />
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-            <label style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Reason</label>
-            <select className="form-input" value={reason} onChange={e => setReason(e.target.value)} style={{ width: 'auto', fontSize: 11, padding: '4px 8px' }}>
-              {REASONS.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
-            <button
-              type="button"
-              onClick={() => setNewHot(v => !v)}
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
-                padding: '4px 10px',
-                borderRadius: 4,
-                cursor: 'pointer',
-                background: newHot ? '#ef444418' : 'transparent',
-                color: newHot ? '#ef4444' : 'var(--text-faint)',
-                border: `0.5px solid ${newHot ? '#ef4444' : 'var(--border)'}`,
-                fontFamily: 'inherit',
-              }}
-            >
-              {newHot ? '🔥 Hot' : 'Hot'}
-            </button>
-            <button
-              className="btn-primary"
-              style={{ fontSize: 11, padding: '5px 12px', marginLeft: 'auto' }}
-              onClick={saveItem}
-              disabled={saving || !title.trim()}
-            >
-              {saving ? 'Saving…' : editingId ? 'Save changes' : 'Save idea'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Results — empty after filtering */}
-      {filtered.length === 0 && totalCount > 0 && (
-        <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>
-          No matches. Adjust search or reason filter.
-        </div>
-      )}
-
-      {/* Grid view */}
-      {view === 'grid' && filtered.length > 0 && (
-        <div className="research-grid">
-          {filtered.map(item => (
-            <IdeaCard
-              key={item.id}
-              item={item}
-              expanded={expanded.has(item.id)}
-              onToggleExpand={() => toggleExpanded(item.id)}
-              onCycleStatus={() => cycleStatus(item.id, item.status)}
-              onEdit={() => openEditForm(item)}
-              onDelete={() => deleteItem(item.id)}
-            />
+    <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Stat cards — the same shell the Studio summary uses. */}
+        <div className="studio-stats">
+          {statCards.map(s => (
+            <div key={s.label} className="studio-stat" style={{ '--stat-color': s.color } as React.CSSProperties}>
+              <span className="studio-stat-icon"><Icon name={s.icon} size={19} /></span>
+              <div className="studio-stat-body">
+                <div className="studio-stat-label">{s.label}</div>
+                <div className="studio-stat-num">{s.value}</div>
+              </div>
+            </div>
           ))}
         </div>
-      )}
 
-      {/* Kanban view */}
-      {view === 'kanban' && filtered.length > 0 && (
-        <div className="research-kanban">
-          {KANBAN_ORDER.map(status => {
-            const colItems = filtered.filter(i => i.status === status);
-            const sc = STATUS_COLORS[status];
-            return (
-              <div key={status} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '6px 10px',
-                  background: sc.bg,
-                  border: `0.5px solid ${sc.border}`,
-                  borderRadius: 6,
-                }}>
-                  <span style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    letterSpacing: '0.07em',
-                    textTransform: 'uppercase',
-                    color: sc.color,
-                  }}>
-                    {STATUS_LABELS[status]}
-                  </span>
-                  <span style={{ fontSize: 10, color: sc.color, fontWeight: 600 }}>{colItems.length}</span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {colItems.length === 0 ? (
-                    <div style={{ fontSize: 11, color: 'var(--text-faint)', textAlign: 'center', padding: '16px 0' }}>
-                      Empty
-                    </div>
-                  ) : colItems.map(item => (
-                    <IdeaCard
-                      key={item.id}
-                      item={item}
-                      expanded={expanded.has(item.id)}
-                      onToggleExpand={() => toggleExpanded(item.id)}
-                      onCycleStatus={() => cycleStatus(item.id, item.status)}
-                      onEdit={() => openEditForm(item)}
-                      onDelete={() => deleteItem(item.id)}
-                      compact
-                    />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+        {/* Filter bar — search · reasons · status · view · add, one line. */}
+        <div className="studio-toolbar">
+          <div className="studio-search">
+            <span className="studio-search-icon" aria-hidden>⌕</span>
+            <input
+              className="form-input"
+              type="search"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search ideas…"
+              aria-label="Search ideas"
+            />
+          </div>
+
+          <div className="studio-filters">
+            <select className="form-input" value={reasonFilter} onChange={e => setReasonFilter(e.target.value)} aria-label="Filter by reason">
+              <option value="All">All reasons</option>
+              {reasonOptions.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+            <select className="form-input" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Filter by status">
+              <option value="All">All status</option>
+              {STATUS_ORDER.map(s => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+            </select>
+            <div className="view-seg" role="group" aria-label="View">
+              <button type="button" className={view === 'grid' ? 'active' : undefined} aria-pressed={view === 'grid'} onClick={() => setView('grid')} title="Grid view">
+                <Icon name="grid" size={14} />Grid
+              </button>
+              <button type="button" className={view === 'kanban' ? 'active' : undefined} aria-pressed={view === 'kanban'} onClick={() => setView('kanban')} title="Kanban view">
+                <Icon name="list" size={14} />Kanban
+              </button>
+            </div>
+          </div>
+
+          <div className="studio-toolbar-end">
+            <button className="btn-primary" style={{ fontSize: 12, padding: '8px 16px', display: 'inline-flex', alignItems: 'center', gap: 7 }} onClick={openAddForm}>
+              <span aria-hidden style={{ fontSize: 13, lineHeight: 1 }}>+</span>Add Idea
+            </button>
+          </div>
         </div>
+
+        {/* Add form */}
+        {formOpen && (
+          <div className="idea-form">
+            <div className="idea-form-head">
+              <span>New idea</span>
+              <button onClick={closeForm} title="Cancel" aria-label="Cancel">✕</button>
+            </div>
+            <input
+              ref={titleInputRef}
+              className="form-input"
+              placeholder="Title (required) — short, distinctive name"
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') saveItem(); }}
+              style={{ fontSize: 13, fontWeight: 600 }}
+            />
+            <input
+              className="form-input"
+              placeholder="Source URL (optional)"
+              value={content}
+              onChange={e => setContent(e.target.value)}
+              onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') saveItem(); }}
+            />
+            <textarea
+              className="form-input"
+              placeholder="Note — why is this worth keeping? (Cmd+Enter to save)"
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') saveItem(); }}
+              style={{ minHeight: 62, resize: 'vertical', lineHeight: 1.45 }}
+            />
+            <div className="idea-form-foot">
+              <select className="form-input" value={reason} onChange={e => setReason(e.target.value)} style={{ width: 'auto' }}>
+                {REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+              <button className="btn-primary" style={{ fontSize: 12, padding: '8px 16px', marginLeft: 'auto' }} onClick={saveItem} disabled={saving || !title.trim()}>
+                {saving ? 'Saving…' : 'Save idea'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {clientItems.length === 0 ? (
+          <div className="idea-empty">
+            <div className="idea-empty-mark" aria-hidden>💡</div>
+            <div className="idea-empty-title">No ideas yet</div>
+            <div className="idea-empty-sub">Capture hooks, formats, references — anything worth coming back to.</div>
+            <button className="btn-primary" style={{ fontSize: 12, padding: '8px 18px' }} onClick={openAddForm}>+ Add Idea</button>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>
+            No matches. Adjust the search or filters.
+          </div>
+        ) : view === 'kanban' ? (
+          // The Studio board, with Research supplying its own card body. Dropping
+          // into another column runs changeStatus — the same handler the panel's
+          // status pill and the "Use" button run.
+          <Board
+            cards={boardCards}
+            statuses={STATUS_ORDER}
+            statusColors={STATUS_COLORS}
+            statusLabels={STATUS_LABELS}
+            profiles={profiles}
+            selectedId={selectedId}
+            onStatusChange={(id, status) => {
+              const item = clientItems.find(x => x.id === id);
+              if (item) changeStatus(item, status as ResearchStatus);
+            }}
+            onOpen={setSelectedId}
+            renderCard={card => <KanbanCardBody item={card.data as ResearchItem} />}
+          />
+        ) : (
+          <div className="idea-grid">
+            {filtered.map(item => (
+              <IdeaCard
+                key={item.id}
+                item={item}
+                onOpen={() => setSelectedId(item.id)}
+                onUse={() => changeStatus(item, NEXT_STATUS[item.status])}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {selected && (
+        <ItemPanel
+          itemType={ITEM_TYPE}
+          itemId={selected.id}
+          title={selected.title}
+          commentsLabel="Notes"
+          fields={fields}
+          values={{
+            title: selected.title,
+            content: selected.content ?? '',
+            reason: selected.reason ?? '',
+            status: selected.status,
+            note: selected.note ?? '',
+            saved: selected.created_at ? `Saved ${shortDate(selected.created_at)}` : '—',
+          }}
+          onChangeField={(key, value) => {
+            if (key === 'saved') return; // read-only
+            if (key === 'status') {
+              changeStatus(selected, value as ResearchStatus);
+              return;
+            }
+            patch(selected.id, { [key]: value || null } as Partial<ResearchItem>);
+          }}
+          onAddOption={() => { /* research reasons are a fixed list */ }}
+          comments={comments}
+          activity={activity}
+          profiles={profiles}
+          isAdmin={isAdmin}
+          onReload={onReload}
+          onClose={() => setSelectedId(null)}
+        />
       )}
 
-      {toast && <Toast msg={toast} />}
+      {toast && <div className="idea-toast">{toast}</div>}
     </div>
   );
 }
 
-function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => void }) {
-  const btn = (active: boolean): React.CSSProperties => ({
-    fontSize: 10,
-    fontWeight: 600,
-    letterSpacing: '0.05em',
-    textTransform: 'uppercase',
-    padding: '5px 10px',
-    cursor: 'pointer',
-    background: active ? 'var(--text)' : 'transparent',
-    color: active ? 'var(--bg)' : 'var(--text-faint)',
-    border: 'none',
-    fontFamily: 'inherit',
-    transition: 'all 0.15s',
-  });
-  return (
-    <div style={{ display: 'inline-flex', border: '0.5px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
-      <button onClick={() => onChange('grid')} style={btn(view === 'grid')}>Grid</button>
-      <button onClick={() => onChange('kanban')} style={btn(view === 'kanban')}>Kanban</button>
-    </div>
-  );
-}
-
-function EmptyState({ onAdd }: { onAdd: () => void }) {
-  return (
-    <div style={{
-      textAlign: 'center',
-      padding: '80px 24px',
-      border: '0.5px dashed var(--border)',
-      borderRadius: 12,
-      background: 'var(--surface)',
-    }}>
-      <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.4 }}>💡</div>
-      <div style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 6, fontWeight: 600 }}>No ideas yet</div>
-      <div style={{ fontSize: 12, color: 'var(--text-faint)', marginBottom: 20, lineHeight: 1.5 }}>
-        Capture hooks, formats, references, or anything else worth coming back to.
-      </div>
-      <button className="btn-primary" style={{ fontSize: 12, padding: '8px 18px' }} onClick={onAdd}>
-        + Add Idea
-      </button>
-    </div>
-  );
-}
-
-function Toast({ msg }: { msg: string }) {
-  return (
-    <div style={{
-      position: 'fixed',
-      bottom: 20,
-      right: 20,
-      background: 'var(--text)',
-      color: 'var(--bg)',
-      padding: '8px 14px',
-      borderRadius: 6,
-      fontSize: 11,
-      fontWeight: 600,
-      zIndex: 999,
-    }}>{msg}</div>
-  );
-}
-
-interface CardProps {
-  item: ResearchItem;
-  expanded: boolean;
-  onToggleExpand: () => void;
-  onCycleStatus: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-  compact?: boolean;
-}
-
-function IdeaCard({ item, expanded, onToggleExpand, onCycleStatus, onEdit, onDelete, compact }: CardProps) {
-  const stColors = STATUS_COLORS[item.status];
-  const dim = item.status === 'used' ? 0.55 : 1;
-  const dateStr = item.created_at
-    ? new Date(item.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-    : '';
-  const content = item.content?.trim() || '';
-  const contentIsUrl = !!content && isUrl(content);
-
-  // Title clamp (always 2 lines max, no expand)
-  const titleClampStyle: React.CSSProperties = {
-    display: '-webkit-box',
-    WebkitLineClamp: 2,
-    WebkitBoxOrient: 'vertical',
-    overflow: 'hidden',
-  };
-
-  // Content clamp — 2 lines by default per spec, expandable on click for non-URL text
-  const contentClampStyle: React.CSSProperties = expanded
-    ? {}
-    : {
-        display: '-webkit-box',
-        WebkitLineClamp: 2,
-        WebkitBoxOrient: 'vertical',
-        overflow: 'hidden',
-      };
+/** Grid card — accent bar tinted by reason, per the reference. */
+function IdeaCard({ item, onOpen, onUse }: { item: ResearchItem; onOpen: () => void; onUse: () => void }) {
+  const rColor = reasonColor(item.reason);
+  const status = item.status;
+  const source = item.content?.trim() || '';
+  const sourceIsUrl = isUrl(source);
 
   return (
     <div
-      className="research-card"
-      style={{
-        background: 'var(--surface)',
-        border: `0.5px solid ${item.hot ? '#ef444440' : 'var(--border)'}`,
-        borderRadius: 10,
-        padding: compact ? 10 : 12,
-        opacity: dim,
-        position: 'relative',
-        transition: 'border-color 0.15s, background 0.15s',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
-      }}
+      className="idea-card"
+      style={{ '--reason-color': rColor, '--status-color': STATUS_COLORS[status] } as React.CSSProperties}
+      onClick={onOpen}
+      role="button"
+      tabIndex={0}
+      onKeyDown={e => { if (e.key === 'Enter') onOpen(); }}
+      title="Open idea"
     >
-      {/* Hover-revealed actions — top-right */}
-      <div
-        className="research-card-actions"
-        style={{
-          position: 'absolute',
-          top: 6,
-          right: 6,
-          display: 'flex',
-          gap: 4,
-          zIndex: 2,
-        }}
-      >
-        <button
-          onClick={onCycleStatus}
-          title="Change status"
-          style={{
-            background: stColors.bg,
-            border: `0.5px solid ${stColors.border}`,
-            borderRadius: 4,
-            color: stColors.color,
-            cursor: 'pointer',
-            fontSize: 11,
-            padding: '2px 7px',
-            fontFamily: 'inherit',
-          }}
-        >
-          ↻
-        </button>
-        <button
-          onClick={onEdit}
-          title="Edit"
-          style={{
-            background: 'var(--border)',
-            border: '0.5px solid var(--border)',
-            borderRadius: 4,
-            color: 'var(--text-dim)',
-            cursor: 'pointer',
-            fontSize: 11,
-            padding: '2px 7px',
-            fontFamily: 'inherit',
-          }}
-        >
-          ✎
-        </button>
-        <button
-          onClick={onDelete}
-          title="Delete"
-          style={{
-            background: '#1a0a0a',
-            border: '0.5px solid #3a1a1a',
-            borderRadius: 4,
-            color: '#ef4444',
-            cursor: 'pointer',
-            fontSize: 11,
-            padding: '2px 7px',
-            fontFamily: 'inherit',
-          }}
-        >
-          ✕
-        </button>
+      <span className="idea-accent" aria-hidden />
+
+      <div className="idea-top">
+        {sourceIsUrl ? <SourceChip url={source} /> : <span className="idea-source-none">No source</span>}
+        <span className="idea-status">{STATUS_LABELS[status]}</span>
       </div>
 
-      {/* Title — prominent, bold, white */}
-      <div
-        style={{
-          fontSize: 14,
-          fontWeight: 700,
-          color: 'var(--text)',
-          lineHeight: 1.3,
-          letterSpacing: '-0.01em',
-          wordBreak: 'break-word',
-          paddingRight: 70,
-          ...titleClampStyle,
-        }}
-        title={item.title}
-      >
-        {item.title || 'Untitled'}
-      </div>
+      <div className="idea-title">{item.title || 'Untitled'}</div>
 
-      {/* Content / URL — smaller muted text, 2-line clamp */}
-      {content && (
-        contentIsUrl ? (
-          <a
-            href={content}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              color: 'var(--text-dim)',
-              textDecoration: 'none',
-              fontSize: 11,
-              wordBreak: 'break-all',
-            }}
-            title={content}
-          >
-            <span style={{ borderBottom: '0.5px solid var(--border)', paddingBottom: 1 }}>{safeDomain(content)}</span>
-            <span style={{ fontSize: 9, color: 'var(--text-faint)' }}>↗</span>
-          </a>
-        ) : (
-          <div
-            onClick={onToggleExpand}
-            style={{
-              fontSize: 11,
-              lineHeight: 1.45,
-              color: 'var(--text-dim)',
-              cursor: 'pointer',
-              wordBreak: 'break-word',
-              ...contentClampStyle,
-            }}
-            title={expanded ? 'Click to collapse' : 'Click to expand'}
-          >
-            {content}
-          </div>
-        )
+      {(item.reason || item.note) && (
+        <div className="idea-body">
+          {item.reason && <span className="idea-reason">{item.reason}</span>}
+          {item.note && <span className="idea-note">{item.note}</span>}
+        </div>
       )}
 
-      {/* Status + reason + hot badges */}
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-        <span
-          onClick={onCycleStatus}
-          style={{
-            fontSize: 9,
-            fontWeight: 700,
-            letterSpacing: '0.05em',
-            textTransform: 'uppercase',
-            padding: '2px 7px',
-            borderRadius: 3,
-            background: stColors.bg,
-            color: stColors.color,
-            border: `0.5px solid ${stColors.border}`,
-            cursor: 'pointer',
-          }}
-          title="Click to advance status"
-        >
-          {STATUS_LABELS[item.status]}
-        </span>
+      <div className="idea-foot">
+        <span className="idea-saved">{item.created_at ? `Saved ${shortDate(item.created_at)}` : ''}</span>
+        {sourceIsUrl && (
+          <a
+            className="idea-open"
+            href={source}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={source}
+            onClick={e => e.stopPropagation()}
+          >↗</a>
+        )}
+        <button
+          className="idea-use"
+          onClick={e => { e.stopPropagation(); onUse(); }}
+          title={`Move to ${STATUS_LABELS[NEXT_STATUS[status]]}`}
+        >→ Use</button>
+      </div>
+    </div>
+  );
+}
+
+/** Kanban card — the same information, tightened for a column. */
+function KanbanCardBody({ item }: { item: ResearchItem }) {
+  if (!item) return null;
+  const source = item.content?.trim() || '';
+  return (
+    <>
+      <div className="idea-top">
+        {isUrl(source) ? <SourceChip url={source} /> : <span className="idea-source-none">No source</span>}
         {item.reason && (
-          <span style={{
-            fontSize: 9,
-            fontWeight: 600,
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-            padding: '2px 7px',
-            borderRadius: 3,
-            background: 'var(--surface)',
-            color: 'var(--text-dim)',
-            border: '0.5px solid var(--border)',
-          }}>
+          <span className="idea-reason is-bare" style={{ '--reason-color': reasonColor(item.reason) } as React.CSSProperties}>
             {item.reason}
           </span>
         )}
-        {item.hot && (
-          <span
-            title="Hot"
-            style={{
-              fontSize: 9,
-              fontWeight: 700,
-              letterSpacing: '0.05em',
-              textTransform: 'uppercase',
-              padding: '2px 7px',
-              borderRadius: 3,
-              background: '#ef444418',
-              color: '#ef4444',
-              border: '0.5px solid #ef444440',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 3,
-            }}
-          >
-            🔥 Hot
-          </span>
-        )}
       </div>
-
-      {/* Note */}
-      {item.note && (
-        <div style={{ fontSize: 11, color: 'var(--text-faint)', fontStyle: 'italic', lineHeight: 1.45, wordBreak: 'break-word' }}>
-          {item.note}
-        </div>
-      )}
-
-      {/* Date — bottom */}
-      {dateStr && (
-        <div style={{ fontSize: 9, color: 'var(--text-faint)', marginTop: 'auto', textAlign: 'right' }}>
-          {dateStr}
-        </div>
-      )}
-    </div>
+      <div className="idea-title is-compact">{item.title || 'Untitled'}</div>
+      {item.note && <div className="idea-note is-block">{item.note}</div>}
+      <div className="idea-saved is-foot">{item.created_at ? `Saved ${shortDate(item.created_at)}` : ''}</div>
+    </>
   );
 }
