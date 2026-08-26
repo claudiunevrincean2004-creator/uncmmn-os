@@ -88,8 +88,8 @@ function FieldControl({ field, values, onChangeField, onAddOption, profiles }: {
         : <PillSelect value={value} options={field.options || []} colors={field.colors || {}} onChange={v => onChangeField(field.key, v)} />;
     case 'url':
       // Same renderer the main tables use: the resting state is the clickable,
-      // truncated url (opens in a new tab), with the ✎ swapping in the editor —
-      // never a bare input box with a launch arrow beside it.
+      // truncated url (opens in a new tab), and clicking the field around it
+      // expands the inline editor — never a bare input box sitting open.
       return <UrlCell value={value || undefined} onCommit={v => onChangeField(field.key, v)} variant="panel" />;
     case 'readonly-url':
       return value
@@ -105,7 +105,7 @@ function FieldControl({ field, values, onChangeField, onAddOption, profiles }: {
         : <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>—</span>;
     case 'maybe-url':
       // Editable value that may be a URL or a bare filename (e.g. Full version file):
-      // renders a clickable link when it's a URL, plain text otherwise, edit behind a ✎.
+      // renders a clickable link when it's a URL, plain text otherwise, click to edit.
       return <MaybeUrlCell value={value || undefined} onCommit={v => onChangeField(field.key, v)} variant="panel" />;
     case 'readonly-maybe-url':
       // Link when the value is an http(s) URL, otherwise plain text (e.g. a filename).
@@ -512,6 +512,7 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
       />
       <div
         ref={panelRef}
+        className="item-panel"
         style={{
           // Floating slide-over: fixed to the right edge, above the page content,
           // so the page keeps its full width and layout (nothing behind reflows).
@@ -529,14 +530,13 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
           borderLeft: '0.5px solid var(--border)',
           background: 'var(--surface)',
           boxShadow: '-16px 0 48px rgba(0, 0, 0, 0.4)',
-          padding: '22px 26px',
           animation: 'slideInRight 0.2s ease',
         }}
       >
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 18 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.3, wordBreak: 'break-word' }}>{title || 'Untitled'}</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, paddingTop: 1 }}>
+      {/* Header — the title gets room to breathe, then a rule down to the props */}
+      <div className="panel-head">
+        <div className="panel-title">{title || 'Untitled'}</div>
+        <div className="panel-head-actions">
           <CopyLinkButton type={linkType} id={itemId} variant="panel" />
           <button
             onClick={onClose}
@@ -548,22 +548,27 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
         </div>
       </div>
 
-      {/* Properties */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginBottom: 28 }}>
-        {fields.filter(f => !f.visibleIf || f.visibleIf(values)).map(f => (
-          <div key={f.key} style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: 16, alignItems: 'start' }}>
-            <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, paddingTop: 7 }}>{f.label}</div>
-            <div><FieldControl field={f} values={values} onChangeField={onChangeField} onAddOption={onAddOption} profiles={profiles} /></div>
-          </div>
-        ))}
+      {/* Properties — one per hairline-divided row, label column aligned all the
+          way down, exactly like the table this panel opened from. */}
+      <div className="panel-props">
+        {fields.filter(f => !f.visibleIf || f.visibleIf(values)).map(f => {
+          // Multi-line controls read from the top, so their label rides up too.
+          const tall = f.type === 'textarea' || f.type === 'readonly-multiline';
+          return (
+            <div key={f.key} className={tall ? 'panel-prop is-tall' : 'panel-prop'}>
+              <div className="panel-prop-label">{f.label}</div>
+              <div className="panel-prop-value"><FieldControl field={f} values={values} onChangeField={onChangeField} onAddOption={onAddOption} profiles={profiles} /></div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Comments */}
-      <div style={{ borderTop: '0.5px solid var(--border)', paddingTop: 20, marginBottom: 28 }}>
-        <div style={{ fontSize: 11, color: 'var(--text-faint)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
-          Comments {itemComments.length > 0 && <span style={{ color: 'var(--text-faint)' }}>· {itemComments.length}</span>}
+      <div className="panel-section">
+        <div className="panel-section-title">
+          Comments {itemComments.length > 0 && <span>· {itemComments.length}</span>}
         </div>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+        <div className="panel-composer">
           <MentionTextarea
             value={newComment}
             onChange={setNewComment}
@@ -571,9 +576,11 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
             onSubmit={addComment}
             placeholder="Leave a comment… (@ to mention, Enter to send, Shift+Enter for a new line)"
           />
-          <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px', alignSelf: 'flex-end' }} onClick={addComment} disabled={saving || !newComment.trim()}>
-            {saving ? '…' : 'Add'}
-          </button>
+          <div className="panel-composer-actions">
+            <button className="btn-primary" style={{ fontSize: 11, padding: '6px 14px' }} onClick={addComment} disabled={saving || !newComment.trim()}>
+              {saving ? '…' : 'Add'}
+            </button>
+          </div>
         </div>
         {itemComments.length === 0 ? (
           <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>No comments yet.</div>
@@ -602,7 +609,9 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
                     >
                       {replies.map(r => renderComment(r, true))}
                       {composing && (
-                        <div style={{ display: 'flex', gap: 6 }}>
+                        // Same composer shape as the top-level one: actions on
+                        // their own line under the box, right-aligned.
+                        <div className="panel-composer" style={{ marginBottom: 0 }}>
                           <MentionTextarea
                             value={replyText}
                             onChange={setReplyText}
@@ -611,11 +620,11 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
                             autoFocus
                             placeholder="Write a reply… (@ to mention, Enter to send)"
                           />
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignSelf: 'flex-end' }}>
-                            <button className="btn-primary" style={{ fontSize: 10, padding: '4px 10px' }} onClick={() => addReply(c.id)} disabled={replySaving || !replyText.trim()}>
+                          <div className="panel-composer-actions">
+                            <button className="btn-ghost" style={{ fontSize: 10, padding: '5px 12px' }} onClick={closeReply}>Cancel</button>
+                            <button className="btn-primary" style={{ fontSize: 10, padding: '5px 12px' }} onClick={() => addReply(c.id)} disabled={replySaving || !replyText.trim()}>
                               {replySaving ? '…' : 'Reply'}
                             </button>
-                            <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 10px' }} onClick={closeReply}>Cancel</button>
                           </div>
                         </div>
                       )}
@@ -629,8 +638,8 @@ export default function ItemPanel({ itemType, linkType, itemId, title, fields, v
       </div>
 
       {/* Activity log */}
-      <div style={{ borderTop: '0.5px solid var(--border)', paddingTop: 20 }}>
-        <div style={{ fontSize: 11, color: 'var(--text-faint)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Activity</div>
+      <div className="panel-section">
+        <div className="panel-section-title">Activity</div>
         {itemActivity.length === 0 ? (
           <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>No activity yet.</div>
         ) : (

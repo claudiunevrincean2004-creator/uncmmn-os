@@ -289,10 +289,13 @@ export function MaybeUrl({ value }: { value?: string | null }) {
 // same — the resting state is always the clickable, truncated url, never an input.
 export type LinkVariant = 'table' | 'panel';
 
-// Click-to-edit link field shared by the tables and the detail panels.
-//   • resting → the truncated url as a clickable link (opens in a new tab), or a
-//     subtle "—" when empty; the ✎ (and the "—" itself) opens the editor
-//   • editing → an inline input that commits on blur/Enter and reverts on Escape
+// Click-to-edit link field shared by the tables and the detail panels — the
+// Notion pattern, with no pencil and no launch arrow:
+//   • resting → a chromeless field holding the truncated url as a real link
+//     (clicking the url itself opens it in a new tab); clicking anywhere else in
+//     the field expands it
+//   • editing → an inline input filling the same footprint, committing on
+//     blur/Enter and reverting on Escape, then collapsing straight back
 // `allowPlainText` keeps a non-url value (e.g. a bare filename) readable as text
 // rather than linking it.
 function LinkEditable({
@@ -314,13 +317,14 @@ function LinkEditable({
 
   const panel = variant === 'panel';
   const fontSize = panel ? 12 : 11;
+  const shell = `link-field ${panel ? 'link-field-panel' : 'link-field-table'}`;
 
   if (editing) {
     return (
       <input
         autoFocus
-        className="form-input"
-        style={{ width: panel ? '100%' : (allowPlainText ? 150 : 130), padding: '4px 7px', fontSize }}
+        className="link-field-input"
+        style={{ fontSize }}
         value={v}
         placeholder={allowPlainText ? 'https://… or filename' : 'https://…'}
         onChange={e => setV(e.target.value)}
@@ -337,51 +341,44 @@ function LinkEditable({
     );
   }
 
-  // minWidth 0 lets the link shrink inside the flex row so long values ellipsize
-  // instead of pushing the ✎ out of the cell.
-  const textStyle: React.CSSProperties = {
-    minWidth: 0, fontSize, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-  };
+  const label = value ? (allowPlainText ? 'Click to edit' : 'Click to edit link') : (allowPlainText ? 'Click to add' : 'Click to add link');
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, maxWidth: panel ? '100%' : (allowPlainText ? 220 : 200) }}>
+    // A div, not a button, so the <a> inside stays a valid, clickable link.
+    // stopPropagation keeps a click here from also opening the row's panel.
+    <div
+      className={shell}
+      style={{ fontSize }}
+      role="button"
+      tabIndex={0}
+      title={value || label}
+      onClick={e => { e.stopPropagation(); setEditing(true); }}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditing(true); } }}
+    >
       {value ? (
         allowPlainText && !isHttpUrl(value)
-          ? <span style={{ ...textStyle, color: 'var(--text-dim)' }} title={value}>{value}</span>
+          ? <span className="link-text">{value}</span>
           : (
             <a
               href={value}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ ...textStyle, color: 'var(--accent)', textDecoration: 'none' }}
+              // The link opens; the field around it edits.
+              onClick={e => e.stopPropagation()}
               title={value}
             >
-              {shortUrl(value, panel ? 46 : 30)}
-              {/* Opens-in-new-tab marker, part of the link so it can't wrap away from it. */}
-              <span className="st-arrow" aria-hidden> ↗</span>
+              {shortUrl(value, panel ? 46 : 26)}
             </a>
           )
       ) : (
-        <button
-          onClick={() => setEditing(true)}
-          style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize, padding: 0, fontFamily: 'inherit' }}
-          title={allowPlainText ? 'Add' : 'Add link'}
-        >—</button>
+        <span className="link-empty">—</span>
       )}
-      {/* Inside a Studio table this stays hidden until the row is hovered, so a
-          column of links reads clean; everywhere else it's always visible. */}
-      <button
-        className="link-pencil"
-        onClick={() => setEditing(true)}
-        style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 11, padding: 0, flexShrink: 0 }}
-        title={value ? (allowPlainText ? 'Edit' : 'Edit link') : (allowPlainText ? 'Add' : 'Add link')}
-      >✎</button>
     </div>
   );
 }
 
 // Editable variant of MaybeUrl: shows a clickable link (when http) or plain text,
-// with a pencil to edit inline. Commits on blur/Enter, reverts on Escape.
+// expanding to an inline input on click. Commits on blur/Enter, reverts on Escape.
 export function MaybeUrlCell({
   value,
   onCommit,
@@ -394,7 +391,7 @@ export function MaybeUrlCell({
   return <LinkEditable value={value} onCommit={onCommit} variant={variant} allowPlainText />;
 }
 
-// A clickable, readable link (short URL) with an inline-editable URL behind a pencil.
+// A clickable, readable link (short URL) that expands to an inline URL editor.
 export function UrlCell({
   value,
   onCommit,
@@ -461,6 +458,14 @@ export function InlineDate({
         title={value ? 'Change date' : 'Set date'}
         value={value ? value.slice(0, 10) : ''}
         onChange={e => onCommit(e.target.value)}
+        // The chip hides the native calendar glyph, so the field itself has to
+        // open the picker. showPicker() is Chrome 99+/Safari 16+; where it's
+        // missing (or throws — it requires a user gesture) the field still
+        // types and arrow-keys like any date input.
+        onClick={e => {
+          const el = e.currentTarget as HTMLInputElement & { showPicker?: () => void };
+          try { el.showPicker?.(); } catch { /* not supported here — typing still works */ }
+        }}
       />
     );
   }

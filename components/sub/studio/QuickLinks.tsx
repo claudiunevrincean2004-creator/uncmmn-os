@@ -43,31 +43,33 @@ export default function QuickLinks({ context, links, onReload }: Props) {
 
   // Plain inline JSX (not a nested component) so the inputs keep focus across re-renders
   const editor = (
-    <div style={{ display: 'flex', gap: 6, alignItems: 'center', background: 'var(--surface-2)', border: '0.5px solid var(--border)', borderRadius: 8, padding: '6px 8px' }}>
-      <input className="form-input" style={{ width: 130, fontSize: 11, padding: '4px 7px' }} value={label} onChange={e => setLabel(e.target.value)} placeholder="Label" autoFocus />
-      <input className="form-input" style={{ width: 200, fontSize: 11, padding: '4px 7px' }} value={url} onChange={e => setUrl(e.target.value)} placeholder="https://…" onKeyDown={e => { if (e.key === 'Enter') save(); }} />
-      <button className="btn-primary" style={{ fontSize: 11, padding: '4px 10px' }} onClick={save} disabled={saving}>Save</button>
-      <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => setEditingId(null)}>Cancel</button>
+    <div className="qlink-editor">
+      <input className="form-input" style={{ width: 140 }} value={label} onChange={e => setLabel(e.target.value)} placeholder="Label" autoFocus />
+      <input className="form-input" style={{ width: 220 }} value={url} onChange={e => setUrl(e.target.value)} placeholder="https://…" onKeyDown={e => { if (e.key === 'Enter') save(); }} />
+      <button className="btn-primary" style={{ fontSize: 12, padding: '6px 14px' }} onClick={save} disabled={saving}>Save</button>
+      <button className="btn-ghost" style={{ fontSize: 12, padding: '6px 12px' }} onClick={() => setEditingId(null)}>Cancel</button>
     </div>
   );
 
   return (
-    <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+    // Same control language as the filter bar below it: rounded shells on the
+    // page surface, hairline borders, 12px labels.
+    <div className="qlinks">
       {items.map(l => (
         editingId === l.id ? (
           <div key={l.id}>{editor}</div>
         ) : (
-          <div key={l.id} style={{ display: 'flex', alignItems: 'center' }}>
+          <div key={l.id} className="qlink">
             <button
-              className="btn-ghost"
-              style={{ fontSize: 11, padding: '5px 12px', borderRadius: '6px 0 0 6px', color: l.url ? 'var(--accent)' : 'var(--text-faint)', borderRight: 'none' }}
+              className={l.url ? 'qlink-open' : 'qlink-open is-empty'}
               onClick={() => { if (l.url) window.open(l.url, '_blank', 'noopener,noreferrer'); else startEdit(l); }}
-              title={l.url || 'No link set'}
+              title={l.url || 'No link set — click to add one'}
             >
-              📁 {l.label || 'Untitled'}{l.url ? ' ↗' : ''}
+              <span aria-hidden>📁</span>
+              <span>{l.label || 'Untitled'}</span>
             </button>
-            <button className="btn-ghost" style={{ fontSize: 10, padding: '5px 7px', borderRadius: 0, borderRight: 'none', color: 'var(--text-faint)' }} onClick={() => startEdit(l)} title="Edit">✎</button>
-            <button className="btn-ghost" style={{ fontSize: 10, padding: '5px 7px', borderRadius: '0 6px 6px 0', color: 'var(--text-faint)' }} onClick={() => del(l.id)} title="Delete">✕</button>
+            <button className="qlink-icon" onClick={() => startEdit(l)} title="Edit quick link" aria-label="Edit quick link">✎</button>
+            <button className="qlink-icon is-danger" onClick={() => del(l.id)} title="Delete quick link" aria-label="Delete quick link">✕</button>
           </div>
         )
       ))}
@@ -75,7 +77,9 @@ export default function QuickLinks({ context, links, onReload }: Props) {
       {editingId === NEW ? (
         editor
       ) : (
-        <button className="btn-ghost" style={{ fontSize: 11, padding: '5px 12px' }} onClick={startAdd}>+ Add Quick Link</button>
+        <button className="qlink-add" onClick={startAdd}>
+          <span aria-hidden style={{ fontSize: 13, lineHeight: 1 }}>+</span>Add Quick Link
+        </button>
       )}
     </div>
   );

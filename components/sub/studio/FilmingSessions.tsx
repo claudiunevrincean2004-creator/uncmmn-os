@@ -293,7 +293,11 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
                       <td><UrlCell value={s.script_url} onCommit={u => patch(s.id, { script_url: u })} /></td>
                       <td><UrlCell value={s.footage_link} onCommit={u => patch(s.id, { footage_link: u })} /></td>
                       <CustomRowCells row={s} props={cprops} optionsByProp={optsByProp} onPatch={patch} size="md" />
-                      <td className="st-right"><InlineDate display="chip" value={s.date} onCommit={d => patch(s.id, { date: d || undefined })} /></td>
+                      <td className="st-right">
+                        <div className="st-datecell">
+                          <InlineDate display="chip" value={s.date} onCommit={d => patch(s.id, { date: d || undefined })} />
+                        </div>
+                      </td>
                       <td><button className="btn-danger row-action" style={{ padding: '2px 6px' }} onClick={() => deleteSession(s.id)} title="Delete session" aria-label="Delete session">✕</button></td>
                     </tr>
                   );

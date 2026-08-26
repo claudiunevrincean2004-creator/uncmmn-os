@@ -95,7 +95,10 @@ export default function MentionTextarea({
         rows={rows}
         autoFocus={autoFocus}
         placeholder={placeholder}
-        style={{ resize: 'vertical', fontSize: 12, lineHeight: 1.4, width: '100%', ...style }}
+        // display:block kills the inline-block baseline gap under the textarea —
+        // that stray few pixels is what used to leave the composer's button
+        // looking like it had slipped below the box.
+        style={{ display: 'block', resize: 'vertical', fontSize: 12, lineHeight: 1.4, width: '100%', ...style }}
         onChange={e => sync(e.target.value, e.target.selectionStart ?? e.target.value.length)}
         onKeyUp={e => sync(e.currentTarget.value, e.currentTarget.selectionStart ?? 0)}
         onBlur={() => setTimeout(() => setAt(null), 120)} // let a click on a row land first

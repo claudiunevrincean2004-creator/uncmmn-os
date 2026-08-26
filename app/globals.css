@@ -394,23 +394,43 @@ html, body {
   white-space: nowrap;
 }
 
+/* The Deadline cell — the chip is right-aligned in the column and any row
+   marker (OVERDUE) sits to its left, so every date lines up on the same edge
+   whether or not the row carries a marker. */
+.st-datecell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 /* Inline deadline picker — a real <input type="date"> that reads as a quiet
    rounded chip at rest and lights up on hover/focus, so a deadline can be
-   changed straight from the row without the field shouting in the line. */
+   changed straight from the row without the field shouting in the line.
+   Fixed box so the column is dead straight row to row: same width whether the
+   date is set or empty, same height as the pills beside it. */
 .st-date {
   appearance: none;
   -webkit-appearance: none;
+  box-sizing: border-box;
+  display: inline-block;
+  width: 112px;
+  height: 26px;
+  flex-shrink: 0;
+  vertical-align: middle;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 3px 9px;
+  padding: 0 11px;
+  margin: 0;
   font-family: var(--font-ui);
   font-size: 11px;
   font-weight: 500;
-  line-height: 1.4;
+  line-height: 24px;
   color: var(--text-dim);
   cursor: pointer;
   outline: none;
+  text-align: center;
   transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
 }
 
@@ -438,45 +458,139 @@ html, body {
   background: color-mix(in srgb, var(--neg) 10%, transparent);
 }
 
+/* Centre the date text in the chip and strip the shadow-DOM padding that would
+   otherwise push it off-centre. */
 .st-date::-webkit-datetime-edit {
   padding: 0;
+  text-align: center;
 }
 
+/* The native calendar glyph doesn't belong in this chip. With it hidden the
+   whole field becomes the click target instead — InlineDate calls showPicker()
+   on click, so the calendar still opens from anywhere on the chip. */
 .st-date::-webkit-calendar-picker-indicator {
-  opacity: 0.45;
-  cursor: pointer;
-  padding: 0;
-  margin-left: 4px;
-  transition: opacity 140ms ease;
-}
-
-.st-date:hover::-webkit-calendar-picker-indicator,
-.st-date:focus::-webkit-calendar-picker-indicator {
-  opacity: 0.85;
-}
-
-/* The native calendar glyph is drawn dark — invert it on the dark theme. */
-[data-theme='midnight'] .st-date::-webkit-calendar-picker-indicator {
-  filter: invert(1);
-}
-
-/* The ↗ on a link — quieter than the URL it follows. */
-.st-arrow {
-  font-size: 9px;
-  opacity: 0.75;
-}
-
-/* Link edit pencils stay out of the way until the row is hovered. Scoped to
-   .studio-table so the same control keeps its always-visible form in the detail
-   panels and every other table. */
-.studio-table .link-pencil {
+  display: none;
+  -webkit-appearance: none;
+  appearance: none;
   opacity: 0;
-  transition: opacity 140ms ease;
+  width: 0;
+  padding: 0;
+  margin: 0;
 }
 
-.studio-table tbody tr:hover .link-pencil,
-.studio-table .link-pencil:focus-visible {
-  opacity: 1;
+/* Firefox draws its own; hide that too. */
+.st-date::-moz-calendar-picker-indicator {
+  display: none;
+  opacity: 0;
+}
+
+/* Chrome renders "mm/dd/yyyy" placeholder segments on an empty field — keep
+   them at the field's own muted colour instead of the browser default. */
+.st-date::-webkit-datetime-edit-text,
+.st-date::-webkit-datetime-edit-month-field,
+.st-date::-webkit-datetime-edit-day-field,
+.st-date::-webkit-datetime-edit-year-field {
+  color: inherit;
+}
+
+/* Revision counter — a red count badge once a row has been through revisions,
+   a quiet "0" before that, so the column reads at a glance. */
+.st-rev {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--neg);
+  background: color-mix(in srgb, var(--neg) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--neg) 34%, transparent);
+}
+
+.st-rev.is-zero {
+  color: var(--text-faint);
+  background: none;
+  border-color: transparent;
+  font-weight: 500;
+}
+
+/* ===== Link fields — Notion-style expand-to-edit ============================
+   At rest a link field is just its truncated, clickable url on a chromeless
+   row. Clicking the field (anywhere but the link text itself) expands it into
+   an input to paste a new url into; committing collapses it straight back to
+   the link. No pencil, no launch arrow — the field IS the affordance, which is
+   why it grows a soft hover surface to say "clickable". */
+.link-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  min-height: 26px;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  min-width: 0;
+  cursor: text;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.link-field:hover,
+.link-field:focus-visible {
+  background: var(--surface-2);
+  border-color: var(--border);
+  outline: none;
+}
+
+/* On the hover-tinted row the field needs the opposite surface to stay visible. */
+.studio-table tbody tr:hover .link-field:hover {
+  background: var(--surface);
+}
+
+.link-field-table { width: 172px; }
+.link-field-panel { width: 100%; }
+
+.link-field a,
+.link-field .link-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: inherit;
+}
+
+.link-field a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.link-field a:hover {
+  text-decoration: underline;
+}
+
+.link-field .link-text { color: var(--text-dim); }
+
+.link-field .link-empty {
+  color: var(--text-faint);
+  font-size: inherit;
+}
+
+/* The expanded editor — same footprint as the resting field so nothing in the
+   row jumps when it opens. */
+.link-field-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 26px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: var(--font-ui);
+  outline: none;
 }
 
 /* Chromeless assignee trigger — avatar + name, with the border only on hover. */
@@ -509,8 +623,9 @@ html, body {
 
 /* Touch devices have no hover, so hover-reveals would be unreachable. */
 @media (hover: none) {
-  .studio-table .link-pencil,
   .studio-table .row-action { opacity: 1; }
+  /* Without hover the link field needs a resting outline to look editable. */
+  .link-field { border-color: var(--border); }
 }
 
 @media (max-width: 640px) {
@@ -520,6 +635,7 @@ html, body {
   .studio-table td:first-child { padding-left: 22px; }
   .studio-table tbody td:first-child::before { left: 9px; }
   .st-title { max-width: 210px; }
+  .link-field-table { width: 140px; }
 }
 
 /* ===== Studio stat pills — the compact status summary above the tabs ========= */
@@ -675,6 +791,248 @@ html, body {
 @media (max-width: 720px) {
   .studio-search { flex: 1 1 100%; }
   .studio-toolbar-end { width: 100%; margin-left: 0; justify-content: space-between; }
+}
+
+/* ===== Quick links — same control language as the filter bar ================
+   A quick link is one rounded control (radius 10, --surface, hairline border,
+   12px) exactly like the filter dropdowns and the search box above it; its
+   edit/delete buttons live inside that same shell, divided by hairlines, so a
+   chip reads as a single object rather than three glued buttons. */
+.qlinks {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.qlink {
+  display: inline-flex;
+  align-items: stretch;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color 140ms ease;
+}
+
+.qlink:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+
+.qlink button {
+  background: none;
+  border: none;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.qlink-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  font-weight: 500;
+  color: var(--accent);
+  max-width: 260px;
+}
+
+.qlink-open.is-empty { color: var(--text-faint); }
+
+.qlink-open span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qlink-open:hover { background: var(--accent-soft); }
+
+/* The two icon buttons stay quiet until the chip is hovered. */
+.qlink .qlink-icon {
+  padding: 8px 9px;
+  font-size: 11px;
+  color: var(--text-faint);
+  border-left: 1px solid var(--border);
+  opacity: 0;
+  transition: opacity 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.qlink:hover .qlink-icon,
+.qlink-icon:focus-visible { opacity: 1; }
+
+.qlink-icon:hover { background: var(--surface-2); color: var(--text); }
+.qlink-icon.is-danger:hover { color: var(--neg); }
+
+/* "+ Add Quick Link" — the same control shell, dashed to read as an empty slot. */
+.qlink-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px dashed var(--border);
+  background: none;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.qlink-add:hover {
+  background: var(--surface);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Inline add/edit form — one rounded shell holding both inputs and the actions. */
+.qlink-editor {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 8px;
+}
+
+.qlink-editor input.form-input {
+  background: var(--surface-2);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+@media (hover: none) {
+  .qlink-icon { opacity: 1; }
+}
+
+/* ===== Item side panel — the row's detail view =============================
+   Reads like the table it opened from: generous outer padding, a title with
+   room to breathe, and one property per divided row with the label column
+   aligned all the way down. */
+.item-panel {
+  padding: 28px 30px 34px;
+}
+
+.panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-title {
+  font-family: var(--font-head);
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.32;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.panel-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding-top: 3px;
+}
+
+/* Property rows — hairline-divided like the table body. */
+.panel-props {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 26px;
+}
+
+.panel-prop {
+  display: grid;
+  grid-template-columns: 148px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  min-height: 46px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-prop:last-child {
+  border-bottom: none;
+}
+
+.panel-prop-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 600;
+  color: var(--text-faint);
+}
+
+.panel-prop-value {
+  min-width: 0;
+  font-size: 12px;
+}
+
+/* A textarea or a long read-only block reads from the top, so its label does too. */
+.panel-prop.is-tall {
+  align-items: start;
+}
+
+.panel-prop.is-tall .panel-prop-label {
+  padding-top: 8px;
+}
+
+.panel-section {
+  border-top: 1px solid var(--border);
+  padding-top: 22px;
+  margin-bottom: 26px;
+}
+
+.panel-section:last-child {
+  margin-bottom: 0;
+}
+
+.panel-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+  margin-bottom: 12px;
+}
+
+/* Comment composer — the action sits on its own line beneath the textarea,
+   right-aligned, instead of floating off its baseline beside it. */
+.panel-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.panel-composer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Narrow panel: labels stack above their values rather than squeezing them. */
+@media (max-width: 560px) {
+  .item-panel { padding: 22px 18px 26px; }
+  .panel-prop {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 7px;
+    align-items: start;
+  }
+  .panel-prop.is-tall .panel-prop-label { padding-top: 0; }
 }
 
 /* ===== Segmented Light / Dark theme control ================================= */

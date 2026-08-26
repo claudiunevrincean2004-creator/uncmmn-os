@@ -264,7 +264,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
                       <td><UrlCell value={s.final_url} onCommit={u => patch(s.id, { final_url: u })} /></td>
                       <CustomRowCells row={s} props={cprops} optionsByProp={optsByProp} onPatch={patch} size="md" />
                       <td className="st-right">
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <div className="st-datecell">
                           {overdue && <span className="st-overdue">OVERDUE</span>}
                           <InlineDate display="chip" value={s.scheduled_date} onCommit={d => patch(s.id, { scheduled_date: d || undefined })} highlight={overdue} />
                         </div>

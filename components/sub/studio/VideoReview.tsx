@@ -314,6 +314,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                   <th>Raw Files</th>
                   <th>Final</th>
                   <th className="st-right">Deadline</th>
+                  <th className="st-right">Revisions</th>
                   <th></th>
                 </tr>
               </thead>
@@ -342,10 +343,18 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                       <td><UrlCell value={v.raw_files_url} onCommit={u => patch(v.id, { raw_files_url: u })} /></td>
                       <td><UrlCell value={v.final_url} onCommit={u => patch(v.id, { final_url: u })} /></td>
                       <td className="st-right">
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <div className="st-datecell">
                           {overdue && <span className="st-overdue">OVERDUE</span>}
                           <InlineDate display="chip" value={v.deadline} onCommit={d => patch(v.id, { deadline: d || undefined })} highlight={overdue} />
                         </div>
+                      </td>
+                      <td className="st-right">
+                        <span
+                          className={v.revision_count > 0 ? 'st-rev' : 'st-rev is-zero'}
+                          title={v.revision_count > 0 ? `${v.revision_count} revision round(s)` : 'No revisions'}
+                        >
+                          {v.revision_count || 0}
+                        </span>
                       </td>
                       <td><button className="btn-danger row-action" style={{ padding: '2px 6px' }} onClick={() => deleteVideo(v.id)} title="Delete video" aria-label="Delete video">✕</button></td>
                     </tr>
