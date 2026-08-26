@@ -1222,6 +1222,10 @@ html, body {
   display: flex;
   align-items: center;
   gap: 10px;
+  /* The confirm step is wider than the trash button it replaces — let the row
+     wrap rather than squeeze the saved date out of the card. */
+  flex-wrap: wrap;
+  row-gap: 8px;
   margin-top: auto;
   padding-top: 13px;
   border-top: 1px solid var(--border);
@@ -1298,6 +1302,125 @@ html, body {
   font-size: 10px;
 }
 
+/* ===== Delete affordance + inline confirm ==================================
+   Quiet by default so it never competes with the title; it surfaces when the
+   card is hovered or anything inside it takes focus. */
+.del-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 140ms ease, background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+
+.del-icon.is-compact { width: 28px; height: 28px; border-radius: 8px; }
+
+.idea-card:hover .del-icon,
+.idea-card:focus-within .del-icon,
+.board-card:hover .del-icon,
+.board-card:focus-within .del-icon { opacity: 1; }
+
+.del-icon:hover,
+.del-icon:focus-visible {
+  opacity: 1;
+  color: var(--neg);
+  background: color-mix(in srgb, var(--neg) 12%, transparent);
+  border-color: color-mix(in srgb, var(--neg) 38%, transparent);
+}
+
+.del-icon:focus-visible {
+  outline: 2px solid var(--neg);
+  outline-offset: 2px;
+}
+
+/* No hover on touch — the control has to be there permanently. */
+@media (hover: none) {
+  .del-icon { opacity: 1; }
+}
+
+/* Labelled form, for the detail panel header. */
+.del-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--neg) 34%, transparent);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--neg) 10%, transparent);
+  color: var(--neg);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.del-btn:hover { background: color-mix(in srgb, var(--neg) 20%, transparent); border-color: var(--neg); }
+.del-btn:focus-visible { outline: 2px solid var(--neg); outline-offset: 2px; }
+
+/* The confirm step, swapped in where the trash button was. */
+.confirm-del {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px 3px 9px;
+  border: 1px solid color-mix(in srgb, var(--neg) 38%, transparent);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--neg) 10%, transparent);
+  white-space: nowrap;
+}
+
+.confirm-del-q {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--neg);
+}
+
+.confirm-del.is-compact .confirm-del-q { font-size: 10px; }
+
+.confirm-del button {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  padding: 4px 9px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+
+.confirm-del.is-compact button { font-size: 10px; padding: 3px 7px; }
+
+.confirm-del-yes {
+  background: var(--neg);
+  color: #fff;
+}
+
+.confirm-del-yes:hover { background: color-mix(in srgb, var(--neg) 84%, #000); }
+.confirm-del-yes:focus-visible { outline: 2px solid var(--neg); outline-offset: 2px; }
+
+.confirm-del-no {
+  background: none;
+  color: var(--text-dim);
+}
+
+.confirm-del-no:hover { background: var(--surface); color: var(--text); }
+.confirm-del-no:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Sits at the end of the card footer, clear of the open-source button. */
+.idea-del { display: inline-flex; flex-shrink: 0; }
+.idea-open + .idea-del { margin-left: 2px; }
+/* With no source button, the delete control takes the right edge itself. */
+.idea-saved + .idea-del { margin-left: auto; }
+
 /* Add-idea form */
 .idea-form {
   display: flex;
@@ -1351,6 +1474,11 @@ html, body {
 .idea-empty-mark { font-size: 30px; opacity: 0.45; margin-bottom: 12px; }
 .idea-empty-title { font-size: 14px; font-weight: 700; color: var(--text-dim); margin-bottom: 6px; }
 .idea-empty-sub { font-size: 12px; color: var(--text-faint); margin-bottom: 20px; line-height: 1.5; }
+
+.idea-toast.is-error {
+  border-color: color-mix(in srgb, var(--neg) 50%, transparent);
+  color: var(--neg);
+}
 
 .idea-toast {
   position: fixed;

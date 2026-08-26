@@ -6,6 +6,7 @@ import { Client, ResearchItem, ResearchStatus, StudioComment, StudioActivity, Pr
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { logActivity, shortDate } from '@/lib/studio';
 import Icon from '@/components/Icon';
+import ConfirmDelete from '@/components/ConfirmDelete';
 import Board, { type BoardCard } from './studio/Board';
 import ItemPanel, { type FieldDef } from './studio/ItemPanel';
 
@@ -148,7 +149,14 @@ function SourceChip({ url }: { url: string }) {
 }
 
 export default function ResearchTab({ client, items, comments, activity, profiles, isAdmin = false, onReload }: Props) {
-  const clientItems = useMemo(() => items.filter(i => i.client_id === client.id), [items, client.id]);
+  // Ideas deleted in this session but still present in `items` until the reload
+  // lands — or until a failed write puts them back.
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+
+  const clientItems = useMemo(
+    () => items.filter(i => i.client_id === client.id && !deletedIds.has(i.id)),
+    [items, client.id, deletedIds],
+  );
 
   // Add form
   const [formOpen, setFormOpen] = useState(false);
@@ -166,7 +174,7 @@ export default function ResearchTab({ client, items, comments, activity, profile
   const [statusFilter, setStatusFilter] = usePersistedState<string>('research_status', 'All');
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; isError: boolean } | null>(null);
   // Reasons changed from a card, held until the reloaded row agrees.
   const [reasonOverride, setReasonOverride] = useState<Record<string, string>>({});
 
@@ -186,6 +194,17 @@ export default function ResearchTab({ client, items, comments, activity, profile
   }, [clientItems]);
 
   const effectiveReason = (item: ResearchItem) => reasonOverride[item.id] ?? item.reason ?? '';
+
+  // Once a deleted row is actually gone from the incoming data, stop tracking it.
+  useEffect(() => {
+    setDeletedIds(prev => {
+      if (prev.size === 0) return prev;
+      const live = new Set(items.map(i => i.id));
+      const next = new Set<string>();
+      prev.forEach(id => { if (live.has(id)) next.add(id); });
+      return next.size === prev.size ? prev : next;
+    });
+  }, [items]);
 
   // Every reason actually in use, so legacy values stay reachable in the filter.
   const reasonOptions = useMemo(
@@ -217,9 +236,9 @@ export default function ResearchTab({ client, items, comments, activity, profile
   // Total is counted off the FULL set, not the filtered one.
   const totalIdeas = clientItems.length;
 
-  function showToast(msg: string) {
-    setToast(msg);
-    setTimeout(() => setToast(null), 1800);
+  function showToast(msg: string, isError = false) {
+    setToast({ msg, isError });
+    setTimeout(() => setToast(null), isError ? 4000 : 1800);
   }
 
   function openAddForm() {
@@ -293,10 +312,29 @@ export default function ResearchTab({ client, items, comments, activity, profile
     await patch(item.id, { status });
   }
 
+  /**
+   * Delete an idea. Optimistic: the card leaves immediately (and the Total Ideas
+   * count drops with it, since both read the same clientItems), and comes back
+   * if the write fails — the UI is never left claiming something the database
+   * disagrees with. The confirm step lives in ConfirmDelete, so by the time we
+   * get here the user has already said yes.
+   */
   async function deleteItem(id: string) {
-    if (!confirm('Delete this idea?')) return;
-    await supabase.from('research_items').delete().eq('id', id);
+    setDeletedIds(prev => new Set(prev).add(id));
     if (selectedId === id) setSelectedId(null);
+
+    const { error } = await supabase.from('research_items').delete().eq('id', id);
+    if (error) {
+      setDeletedIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      console.error('[ResearchTab] failed to delete idea', { id, error });
+      showToast(`Couldn't delete: ${error.message}`, true);
+      return;
+    }
+    showToast('Idea deleted');
     onReload();
   }
 
@@ -449,7 +487,12 @@ export default function ResearchTab({ client, items, comments, activity, profile
               if (item) changeStatus(item, status as ResearchStatus);
             }}
             onOpen={setSelectedId}
-            renderCard={card => <KanbanCardBody item={card.data as ResearchItem} />}
+            renderCard={card => (
+              <KanbanCardBody
+                item={card.data as ResearchItem}
+                onDelete={() => deleteItem(card.id)}
+              />
+            )}
           />
         ) : (
           <div className="idea-grid">
@@ -461,6 +504,7 @@ export default function ResearchTab({ client, items, comments, activity, profile
                 reasonOptions={REASONS}
                 onOpen={() => setSelectedId(item.id)}
                 onChangeReason={r => changeReason(item, r)}
+                onDelete={() => deleteItem(item.id)}
               />
             ))}
           </div>
@@ -473,6 +517,8 @@ export default function ResearchTab({ client, items, comments, activity, profile
           itemId={selected.id}
           title={selected.title}
           commentsLabel="Notes"
+          // deleteItem clears selectedId itself, so the panel closes on confirm.
+          onDelete={() => deleteItem(selected.id)}
           fields={fields}
           values={{
             title: selected.title,
@@ -500,7 +546,7 @@ export default function ResearchTab({ client, items, comments, activity, profile
         />
       )}
 
-      {toast && <div className="idea-toast">{toast}</div>}
+      {toast && <div className={toast.isError ? 'idea-toast is-error' : 'idea-toast'} role="status">{toast.msg}</div>}
     </div>
   );
 }
@@ -605,13 +651,14 @@ function ReasonPicker({
 
 /** Grid card — accent bar tinted by reason, per the reference. */
 function IdeaCard({
-  item, reason, reasonOptions, onOpen, onChangeReason,
+  item, reason, reasonOptions, onOpen, onChangeReason, onDelete,
 }: {
   item: ResearchItem;
   reason: string;
   reasonOptions: string[];
   onOpen: () => void;
   onChangeReason: (reason: string) => void;
+  onDelete: () => void;
 }) {
   const rColor = reasonColor(reason);
   const status = item.status;
@@ -646,13 +693,14 @@ function IdeaCard({
         <span className="idea-saved">{item.created_at ? `Saved ${shortDate(item.created_at)}` : ''}</span>
         {/* No source URL → no button at all, rather than a dead control. */}
         {sourceIsUrl && <OpenSourceLink url={source} />}
+        <span className="idea-del"><ConfirmDelete onConfirm={onDelete} title="Delete idea" /></span>
       </div>
     </div>
   );
 }
 
 /** Kanban card — the same information, tightened for a column. */
-function KanbanCardBody({ item }: { item: ResearchItem }) {
+function KanbanCardBody({ item, onDelete }: { item: ResearchItem; onDelete: () => void }) {
   if (!item) return null;
   const source = item.content?.trim() || '';
   return (
@@ -670,6 +718,7 @@ function KanbanCardBody({ item }: { item: ResearchItem }) {
       <div className="idea-foot is-compact">
         <span className="idea-saved">{item.created_at ? `Saved ${shortDate(item.created_at)}` : ''}</span>
         {isUrl(source) && <OpenSourceLink url={source} compact />}
+        <span className="idea-del"><ConfirmDelete onConfirm={onDelete} title="Delete idea" compact /></span>
       </div>
     </>
   );

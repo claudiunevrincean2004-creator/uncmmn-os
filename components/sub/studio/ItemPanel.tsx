@@ -13,6 +13,7 @@ import CommentText from '@/components/CommentText';
 import EmojiPicker from '@/components/EmojiPicker';
 import { parseMentions } from '@/lib/mentions';
 import CopyLinkButton from '@/components/CopyLinkButton';
+import ConfirmDelete from '@/components/ConfirmDelete';
 import { ItemType } from '@/lib/item-link';
 
 // Collapse a comment's raw reaction rows into one pill per emoji: how many people
@@ -60,6 +61,9 @@ interface Props {
   title: string;
   /** Heading for the comments block — "Notes" on Research, say. */
   commentsLabel?: string;
+  /** Omit to hide the header's Delete button. Confirmed before it fires; the
+   *  caller is responsible for closing the panel afterwards. */
+  onDelete?: () => void;
   fields: FieldDef[];
   values: Record<string, any>;
   onChangeField: (key: string, value: any) => void;
@@ -133,7 +137,7 @@ function FieldControl({ field, values, onChangeField, onAddOption, profiles }: {
   }
 }
 
-export default function ItemPanel({ itemType, linkType, itemId, title, commentsLabel = 'Comments', fields, values, onChangeField, onAddOption, comments, activity, profiles = [], isAdmin = false, onReload, onClose }: Props) {
+export default function ItemPanel({ itemType, linkType, itemId, title, commentsLabel = 'Comments', onDelete, fields, values, onChangeField, onAddOption, comments, activity, profiles = [], isAdmin = false, onReload, onClose }: Props) {
   const [newComment, setNewComment] = useState('');
   // Whether the new-comment box is focused — drives whether Add is on screen.
   const [composerActive, setComposerActive] = useState(false);
@@ -551,6 +555,7 @@ export default function ItemPanel({ itemType, linkType, itemId, title, commentsL
       <div className="panel-head">
         <div className="panel-title">{title || 'Untitled'}</div>
         <div className="panel-head-actions">
+          {onDelete && <ConfirmDelete onConfirm={onDelete} variant="button" title="Delete this item" />}
           {linkType && <CopyLinkButton type={linkType} id={itemId} variant="panel" />}
           <button
             onClick={onClose}
