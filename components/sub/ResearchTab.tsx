@@ -684,9 +684,10 @@ function IdeaCard({
 
       <div className="idea-title">{item.title || 'Untitled'}</div>
 
-      <div className="idea-body">
+      {/* The note lives in the detail panel only — the card face stays to
+          title + reason so footers can line up across the row. */}
+      <div className="idea-reason-row">
         <ReasonPicker value={reason} options={reasonOptions} onPick={onChangeReason} />
-        {item.note && <span className="idea-note">{item.note}</span>}
       </div>
 
       <div className="idea-foot">
@@ -714,7 +715,6 @@ function KanbanCardBody({ item, onDelete }: { item: ResearchItem; onDelete: () =
         )}
       </div>
       <div className="idea-title is-compact">{item.title || 'Untitled'}</div>
-      {item.note && <div className="idea-note is-block">{item.note}</div>}
       <div className="idea-foot is-compact">
         <span className="idea-saved">{item.created_at ? `Saved ${shortDate(item.created_at)}` : ''}</span>
         {isUrl(source) && <OpenSourceLink url={source} compact />}

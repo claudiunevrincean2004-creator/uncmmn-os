@@ -960,10 +960,14 @@ html, body {
   margin-bottom: 28px;
 }
 
+/* stretch (the default, stated explicitly because it's load-bearing here): every
+   card in a row takes the row's full height, which is what lets each card's
+   footer sit on a shared baseline. */
 .idea-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 16px;
+  align-items: stretch;
 }
 
 .idea-card {
@@ -1083,16 +1087,15 @@ html, body {
   margin: 8px 0 6px;
 }
 
-/* The tinted inner block: the reason label, then the note beside it. */
-.idea-body {
+/* The reason sits on its own row, sized to itself. margin-bottom is the MINIMUM
+   gap down to the footer; the footer's margin-top:auto eats whatever slack the
+   equal-height card leaves over. */
+.idea-reason-row {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin-top: 12px;
-  padding: 12px 13px;
-  border-radius: 10px;
-  background: var(--surface-2);
+  align-items: center;
   min-width: 0;
+  margin-top: 12px;
+  margin-bottom: 14px;
 }
 
 .idea-reason {
@@ -1108,26 +1111,41 @@ html, body {
 
 .idea-reason.is-bare { margin-left: auto; }
 
-/* Editable form: reads as a chip you can press, not as a static label. */
+/* Editable form: a self-contained badge sized to its own text — tinted at rest
+   so it reads as a deliberate chip rather than a container missing its
+   contents, and deepening on hover to show it's pressable. */
 .idea-reason.is-editable {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  max-width: 100%;
   font-family: var(--font-ui);
-  background: none;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  padding: 2px 7px;
-  margin: -2px 0 0 -7px;
+  background: color-mix(in srgb, var(--reason-color) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--reason-color) 26%, transparent);
+  border-radius: 999px;
+  padding: 4px 11px;
   cursor: pointer;
   transition: background 140ms ease, border-color 140ms ease;
 }
 
+/* A flat 12% tint disappears on the dark surface. */
+[data-theme='midnight'] .idea-reason.is-editable {
+  background: color-mix(in srgb, var(--reason-color) 22%, transparent);
+  border-color: color-mix(in srgb, var(--reason-color) 34%, transparent);
+}
+
 .idea-reason.is-editable:hover,
-.idea-reason.is-editable:focus-visible {
-  background: color-mix(in srgb, var(--reason-color) 12%, transparent);
-  border-color: color-mix(in srgb, var(--reason-color) 38%, transparent);
+.idea-reason.is-editable:focus-visible,
+[data-theme='midnight'] .idea-reason.is-editable:hover,
+[data-theme='midnight'] .idea-reason.is-editable:focus-visible {
+  background: color-mix(in srgb, var(--reason-color) 22%, transparent);
+  border-color: color-mix(in srgb, var(--reason-color) 52%, transparent);
   outline: none;
+}
+
+.idea-reason.is-editable:focus-visible {
+  outline: 2px solid var(--reason-color);
+  outline-offset: 2px;
 }
 
 .idea-reason-caret {
@@ -1198,26 +1216,6 @@ html, body {
   background: var(--reason-color, var(--accent));
 }
 
-.idea-note {
-  min-width: 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--text-dim);
-  word-break: break-word;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.idea-note.is-block {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  font-size: 11px;
-  margin-bottom: 8px;
-}
-
 .idea-foot {
   display: flex;
   align-items: center;
@@ -1231,8 +1229,6 @@ html, body {
   border-top: 1px solid var(--border);
 }
 
-/* Push the footer clear of the body block even on a short card. */
-.idea-body + .idea-foot { margin-top: 16px; }
 
 .idea-saved {
   font-size: 11px;
