@@ -58,35 +58,45 @@ export function InlineText({
 }
 
 
+// The one pill geometry in the app, so a Status/Format/Priority chip looks the
+// same in a Studio table as it does in that row's detail panel. 'md' is the
+// Studio shape — a soft rounded RECTANGLE, not a lozenge; 'sm' is the dense
+// legacy pill the non-Studio tables still use.
+export function pillShape(size: 'sm' | 'md'): React.CSSProperties {
+  const md = size === 'md';
+  return {
+    appearance: 'none',
+    WebkitAppearance: 'none',
+    borderRadius: md ? 6 : 20,
+    padding: md ? '4px 10px' : '3px 9px',
+    fontSize: md ? 11 : 10,
+    fontWeight: md ? 600 : 700,
+    cursor: 'pointer',
+    outline: 'none',
+    fontFamily: 'inherit',
+  };
+}
+
 // A select styled as a colored pill — click opens the dropdown to change.
 export function PillSelect({
   value,
   options,
   colors,
   onChange,
+  size = 'md',
 }: {
   value: string;
   options: string[];
   colors: Record<string, string>;
   onChange: (v: string) => void;
+  size?: 'sm' | 'md';
 }) {
   const color = colors[value] || '#6b7280';
   return (
     <select
       value={value}
       onChange={e => onChange(e.target.value)}
-      style={{
-        ...pillStyle(color),
-        appearance: 'none',
-        WebkitAppearance: 'none',
-        borderRadius: 20,
-        padding: '3px 9px',
-        fontSize: 10,
-        fontWeight: 700,
-        cursor: 'pointer',
-        outline: 'none',
-        fontFamily: 'inherit',
-      }}
+      style={{ ...pillStyle(color), ...pillShape(size) }}
       title="Click to change"
     >
       {options.map(o => (
@@ -229,18 +239,8 @@ export function EditPillSelect({
       onChange={e => handle(e.target.value)}
       style={{
         ...pillStyle(color),
-        appearance: 'none',
-        WebkitAppearance: 'none',
-        // Studio pills are soft rounded RECTANGLES (radius 6), not lozenges —
-        // matching the Format/Status chips in the design.
-        borderRadius: md ? 6 : 20,
-        padding: md ? '4px 10px' : '3px 9px',
-        fontSize: md ? 11 : 10,
-        fontWeight: md ? 600 : 700,
+        ...pillShape(size),
         maxWidth: md ? 190 : undefined,
-        cursor: 'pointer',
-        outline: 'none',
-        fontFamily: 'inherit',
       }}
       title="Click to change"
     >

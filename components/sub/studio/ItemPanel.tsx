@@ -77,15 +77,17 @@ function FieldControl({ field, values, onChangeField, onAddOption, profiles }: {
     case 'date':
       return <InlineDate value={value} onCommit={v => onChangeField(field.key, v || undefined)} />;
     case 'user':
-      return <UserPicker value={value} profiles={profiles} onChange={v => onChangeField(field.key, v)} />;
+      // size="md" throughout: the panel's pills and assignee chip are the same
+      // controls the table row uses, so the two never drift apart in shape.
+      return <UserPicker size="md" value={value} profiles={profiles} onChange={v => onChangeField(field.key, v)} />;
     case 'select':
       return field.field
         ? <EditSelect field={field.field} value={value} options={field.options || []} onChange={v => onChangeField(field.key, v)} onAddOption={onAddOption} placeholder="—" width="100%" allowAdd={field.allowAdd} />
         : <MiniSelect value={value} options={field.options || []} onChange={v => onChangeField(field.key, v)} placeholder="—" width="100%" />;
     case 'pill':
       return field.field
-        ? <EditPillSelect field={field.field} value={value || ''} options={field.options || []} colors={field.colors || {}} onChange={v => onChangeField(field.key, v)} onAddOption={onAddOption} allowAdd={field.allowAdd} allowEmpty={field.allowEmpty} />
-        : <PillSelect value={value} options={field.options || []} colors={field.colors || {}} onChange={v => onChangeField(field.key, v)} />;
+        ? <EditPillSelect size="md" field={field.field} value={value || ''} options={field.options || []} colors={field.colors || {}} onChange={v => onChangeField(field.key, v)} onAddOption={onAddOption} allowAdd={field.allowAdd} allowEmpty={field.allowEmpty} />
+        : <PillSelect size="md" value={value} options={field.options || []} colors={field.colors || {}} onChange={v => onChangeField(field.key, v)} />;
     case 'url':
       // Same renderer the main tables use: the resting state is the clickable,
       // truncated url (opens in a new tab), and clicking the field around it

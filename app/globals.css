@@ -917,11 +917,13 @@ html, body {
 /* Property rows — no per-row rules; the only line in the panel body is the one
    under the title (and the section rules further down). Rhythm comes from the
    row spacing and the aligned label column instead. */
+/* Equal air above and below the block: the same distance from the title rule
+   down to the first property as from the last property to the Comments rule. */
 .panel-props {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding-top: 6px;
+  padding-top: 28px;
   margin-bottom: 28px;
 }
 

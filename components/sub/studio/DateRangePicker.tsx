@@ -114,7 +114,6 @@ export default function DateRangePicker({ from, to, onChange, align = 'left' }: 
         style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '4px 9px', cursor: 'pointer', whiteSpace: 'nowrap', color: from || to ? 'var(--text)' : 'var(--text-dim)' }}
         title="Filter by date range"
       >
-        <span style={{ opacity: 0.7 }}>📅</span>
         <span>{labelFor(from, to, presets)}</span>
         <span style={{ color: 'var(--text-faint)', fontSize: 9 }}>▾</span>
       </button>
