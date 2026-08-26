@@ -927,6 +927,279 @@ html, body {
   color: var(--accent);
 }
 
+/* ===== Assets — linked Drive folders, grouped by category ==================
+   Cards (grid) or rows (list) on the page surface, with each category carrying
+   one colour through its section dot and its folder tiles. Deliberately shows
+   NO file count or size: we don't track either, and a placeholder would read as
+   real data. Every colour is a theme token or the category's own, so this holds
+   in both aurora and midnight. */
+.assets-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.assets-count {
+  font-size: 12px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.assets-count strong {
+  font-family: var(--font-head);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-right: 2px;
+}
+
+.assets-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.assets-select {
+  width: auto;
+  min-width: 150px;
+  padding: 8px 12px;
+  font-size: 12px;
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.assets-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  padding: 8px 16px;
+  white-space: nowrap;
+}
+
+.assets-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+/* Section header: dot · NAME · count, then a hairline running to the edge. */
+.asset-group-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+}
+
+.asset-group-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--cat-color, var(--accent));
+}
+
+.asset-group-name {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.asset-group-count {
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.asset-group-rule {
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+  min-width: 12px;
+}
+
+/* The tinted folder tile — the category's colour, washed for the background. */
+.asset-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  flex-shrink: 0;
+  color: var(--cat-color, var(--accent));
+  background: color-mix(in srgb, var(--cat-color, var(--accent)) 14%, transparent);
+}
+
+[data-theme='midnight'] .asset-icon {
+  background: color-mix(in srgb, var(--cat-color, var(--accent)) 22%, transparent);
+}
+
+.asset-id { min-width: 0; flex: 1; }
+
+.asset-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asset-sub {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asset-time {
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.asset-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.asset-open:hover { text-decoration: underline; }
+
+.asset-nourl {
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+/* Edit / remove — quiet until the card or row is hovered. */
+.asset-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.asset-card:hover .asset-actions,
+.asset-row:hover .asset-actions,
+.asset-actions:focus-within { opacity: 1; }
+
+.asset-action {
+  background: none;
+  border: none;
+  border-radius: 6px;
+  padding: 3px 5px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-faint);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.asset-action:hover { background: var(--surface-2); color: var(--text); }
+.asset-action.is-danger:hover { color: var(--neg); }
+
+/* --- Grid view --- */
+.asset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+  gap: 14px;
+}
+
+.asset-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 16px 18px;
+  min-width: 0;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.asset-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  border-color: color-mix(in srgb, var(--cat-color, var(--accent)) 42%, var(--border));
+}
+
+.asset-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.asset-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 13px;
+  border-top: 1px solid var(--border);
+}
+
+/* --- List view --- */
+.asset-list {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.asset-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+  transition: background 140ms ease;
+}
+
+.asset-row:last-child { border-bottom: none; }
+.asset-row:hover { background: var(--surface-2); }
+
+@media (max-width: 720px) {
+  .assets-controls { margin-left: 0; width: 100%; }
+  .studio-search { flex: 1 1 100%; }
+  .asset-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+  /* The row's timestamp is the first thing to go when space runs out. */
+  .asset-row { padding: 12px 14px; gap: 10px; }
+  .asset-row .asset-time { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .asset-card { transition: none; }
+  .asset-card:hover { transform: none; }
+}
+
 /* ===== Kanban board ========================================================
    One column per status, scrolling sideways when a pipeline is long. Columns
    sit a step back on --surface-2 so the cards on --surface read as the objects

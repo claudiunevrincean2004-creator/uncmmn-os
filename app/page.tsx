@@ -51,7 +51,7 @@ const PAGE_SUBTITLES: Record<MainPage, string> = {
   dashboard: 'Performance at a glance',
   content: 'Posts & analytics',
   research: 'Ideas & references',
-  drive: 'Files & folders',
+  drive: 'Files & folders · your linked Drive workspaces',
   studio: 'Review & production',
   trialreels: 'Recreate high-converting reels',
   cliplibrary: 'Clips from long-form content',

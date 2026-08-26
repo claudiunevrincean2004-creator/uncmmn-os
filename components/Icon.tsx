@@ -22,7 +22,9 @@ export type IconName =
   | 'power'       // Sign out
   | 'clock'       // Overdue
   | 'revision'    // Awaiting revision — counter-clockwise arrow
-  | 'check';      // Approved / ready to post
+  | 'check'       // Approved / ready to post
+  | 'folder'      // A linked Drive folder
+  | 'list';       // List view
 
 const PATHS: Record<IconName, ReactNode> = {
   grid: (
@@ -101,6 +103,10 @@ const PATHS: Record<IconName, ReactNode> = {
     </>
   ),
   check: <path d="m5 12.6 4.8 4.7L19 6.9" />,
+  folder: (
+    <path d="M3 7.2A2.7 2.7 0 0 1 5.7 4.5h3.1a2 2 0 0 1 1.55.74l1.05 1.3a2 2 0 0 0 1.55.74h5.35A2.7 2.7 0 0 1 21 9.98v6.32a2.7 2.7 0 0 1-2.7 2.7H5.7A2.7 2.7 0 0 1 3 16.3z" />
+  ),
+  list: <path d="M4 6.5h16M4 12h16M4 17.5h16" />,
 };
 
 export default function Icon({
