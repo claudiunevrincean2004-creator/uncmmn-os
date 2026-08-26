@@ -684,44 +684,76 @@ html, body {
   .link-field-table { width: 140px; }
 }
 
-/* ===== Studio stat pills — the compact status summary above the tabs ========= */
-.stat-pills {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+/* ===== Studio stat cards — the status summary above the tabs ================
+   Equal cards sharing the rounded-panel language of the table below them: a
+   small uppercase label with its status dot, and the count set large beneath.
+   Every colour is a theme token or the card's own status colour, so this holds
+   up in both light (aurora) and dark (midnight). */
+.studio-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
   margin-bottom: 18px;
 }
 
-.stat-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 16px;
-  border-radius: 999px;
+.studio-stat {
   background: var(--surface);
   border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 18px 20px;
+  min-width: 0;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.studio-stat:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.studio-stat-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 600;
+  color: var(--text-faint);
+  min-width: 0;
+}
+
+.studio-stat-label span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.stat-pill-dot {
+.studio-stat-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
-.stat-pill-num {
+.studio-stat-num {
   font-family: var(--font-head);
   font-variant-numeric: tabular-nums;
-  font-size: 13px;
+  font-size: 32px;
   font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
   color: var(--text);
 }
 
-.stat-pill-label {
-  font-size: 12px;
-  color: var(--text-dim);
+@media (max-width: 640px) {
+  .studio-stats {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+  }
+  .studio-stat { padding: 14px 16px; }
+  .studio-stat-num { font-size: 26px; }
 }
 
 /* ===== Studio sub-tabs — underlined text tabs =============================== */

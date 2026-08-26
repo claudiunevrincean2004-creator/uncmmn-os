@@ -10,9 +10,10 @@ import AdCreative from './studio/AdCreative';
 
 type SubTab = 'videos' | 'sequences' | 'sessions' | 'ads';
 
-// One chip in the summary row above the sub-tabs: a coloured dot, the count, and
-// a lower-case label ("6 ready to edit").
-interface StatPill { label: string; value: number; color: string }
+// One card in the summary row above the sub-tabs: a small uppercase label with
+// a coloured dot, and the count set large beneath it. `numColor` tints the
+// number itself when the count is worth flagging (overdue work in red).
+interface StatCard { label: string; value: number; color: string; numColor?: string }
 
 const SUBTABS: { key: SubTab; label: string }[] = [
   { key: 'videos', label: 'Video Review' },
@@ -60,43 +61,49 @@ export default function StudioTab({ videos, sequences, sessions, adCreatives, co
     setSub(map[deepLink.type]);
   }, [deepLink, setSub]);
 
-  // Pipeline counts for the Video Review pill row.
-  const overviewItems: StatPill[] = useMemo(() => [
-    { label: 'ready to edit', value: videos.filter(v => v.status === 'Ready to Edit').length, color: '#10b981' },
-    { label: 'in editing', value: videos.filter(v => v.status === 'Editing').length, color: '#f59e0b' },
-    { label: 'posted', value: videos.filter(v => v.status === 'Posted').length, color: '#14b8a6' },
-    { label: 'with revisions', value: videos.filter(v => (v.revision_count || 0) > 0).length, color: '#8b5cf6' },
-  ], [videos]);
+  // Video Review: what needs a human right now. Overdue = a deadline in the past
+  // on anything not yet posted. Awaiting Revision and Overdue turn their number
+  // red once there's actually something to chase — a red 0 would cry wolf.
+  const overviewItems: StatCard[] = useMemo(() => {
+    const today = todayISO();
+    const awaitingRevision = videos.filter(v => v.status === 'Revisions Needed').length;
+    const overdue = videos.filter(v => v.deadline && v.deadline.slice(0, 10) < today && v.status !== 'Posted').length;
+    return [
+      { label: 'Videos in Review', value: videos.filter(v => v.status === 'In Review').length, color: '#8b5cf6' },
+      { label: 'Awaiting Revision', value: awaitingRevision, color: '#f59e0b', numColor: awaitingRevision > 0 ? 'var(--neg)' : undefined },
+      { label: 'Overdue', value: overdue, color: '#ef4444', numColor: overdue > 0 ? 'var(--neg)' : undefined },
+    ];
+  }, [videos]);
 
   // Filming Sessions: what's still ahead to film, and what shipped this month.
-  const sessionOverviewItems: StatPill[] = useMemo(() => {
+  const sessionOverviewItems: StatCard[] = useMemo(() => {
     const month = todayISO().slice(0, 7); // YYYY-MM
     return [
-      { label: 'planned', value: sessions.filter(s => s.status === 'Planned').length, color: '#3b82f6' },
-      { label: 'ready to film', value: sessions.filter(s => s.status === 'Ready to Film').length, color: '#eab308' },
-      { label: 'filmed this month', value: sessions.filter(s => s.status === 'Filmed' && (s.date || '').slice(0, 7) === month).length, color: '#10b981' },
+      { label: 'Planned', value: sessions.filter(s => s.status === 'Planned').length, color: '#3b82f6' },
+      { label: 'Ready to Film', value: sessions.filter(s => s.status === 'Ready to Film').length, color: '#eab308' },
+      { label: 'Filmed This Month', value: sessions.filter(s => s.status === 'Filmed' && (s.date || '').slice(0, 7) === month).length, color: '#10b981' },
     ];
   }, [sessions]);
 
   // Story Sequences. "In progress" = anything not yet in a done/approved state.
   // Unknown status names simply don't match, leaving 0.
-  const sequenceOverviewItems: StatPill[] = useMemo(() => {
+  const sequenceOverviewItems: StatCard[] = useMemo(() => {
     const month = todayISO().slice(0, 7); // YYYY-MM
     const DONE = ['Approved', 'Posted'];
     return [
-      { label: 'in progress', value: sequences.filter(s => !DONE.includes(s.status)).length, color: '#8b5cf6' },
-      { label: 'approved', value: sequences.filter(s => s.status === 'Approved').length, color: '#10b981' },
-      { label: 'this month', value: sequences.filter(s => ((s.created_at || s.scheduled_date) || '').slice(0, 7) === month).length, color: '#14b8a6' },
+      { label: 'In Progress', value: sequences.filter(s => !DONE.includes(s.status)).length, color: '#8b5cf6' },
+      { label: 'Approved', value: sequences.filter(s => s.status === 'Approved').length, color: '#10b981' },
+      { label: 'This Month', value: sequences.filter(s => ((s.created_at || s.scheduled_date) || '').slice(0, 7) === month).length, color: '#14b8a6' },
     ];
   }, [sequences]);
 
   // Ad Creative, counted from real status values. Unknown status names simply
-  // don't match, leaving the relevant pill at 0.
-  const adOverviewItems: StatPill[] = useMemo(() => [
-    { label: 'ready for review', value: adCreatives.filter(a => a.status === 'Ready for Review').length, color: '#eab308' },
-    { label: 'testing', value: adCreatives.filter(a => a.status === 'Testing').length, color: '#8b5cf6' },
-    { label: 'winners', value: adCreatives.filter(a => a.status === 'Winner').length, color: '#10b981' },
-    { label: 'total creatives', value: adCreatives.length, color: '#6b7280' },
+  // don't match, leaving the relevant card at 0.
+  const adOverviewItems: StatCard[] = useMemo(() => [
+    { label: 'Ready for Review', value: adCreatives.filter(a => a.status === 'Ready for Review').length, color: '#eab308' },
+    { label: 'Testing', value: adCreatives.filter(a => a.status === 'Testing').length, color: '#8b5cf6' },
+    { label: 'Winners', value: adCreatives.filter(a => a.status === 'Winner').length, color: '#10b981' },
+    { label: 'Total Creatives', value: adCreatives.length, color: '#6b7280' },
   ], [adCreatives]);
 
   const activeOverview =
@@ -107,13 +114,15 @@ export default function StudioTab({ videos, sequences, sessions, adCreatives, co
 
   return (
     <div style={{ position: 'relative' }}>
-      {/* Status summary — compact pills, one per meaningful state of the active tab */}
-      <div className="stat-pills">
+      {/* Status summary — one card per meaningful state of the active tab */}
+      <div className="studio-stats">
         {activeOverview.map(item => (
-          <div key={item.label} className="stat-pill">
-            <span className="stat-pill-dot" style={{ background: item.color }} />
-            <span className="stat-pill-num">{item.value}</span>
-            <span className="stat-pill-label">{item.label}</span>
+          <div key={item.label} className="studio-stat">
+            <div className="studio-stat-label">
+              <span className="studio-stat-dot" style={{ background: item.color }} />
+              <span>{item.label}</span>
+            </div>
+            <div className="studio-stat-num" style={item.numColor ? { color: item.numColor } : undefined}>{item.value}</div>
           </div>
         ))}
       </div>
