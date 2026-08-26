@@ -7,7 +7,6 @@ import PlatformIcon from '@/components/PlatformIcon';
 import PostModal from '@/components/modals/PostModal';
 import { usePersistedState } from '@/lib/use-persisted-state';
 import ViewsOverTime from '@/components/ViewsOverTime';
-import OutlierCard from '@/components/OutlierCard';
 
 type SortKey = 'date' | 'views' | 'likes' | 'comments' | 'shares' | 'saves' | 'follows' | 'er';
 type SortDir = 'asc' | 'desc';
@@ -384,8 +383,37 @@ export default function ContentTab({ client, posts, subscriberSnapshots, onReloa
         {outliers.length === 0 ? (
           <div style={{ color: 'var(--text-faint)', fontSize: 12 }}>No outlier posts in this period.</div>
         ) : (
-          <div className="outlier-grid">
-            {outliers.map(p => <OutlierCard key={p.id} post={p} multiple={p.multiple} />)}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+            {outliers.map(p => {
+              const link = p.post_url || p.drive_link;
+              return (
+                <div
+                  key={p.id}
+                  style={{ background: 'var(--surface-2)', border: '0.5px solid var(--border)', borderRadius: 8, padding: 12, cursor: link ? 'pointer' : 'default', position: 'relative', transition: 'border-color 0.15s' }}
+                  onClick={() => { if (link) window.open(link, '_blank', 'noopener,noreferrer'); }}
+                  onMouseEnter={e => { if (link) e.currentTarget.style.borderColor = 'var(--text-faint)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                    <span className="badge badge-outlier">{p.multiple.toFixed(1)}x</span>
+                    <PlatformIcon platform={p.platform} size={14} />
+                  </div>
+                  <div style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3, marginBottom: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                    {[
+                      { l: 'Views', v: fn(p.views) },
+                      { l: 'Likes', v: fn(p.likes) },
+                      { l: 'ER%', v: `${er(p).toFixed(1)}%` },
+                    ].map(m => (
+                      <div key={m.l}>
+                        <div style={{ fontSize: 9, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{m.l}</div>
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>{m.v}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
