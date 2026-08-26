@@ -724,6 +724,12 @@ html, body {
   margin-bottom: 18px;
 }
 
+/* A lone card keeps a card's width on the left instead of spanning the row. */
+.studio-stats.is-single {
+  grid-template-columns: minmax(190px, 240px);
+  justify-content: start;
+}
+
 .studio-stat {
   display: flex;
   align-items: center;
@@ -1098,6 +1104,96 @@ html, body {
 
 .idea-reason.is-bare { margin-left: auto; }
 
+/* Editable form: reads as a chip you can press, not as a static label. */
+.idea-reason.is-editable {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-ui);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 2px 7px;
+  margin: -2px 0 0 -7px;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.idea-reason.is-editable:hover,
+.idea-reason.is-editable:focus-visible {
+  background: color-mix(in srgb, var(--reason-color) 12%, transparent);
+  border-color: color-mix(in srgb, var(--reason-color) 38%, transparent);
+  outline: none;
+}
+
+.idea-reason-caret {
+  font-size: 8px;
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.idea-reason.is-editable:hover .idea-reason-caret,
+.idea-reason.is-editable:focus-visible .idea-reason-caret { opacity: 0.8; }
+
+/* No hover on touch — show the affordance at rest. */
+@media (hover: none) {
+  .idea-reason.is-editable { border-color: color-mix(in srgb, var(--reason-color) 32%, transparent); }
+  .idea-reason-caret { opacity: 0.8; }
+}
+
+/* Portalled to <body>: the card clips its own overflow, and a later sibling
+   card would otherwise paint over a menu rendered inside this one. */
+.idea-reason-menu {
+  position: fixed;
+  z-index: 3000;
+  width: 186px;
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  animation: fadeIn 0.12s ease;
+}
+
+.idea-reason-menu button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.idea-reason-menu button:hover { background: var(--surface-2); color: var(--text); }
+
+.idea-reason-menu button.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.idea-reason-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--reason-color, var(--accent));
+}
+
 .idea-note {
   min-width: 0;
   font-size: 12px;
@@ -1149,31 +1245,6 @@ html, body {
 }
 
 .idea-open:hover { color: var(--accent); background: var(--accent-soft); }
-
-/* "→ Use" — advances the idea one step along the pipeline. */
-.idea-use {
-  flex-shrink: 0;
-  font-family: var(--font-ui);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--accent);
-  background: var(--accent-soft);
-  border: 1px solid transparent;
-  border-radius: 8px;
-  padding: 5px 12px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
-}
-
-/* Without a source link there's no ↗ to push Use rightwards. */
-.idea-saved + .idea-use { margin-left: auto; }
-
-.idea-use:hover {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
 
 /* Add-idea form */
 .idea-form {

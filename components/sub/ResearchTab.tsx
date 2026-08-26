@@ -1,5 +1,6 @@
 'use client';
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabase';
 import { Client, ResearchItem, ResearchStatus, StudioComment, StudioActivity, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
@@ -67,13 +68,6 @@ const STATUS_COLORS: Record<ResearchStatus, string> = {
   progress: '#f59e0b',
   used: '#10b981',
 };
-// The "→ Use" button walks an idea along the pipeline.
-const NEXT_STATUS: Record<ResearchStatus, ResearchStatus> = {
-  unused: 'progress',
-  progress: 'used',
-  used: 'unused',
-};
-
 // Known platforms get their monogram and brand tint; anything else falls back to
 // the first two letters of its domain.
 const PLATFORMS: { match: RegExp; code: string; color: string }[] = [
@@ -137,6 +131,25 @@ export default function ResearchTab({ client, items, comments, activity, profile
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // Reasons changed from a card, held until the reloaded row agrees.
+  const [reasonOverride, setReasonOverride] = useState<Record<string, string>>({});
+
+  // Retire an override once the real row catches up (or the row disappears).
+  useEffect(() => {
+    setReasonOverride(prev => {
+      const keys = Object.keys(prev);
+      if (keys.length === 0) return prev;
+      const byId = new Map(clientItems.map(i => [i.id, i.reason ?? '']));
+      const next: Record<string, string> = {};
+      for (const id of keys) {
+        const real = byId.get(id);
+        if (real !== undefined && real !== prev[id]) next[id] = prev[id];
+      }
+      return Object.keys(next).length === keys.length ? prev : next;
+    });
+  }, [clientItems]);
+
+  const effectiveReason = (item: ResearchItem) => reasonOverride[item.id] ?? item.reason ?? '';
 
   // Every reason actually in use, so legacy values stay reachable in the filter.
   const reasonOptions = useMemo(
@@ -165,13 +178,8 @@ export default function ResearchTab({ client, items, comments, activity, profile
       });
   }, [clientItems, query, reasonFilter, statusFilter]);
 
-  // Counts for the stat row — off the FULL set, not the filtered one.
-  const stats = useMemo(() => ({
-    total: clientItems.length,
-    unused: clientItems.filter(i => i.status === 'unused').length,
-    progress: clientItems.filter(i => i.status === 'progress').length,
-    used: clientItems.filter(i => i.status === 'used').length,
-  }), [clientItems]);
+  // Total is counted off the FULL set, not the filtered one.
+  const totalIdeas = clientItems.length;
 
   function showToast(msg: string) {
     setToast(msg);
@@ -220,7 +228,29 @@ export default function ResearchTab({ client, items, comments, activity, profile
     onReload();
   }
 
-  /** Status change with its activity-log entry — the panel, Use and drag all use this. */
+  /**
+   * Reason change from a grid card's chip. Optimistic: the card re-tints at
+   * once and reverts if the write fails, so the accent bar never shows a colour
+   * the database doesn't agree with.
+   */
+  async function changeReason(item: ResearchItem, next: string) {
+    if (next === (item.reason ?? '')) return;
+    setReasonOverride(o => ({ ...o, [item.id]: next }));
+    const { error } = await supabase.from('research_items').update({ reason: next }).eq('id', item.id);
+    if (error) {
+      setReasonOverride(o => {
+        const copy = { ...o };
+        delete copy[item.id];
+        return copy;
+      });
+      console.error('[ResearchTab] failed to change reason', { id: item.id, next, error });
+      alert(`Couldn't change reason: ${error.message}`);
+      return;
+    }
+    onReload();
+  }
+
+  /** Status change with its activity-log entry — the panel and drag both use this. */
   async function changeStatus(item: ResearchItem, status: ResearchStatus) {
     if (status === item.status) return;
     await logActivity(ITEM_TYPE, item.id, 'Status changed', STATUS_LABELS[item.status], STATUS_LABELS[status]);
@@ -257,27 +287,19 @@ export default function ResearchTab({ client, items, comments, activity, profile
     [filtered],
   );
 
-  const statCards = [
-    { label: 'Total Ideas', value: stats.total, color: '#6366f1', icon: 'stack' as const },
-    { label: 'Unused', value: stats.unused, color: STATUS_COLORS.unused, icon: 'search' as const },
-    { label: 'In Progress', value: stats.progress, color: STATUS_COLORS.progress, icon: 'revision' as const },
-    { label: 'Used', value: stats.used, color: STATUS_COLORS.used, icon: 'check' as const },
-  ];
-
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        {/* Stat cards — the same shell the Studio summary uses. */}
-        <div className="studio-stats">
-          {statCards.map(s => (
-            <div key={s.label} className="studio-stat" style={{ '--stat-color': s.color } as React.CSSProperties}>
-              <span className="studio-stat-icon"><Icon name={s.icon} size={19} /></span>
-              <div className="studio-stat-body">
-                <div className="studio-stat-label">{s.label}</div>
-                <div className="studio-stat-num">{s.value}</div>
-              </div>
+        {/* One stat card, in the same shell the Studio summary uses. is-single
+            keeps it card-width on the left rather than stretching the row. */}
+        <div className="studio-stats is-single">
+          <div className="studio-stat" style={{ '--stat-color': '#6366f1' } as React.CSSProperties}>
+            <span className="studio-stat-icon"><Icon name="stack" size={19} /></span>
+            <div className="studio-stat-body">
+              <div className="studio-stat-label">Total Ideas</div>
+              <div className="studio-stat-num">{totalIdeas}</div>
             </div>
-          ))}
+          </div>
         </div>
 
         {/* Filter bar — search · reasons · status · view · add, one line. */}
@@ -295,11 +317,13 @@ export default function ResearchTab({ client, items, comments, activity, profile
           </div>
 
           <div className="studio-filters">
-            <select className="form-input" value={reasonFilter} onChange={e => setReasonFilter(e.target.value)} aria-label="Filter by reason">
+            {/* width:auto matters — .form-input sets width:100%, and a bare
+                select without this override blows the toolbar onto three rows. */}
+            <select className="form-input" style={{ width: 'auto' }} value={reasonFilter} onChange={e => setReasonFilter(e.target.value)} aria-label="Filter by reason">
               <option value="All">All reasons</option>
               {reasonOptions.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
-            <select className="form-input" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Filter by status">
+            <select className="form-input" style={{ width: 'auto' }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Filter by status">
               <option value="All">All status</option>
               {STATUS_ORDER.map(s => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
             </select>
@@ -397,8 +421,10 @@ export default function ResearchTab({ client, items, comments, activity, profile
               <IdeaCard
                 key={item.id}
                 item={item}
+                reason={effectiveReason(item)}
+                reasonOptions={REASONS}
                 onOpen={() => setSelectedId(item.id)}
-                onUse={() => changeStatus(item, NEXT_STATUS[item.status])}
+                onChangeReason={r => changeReason(item, r)}
               />
             ))}
           </div>
@@ -443,9 +469,115 @@ export default function ResearchTab({ client, items, comments, activity, profile
   );
 }
 
+/**
+ * The reason chip, editable in place. The menu is portalled to <body> so the
+ * card's `overflow: hidden` can't clip it and a later sibling card can't paint
+ * over it. Every click inside stops propagating — React routes portal events
+ * through the React tree, so without that a pick would also open the panel.
+ */
+function ReasonPicker({
+  value, options, onPick,
+}: {
+  value: string;
+  options: string[];
+  onPick: (reason: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  const color = reasonColor(value);
+
+  // Anchor under the chip, and keep it there while the page moves.
+  useEffect(() => {
+    if (!open) { setPos(null); return; }
+    const place = () => {
+      const r = btnRef.current?.getBoundingClientRect();
+      if (!r) return;
+      setPos({ left: Math.min(r.left, window.innerWidth - 196), top: r.bottom + 6 });
+    };
+    place();
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
+    return () => {
+      window.removeEventListener('scroll', place, true);
+      window.removeEventListener('resize', place);
+    };
+  }, [open]);
+
+  // Dismiss on an outside click or Escape.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (btnRef.current?.contains(t) || popRef.current?.contains(t)) return;
+      setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDown, true);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown, true);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        className="idea-reason is-editable"
+        style={{ '--reason-color': color } as React.CSSProperties}
+        title="Change reason"
+        onClick={e => { e.stopPropagation(); setOpen(o => !o); }}
+        onMouseDown={stop}
+        onKeyDown={stop}
+      >
+        {value || 'Reason'}
+        <span className="idea-reason-caret" aria-hidden>▾</span>
+      </button>
+
+      {open && pos && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={popRef}
+          className="idea-reason-menu"
+          style={{ left: pos.left, top: pos.top }}
+          onClick={stop}
+          onMouseDown={stop}
+        >
+          {options.map(o => (
+            <button
+              key={o}
+              type="button"
+              className={o === value ? 'active' : undefined}
+              style={{ '--reason-color': reasonColor(o) } as React.CSSProperties}
+              onClick={e => { e.stopPropagation(); setOpen(false); onPick(o); }}
+            >
+              <span className="idea-reason-swatch" aria-hidden />
+              {o}
+            </button>
+          ))}
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
+
 /** Grid card — accent bar tinted by reason, per the reference. */
-function IdeaCard({ item, onOpen, onUse }: { item: ResearchItem; onOpen: () => void; onUse: () => void }) {
-  const rColor = reasonColor(item.reason);
+function IdeaCard({
+  item, reason, reasonOptions, onOpen, onChangeReason,
+}: {
+  item: ResearchItem;
+  reason: string;
+  reasonOptions: string[];
+  onOpen: () => void;
+  onChangeReason: (reason: string) => void;
+}) {
+  const rColor = reasonColor(reason);
   const status = item.status;
   const source = item.content?.trim() || '';
   const sourceIsUrl = isUrl(source);
@@ -469,12 +601,10 @@ function IdeaCard({ item, onOpen, onUse }: { item: ResearchItem; onOpen: () => v
 
       <div className="idea-title">{item.title || 'Untitled'}</div>
 
-      {(item.reason || item.note) && (
-        <div className="idea-body">
-          {item.reason && <span className="idea-reason">{item.reason}</span>}
-          {item.note && <span className="idea-note">{item.note}</span>}
-        </div>
-      )}
+      <div className="idea-body">
+        <ReasonPicker value={reason} options={reasonOptions} onPick={onChangeReason} />
+        {item.note && <span className="idea-note">{item.note}</span>}
+      </div>
 
       <div className="idea-foot">
         <span className="idea-saved">{item.created_at ? `Saved ${shortDate(item.created_at)}` : ''}</span>
@@ -488,11 +618,6 @@ function IdeaCard({ item, onOpen, onUse }: { item: ResearchItem; onOpen: () => v
             onClick={e => e.stopPropagation()}
           >↗</a>
         )}
-        <button
-          className="idea-use"
-          onClick={e => { e.stopPropagation(); onUse(); }}
-          title={`Move to ${STATUS_LABELS[NEXT_STATUS[status]]}`}
-        >→ Use</button>
       </div>
     </div>
   );
