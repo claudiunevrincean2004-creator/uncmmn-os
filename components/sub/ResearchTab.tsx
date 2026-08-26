@@ -303,7 +303,7 @@ export default function ResearchTab({ client, items, comments, activity, profile
         </div>
 
         {/* Filter bar — search · reasons · status · view · add, one line. */}
-        <div className="studio-toolbar">
+        <div className="studio-toolbar research-toolbar">
           <div className="studio-search">
             <span className="studio-search-icon" aria-hidden>⌕</span>
             <input

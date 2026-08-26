@@ -956,6 +956,13 @@ html, body {
 }
 
 /* ===== Research — the swipe file =========================================== */
+
+/* Research cards carry more visual weight than a table's first row, so the
+   filter bar needs a clear section break beneath it — in both views. */
+.research-toolbar {
+  margin-bottom: 28px;
+}
+
 .idea-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -2162,34 +2169,11 @@ html, body {
   color: var(--accent);
 }
 
-/* ===== Sidebar wordmark — star + "uncmmn" + OS badge ======================== */
+/* ===== Sidebar mark — the star on its own, no wordmark ====================== */
 .logo-lockup {
   display: flex;
   align-items: center;
-  gap: 8px;
   min-width: 0;
-}
-
-.logo-word {
-  font-family: var(--font-head);
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1;
-  color: var(--text);
-}
-
-.logo-badge {
-  font-family: var(--font-ui);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  line-height: 1;
-  color: var(--accent);
-  background: var(--accent-soft);
-  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
-  border-radius: 6px;
-  padding: 3px 5px;
 }
 
 /* Modal overlay */
