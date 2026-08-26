@@ -347,7 +347,7 @@ export function MaybeUrl({ value }: { value?: string | null }) {
   if (!value) return <span style={{ color: 'var(--text-faint)' }}>—</span>;
   if (isHttpUrl(value)) {
     return (
-      <a href={value} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={value}>
+      <a className="link-anim" href={value} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={value}>
         {shortUrl(value)}
       </a>
     );
@@ -431,6 +431,7 @@ function LinkEditable({
           ? <span className="link-text">{value}</span>
           : (
             <a
+              className="link-anim"
               href={value}
               target="_blank"
               rel="noopener noreferrer"

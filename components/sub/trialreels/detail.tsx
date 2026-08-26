@@ -27,7 +27,7 @@ export function DetailLink({ label, value }: { label: string; value?: string | n
       <div style={{ flex: 1, minWidth: 0, textAlign: 'right' }}>
         {value
           ? (isHttpUrl(value)
-              ? <a href={value} target="_blank" rel="noopener noreferrer" title={value} style={{ display: 'inline-block', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'bottom', fontSize: 12, color: 'var(--accent)', textDecoration: 'none' }}>{shortUrl(value, 46)}</a>
+              ? <a className="link-anim" href={value} target="_blank" rel="noopener noreferrer" title={value} style={{ display: 'inline-block', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'bottom', fontSize: 12, color: 'var(--accent)' }}>{shortUrl(value, 46)}</a>
               : <span title={value} style={{ fontSize: 12, color: 'var(--text-dim)', wordBreak: 'break-word' }}>{value}</span>)
           : <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>—</span>}
       </div>

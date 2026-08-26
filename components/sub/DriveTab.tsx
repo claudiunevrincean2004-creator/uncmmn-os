@@ -221,7 +221,7 @@ export default function DriveTab({ client, driveFolders, onReload }: Props) {
                             {/* created_at, not an updated_at — see timeAgo(). */}
                             <span className="asset-time">{added ? `Added ${added}` : ''}</span>
                             {f.url
-                              ? <a className="asset-open" href={f.url} target="_blank" rel="noopener noreferrer">Open in Drive <span aria-hidden>→</span></a>
+                              ? <a className="asset-open link-anim" href={f.url} target="_blank" rel="noopener noreferrer">Open in Drive <span aria-hidden>→</span></a>
                               : <span className="asset-nourl">No URL set</span>}
                           </div>
                         </div>
@@ -241,7 +241,7 @@ export default function DriveTab({ client, driveFolders, onReload }: Props) {
                           </div>
                           <span className="asset-time">{added ?? ''}</span>
                           {f.url
-                            ? <a className="asset-open" href={f.url} target="_blank" rel="noopener noreferrer">Open <span aria-hidden>↗</span></a>
+                            ? <a className="asset-open link-anim" href={f.url} target="_blank" rel="noopener noreferrer">Open <span aria-hidden>↗</span></a>
                             : <span className="asset-nourl">No URL</span>}
                           <RowActions folder={f} />
                         </div>

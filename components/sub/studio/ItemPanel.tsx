@@ -105,14 +105,14 @@ function FieldControl({ field, values, onChangeField, onAddOption, profiles }: {
       return <UrlCell value={value || undefined} onCommit={v => onChangeField(field.key, v)} variant="panel" />;
     case 'readonly-url':
       return value
-        ? <a href={value} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontSize: 12, wordBreak: 'break-all' }}>{value} ↗</a>
+        ? <a className="link-anim" href={value} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', fontSize: 12, wordBreak: 'break-all' }}>{value} ↗</a>
         : <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>—</span>;
     case 'readonly-url-short':
       // Clickable link showing the actual URL truncated to domain + start of path
       // (e.g. "drive.google.com/file/d/1rhPEx…"); plain text for a bare filename.
       return value
         ? (isHttpUrl(value)
-            ? <a href={value} target="_blank" rel="noopener noreferrer" title={value} style={{ display: 'inline-block', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'bottom', color: 'var(--accent)', textDecoration: 'none', fontSize: 12 }}>{shortUrl(value, 46)}</a>
+            ? <a className="link-anim" href={value} target="_blank" rel="noopener noreferrer" title={value} style={{ display: 'inline-block', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'bottom', color: 'var(--accent)', fontSize: 12 }}>{shortUrl(value, 46)}</a>
             : <span style={{ color: 'var(--text-dim)', fontSize: 12, wordBreak: 'break-word' }} title={value}>{value}</span>)
         : <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>—</span>;
     case 'maybe-url':

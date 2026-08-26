@@ -564,13 +564,10 @@ html, body {
   font-size: inherit;
 }
 
+/* The underline itself comes from .link-anim on the anchor. */
 .link-field a {
   color: var(--accent);
   text-decoration: none;
-}
-
-.link-field a:hover {
-  text-decoration: underline;
 }
 
 .link-field .link-text { color: var(--text-dim); }
@@ -1501,7 +1498,7 @@ html, body {
   white-space: nowrap;
 }
 
-.asset-open:hover { text-decoration: underline; }
+/* Hover underline comes from .link-anim on the anchor. */
 
 .asset-nourl {
   font-size: 11px;
@@ -2226,6 +2223,60 @@ input[type='datetime-local']::-moz-calendar-picker-indicator {
 
 input[type='date'] {
   cursor: pointer;
+}
+
+/* ===== Animated link underline ==============================================
+   Opt-in via .link-anim, so it lands on real text links (url chips, source
+   links, linkified comment urls) and never on the buttons, nav items or tabs
+   that happen to be anchors — those keep their own hover styling.
+
+   The line is a ::after pinned to the bottom of the link in the link's own
+   colour, scaled to 0 across the x-axis. On hover the origin is the left edge so
+   it sweeps in; at rest the origin is the right edge, so letting go retracts it
+   the way it came rather than snapping back.
+
+   bottom:0 rather than a negative offset on purpose: several of these links sit
+   in flex rows with overflow:hidden for their ellipsis, which would clip a line
+   drawn outside the content box. */
+.link-anim {
+  --link-hover-color: color-mix(in srgb, var(--accent) 80%, var(--text));
+  position: relative;
+  text-decoration: none;
+  transition: color 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.link-anim::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.55;
+  pointer-events: none;
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.link-anim:hover,
+.link-anim:focus-visible {
+  color: var(--link-hover-color);
+  text-decoration: none;
+  outline: none;
+}
+
+.link-anim:hover::after,
+.link-anim:focus-visible::after {
+  transform: scaleX(1);
+  transform-origin: left;
+}
+
+/* No sweep for anyone who asked for less motion — just the underline. */
+@media (prefers-reduced-motion: reduce) {
+  .link-anim,
+  .link-anim::after { transition: none; }
 }
 
 /* Form inputs */

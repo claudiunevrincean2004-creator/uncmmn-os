@@ -38,7 +38,8 @@ export default function CommentText({
               rel="noopener noreferrer"
               // Long URLs are common in comments and the panel is narrow, so let
               // one wrap mid-string rather than push the column wide.
-              style={{ color: 'var(--accent)', textDecoration: 'underline', overflowWrap: 'anywhere' }}
+              className="link-anim"
+              style={{ color: 'var(--accent)', overflowWrap: 'anywhere' }}
             >
               {part.text}
             </a>

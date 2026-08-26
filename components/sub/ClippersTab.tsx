@@ -473,7 +473,7 @@ function ClipperDashboard({ clipper, accounts, content, onBack, onReload }: {
                         <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {capPlatform(a.platform)} {a.handle && <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>· {a.handle}</span>}
                         </div>
-                        {a.account_url && <a href={a.account_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, color: 'var(--accent)', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{a.account_url} ↗</a>}
+                        {a.account_url && <a className="link-anim" href={a.account_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, color: 'var(--accent)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{a.account_url} ↗</a>}
                       </div>
                       <span className="badge" style={{ fontSize: 9, flexShrink: 0, ...(aActive ? { background: 'rgba(16,185,129,0.15)', color: '#10b981' } : { background: 'rgba(107,114,128,0.18)', color: 'var(--text-faint)' }) }}>{aActive ? 'Active' : 'Inactive'}</span>
                       <button className="btn-ghost" style={{ fontSize: 10, padding: '2px 8px', flexShrink: 0 }} onClick={() => setEditingAccount(a)}>Edit</button>
