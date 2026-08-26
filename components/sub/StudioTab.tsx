@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { todayISO } from '@/lib/studio';
+import Icon, { type IconName } from '@/components/Icon';
 import VideoReview from './studio/VideoReview';
 import StorySequences from './studio/StorySequences';
 import FilmingSessions from './studio/FilmingSessions';
@@ -10,10 +11,11 @@ import AdCreative from './studio/AdCreative';
 
 type SubTab = 'videos' | 'sequences' | 'sessions' | 'ads';
 
-// One card in the summary row above the sub-tabs: a small uppercase label with
-// a coloured dot, and the count set large beneath it. `numColor` tints the
-// number itself when the count is worth flagging (overdue work in red).
-interface StatCard { label: string; value: number; color: string; numColor?: string }
+// One card in the summary row above the sub-tabs: a colour-tinted icon tile on
+// the left, then the uppercase label with the count set large beneath it.
+// `color` drives BOTH the tile tint and its glyph; `numColor` tints the number
+// itself when the count is worth flagging (overdue work in red).
+interface StatCard { label: string; value: number; color: string; icon: IconName; numColor?: string }
 
 const SUBTABS: { key: SubTab; label: string }[] = [
   { key: 'videos', label: 'Video Review' },
@@ -69,9 +71,9 @@ export default function StudioTab({ videos, sequences, sessions, adCreatives, co
     const awaitingRevision = videos.filter(v => v.status === 'Revisions Needed').length;
     const overdue = videos.filter(v => v.deadline && v.deadline.slice(0, 10) < today && v.status !== 'Posted').length;
     return [
-      { label: 'Videos in Review', value: videos.filter(v => v.status === 'In Review').length, color: '#8b5cf6' },
-      { label: 'Awaiting Revision', value: awaitingRevision, color: '#f59e0b', numColor: awaitingRevision > 0 ? 'var(--neg)' : undefined },
-      { label: 'Overdue', value: overdue, color: '#ef4444', numColor: overdue > 0 ? 'var(--neg)' : undefined },
+      { label: 'Videos in Review', value: videos.filter(v => v.status === 'In Review').length, color: '#3b82f6', icon: 'search' },
+      { label: 'Awaiting Revision', value: awaitingRevision, color: '#f59e0b', icon: 'revision', numColor: awaitingRevision > 0 ? 'var(--neg)' : undefined },
+      { label: 'Overdue', value: overdue, color: '#ef4444', icon: 'clock', numColor: overdue > 0 ? 'var(--neg)' : undefined },
     ];
   }, [videos]);
 
@@ -79,9 +81,9 @@ export default function StudioTab({ videos, sequences, sessions, adCreatives, co
   const sessionOverviewItems: StatCard[] = useMemo(() => {
     const month = todayISO().slice(0, 7); // YYYY-MM
     return [
-      { label: 'Planned', value: sessions.filter(s => s.status === 'Planned').length, color: '#3b82f6' },
-      { label: 'Ready to Film', value: sessions.filter(s => s.status === 'Ready to Film').length, color: '#eab308' },
-      { label: 'Filmed This Month', value: sessions.filter(s => s.status === 'Filmed' && (s.date || '').slice(0, 7) === month).length, color: '#10b981' },
+      { label: 'Planned', value: sessions.filter(s => s.status === 'Planned').length, color: '#3b82f6', icon: 'document' },
+      { label: 'Ready to Film', value: sessions.filter(s => s.status === 'Ready to Film').length, color: '#eab308', icon: 'film' },
+      { label: 'Filmed This Month', value: sessions.filter(s => s.status === 'Filmed' && (s.date || '').slice(0, 7) === month).length, color: '#10b981', icon: 'check' },
     ];
   }, [sessions]);
 
@@ -91,19 +93,19 @@ export default function StudioTab({ videos, sequences, sessions, adCreatives, co
     const month = todayISO().slice(0, 7); // YYYY-MM
     const DONE = ['Approved', 'Posted'];
     return [
-      { label: 'In Progress', value: sequences.filter(s => !DONE.includes(s.status)).length, color: '#8b5cf6' },
-      { label: 'Approved', value: sequences.filter(s => s.status === 'Approved').length, color: '#10b981' },
-      { label: 'This Month', value: sequences.filter(s => ((s.created_at || s.scheduled_date) || '').slice(0, 7) === month).length, color: '#14b8a6' },
+      { label: 'In Progress', value: sequences.filter(s => !DONE.includes(s.status)).length, color: '#8b5cf6', icon: 'playSquare' },
+      { label: 'Approved', value: sequences.filter(s => s.status === 'Approved').length, color: '#10b981', icon: 'check' },
+      { label: 'This Month', value: sequences.filter(s => ((s.created_at || s.scheduled_date) || '').slice(0, 7) === month).length, color: '#14b8a6', icon: 'clock' },
     ];
   }, [sequences]);
 
   // Ad Creative, counted from real status values. Unknown status names simply
   // don't match, leaving the relevant card at 0.
   const adOverviewItems: StatCard[] = useMemo(() => [
-    { label: 'Ready for Review', value: adCreatives.filter(a => a.status === 'Ready for Review').length, color: '#eab308' },
-    { label: 'Testing', value: adCreatives.filter(a => a.status === 'Testing').length, color: '#8b5cf6' },
-    { label: 'Winners', value: adCreatives.filter(a => a.status === 'Winner').length, color: '#10b981' },
-    { label: 'Total Creatives', value: adCreatives.length, color: '#6b7280' },
+    { label: 'Ready for Review', value: adCreatives.filter(a => a.status === 'Ready for Review').length, color: '#eab308', icon: 'search' },
+    { label: 'Testing', value: adCreatives.filter(a => a.status === 'Testing').length, color: '#8b5cf6', icon: 'film' },
+    { label: 'Winners', value: adCreatives.filter(a => a.status === 'Winner').length, color: '#10b981', icon: 'check' },
+    { label: 'Total Creatives', value: adCreatives.length, color: '#6b7280', icon: 'grid' },
   ], [adCreatives]);
 
   const activeOverview =
@@ -114,15 +116,17 @@ export default function StudioTab({ videos, sequences, sessions, adCreatives, co
 
   return (
     <div style={{ position: 'relative' }}>
-      {/* Status summary — one card per meaningful state of the active tab */}
+      {/* Status summary — one card per meaningful state of the active tab. The
+          card's status colour rides down as --stat-color, which tints both the
+          icon tile and its glyph. */}
       <div className="studio-stats">
         {activeOverview.map(item => (
-          <div key={item.label} className="studio-stat">
-            <div className="studio-stat-label">
-              <span className="studio-stat-dot" style={{ background: item.color }} />
-              <span>{item.label}</span>
+          <div key={item.label} className="studio-stat" style={{ '--stat-color': item.color } as React.CSSProperties}>
+            <span className="studio-stat-icon"><Icon name={item.icon} size={19} /></span>
+            <div className="studio-stat-body">
+              <div className="studio-stat-label">{item.label}</div>
+              <div className="studio-stat-num" style={item.numColor ? { color: item.numColor } : undefined}>{item.value}</div>
             </div>
-            <div className="studio-stat-num" style={item.numColor ? { color: item.numColor } : undefined}>{item.value}</div>
           </div>
         ))}
       </div>

@@ -3,22 +3,26 @@ import { MainPage } from '@/lib/types';
 import { Role, canAccess } from '@/lib/auth-config';
 import StarLogo from '@/components/StarLogo';
 import Avatar from '@/components/Avatar';
+import Icon, { type IconName } from '@/components/Icon';
 
 interface NavItem {
   key: MainPage;
   label: string;
-  icon: string;
+  icon: IconName;
 }
 
+// One line-icon per destination, drawn from the shared set so the column reads
+// as a single family. They stroke in currentColor, so an active item's glyph
+// turns --accent along with its label.
 const NAV: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: '◎' },
-  { key: 'content', label: 'Content', icon: '▦' },
-  { key: 'research', label: 'Research', icon: '✦' },
-  { key: 'studio', label: 'Studio', icon: '◈' },
-  { key: 'trialreels', label: 'Trial Reels', icon: '↻' },
-  { key: 'cliplibrary', label: 'Clip Library', icon: '▧' },
-  { key: 'drive', label: 'Assets', icon: '▤' },
-  { key: 'clippers', label: 'Clippers', icon: '✂' },
+  { key: 'dashboard', label: 'Dashboard', icon: 'grid' },
+  { key: 'content', label: 'Content', icon: 'document' },
+  { key: 'research', label: 'Research', icon: 'search' },
+  { key: 'studio', label: 'Studio', icon: 'playSquare' },
+  { key: 'trialreels', label: 'Trial Reels', icon: 'film' },
+  { key: 'cliplibrary', label: 'Clip Library', icon: 'stack' },
+  { key: 'drive', label: 'Assets', icon: 'archive' },
+  { key: 'clippers', label: 'Clippers', icon: 'scissors' },
 ];
 
 interface Props {
@@ -125,7 +129,7 @@ export default function Sidebar({ activeMP, collapsed, role, userName, unreadCou
             title={item.label}
             style={collapsed ? { justifyContent: 'center', padding: '8px 0' } : undefined}
           >
-            <span style={{ fontSize: 13 }}>{item.icon}</span>
+            <Icon name={item.icon} size={17} />
             {!collapsed && <span>{item.label}</span>}
           </div>
         ))}
@@ -140,7 +144,7 @@ export default function Sidebar({ activeMP, collapsed, role, userName, unreadCou
           title={unreadCount > 0 ? `Inbox — ${unreadCount} unread` : 'Inbox'}
           style={collapsed ? { justifyContent: 'center', padding: '8px 0', position: 'relative' } : { position: 'relative' }}
         >
-          <span style={{ fontSize: 13 }}>✉</span>
+          <Icon name="mail" size={17} />
           {!collapsed && <span>Inbox</span>}
           {!collapsed && <div style={{ flex: 1 }} />}
           <UnreadBadge count={unreadCount} dot={collapsed} />
@@ -160,7 +164,7 @@ export default function Sidebar({ activeMP, collapsed, role, userName, unreadCou
           title="Sign out"
           style={collapsed ? { justifyContent: 'center', padding: '8px 0' } : undefined}
         >
-          <span style={{ fontSize: 13 }}>⏻</span>
+          <Icon name="power" size={17} />
           {!collapsed && <span>Sign out</span>}
         </div>
         <div style={{ fontSize: 10, color: 'var(--text-faint)', textAlign: collapsed ? 'center' : undefined, padding: collapsed ? 0 : '0 2px' }}>v1.0.0</div>

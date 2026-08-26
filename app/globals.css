@@ -703,11 +703,14 @@ html, body {
 }
 
 .studio-stat {
+  display: flex;
+  align-items: center;
+  gap: 14px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 16px;
   box-shadow: var(--shadow);
-  padding: 18px 20px;
+  padding: 16px 18px;
   min-width: 0;
   transition: transform 160ms ease, box-shadow 160ms ease;
 }
@@ -717,30 +720,39 @@ html, body {
   box-shadow: var(--shadow-lg);
 }
 
-.studio-stat-label {
-  display: flex;
+/* Tinted icon tile. Both the wash and the glyph come from the card's own
+   --stat-color, so one value per card keeps them in step; the dark theme takes
+   a stronger wash because a 14% tint disappears on a dark surface. */
+.studio-stat-icon {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  flex-shrink: 0;
+  color: var(--stat-color, var(--accent));
+  background: color-mix(in srgb, var(--stat-color, var(--accent)) 14%, transparent);
+}
+
+[data-theme='midnight'] .studio-stat-icon {
+  background: color-mix(in srgb, var(--stat-color, var(--accent)) 22%, transparent);
+}
+
+.studio-stat-body {
+  min-width: 0;
+}
+
+.studio-stat-label {
+  margin-bottom: 6px;
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.07em;
   font-weight: 600;
   color: var(--text-faint);
-  min-width: 0;
-}
-
-.studio-stat-label span:last-child {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.studio-stat-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
 }
 
 .studio-stat-num {
@@ -758,7 +770,8 @@ html, body {
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: 10px;
   }
-  .studio-stat { padding: 14px 16px; }
+  .studio-stat { padding: 13px 14px; gap: 11px; }
+  .studio-stat-icon { width: 34px; height: 34px; border-radius: 10px; }
   .studio-stat-num { font-size: 26px; }
 }
 
