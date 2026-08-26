@@ -21,6 +21,7 @@ import ClippersTab from '@/components/sub/ClippersTab';
 import TrialReelsTab from '@/components/sub/TrialReelsTab';
 import ClipLibraryTab from '@/components/sub/ClipLibraryTab';
 import StarLogo from '@/components/StarLogo';
+import Avatar from '@/components/Avatar';
 import InboxPanel from '@/components/InboxPanel';
 import { profileName } from '@/lib/profile-name';
 import { INBOX_SOURCES, isUnread } from '@/lib/inbox';
@@ -580,24 +581,37 @@ export default function Home() {
               <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 3 }}>{PAGE_SUBTITLES[mainPage]}</div>
             </div>
             <div style={{ flex: 1 }} />
-            <div className="theme-seg" role="group" aria-label="Theme">
+            {/* Top-right account cluster — the theme control sits with the
+                profile avatar, the spot users expect both to be in. */}
+            <div className="topbar-actions">
+              <div className="theme-seg" role="group" aria-label="Theme">
+                <button
+                  type="button"
+                  className={theme === 'aurora' ? 'active' : undefined}
+                  aria-pressed={theme === 'aurora'}
+                  onClick={() => applyTheme('aurora')}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></svg>
+                  Light
+                </button>
+                <button
+                  type="button"
+                  className={theme === 'midnight' ? 'active' : undefined}
+                  aria-pressed={theme === 'midnight'}
+                  onClick={() => applyTheme('midnight')}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
+                  Dark
+                </button>
+              </div>
               <button
                 type="button"
-                className={theme === 'aurora' ? 'active' : undefined}
-                aria-pressed={theme === 'aurora'}
-                onClick={() => applyTheme('aurora')}
+                className="topbar-avatar"
+                onClick={() => setAccountOpen(true)}
+                title={`${currentName} — account`}
+                aria-label={`${currentName} — account`}
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></svg>
-                Light
-              </button>
-              <button
-                type="button"
-                className={theme === 'midnight' ? 'active' : undefined}
-                aria-pressed={theme === 'midnight'}
-                onClick={() => applyTheme('midnight')}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
-                Dark
+                <Avatar name={currentName} size={26} />
               </button>
             </div>
           </div>

@@ -435,10 +435,11 @@ export function InlineNumber({
 
 // Inline date picker that commits on change.
 //
-// `display='text'` is the Studio-table form: at rest it's just the short date
-// ("Aug 13") or a muted "—", and clicking swaps in the real date input. Keeps the
-// row line quiet without giving up inline editing. `display='input'` (default) is
-// the always-visible picker every other table and the panels use.
+// `display='chip'` is the Studio-table form: an always-editable date field
+// styled as a small rounded chip, so a deadline reads clearly in the row and is
+// still one click from being changed. `display='text'` collapses to plain text
+// until clicked. `display='input'` (default) is the full-width picker the detail
+// panels and every other table use.
 export function InlineDate({
   value,
   onCommit,
@@ -448,9 +449,21 @@ export function InlineDate({
   value?: string;
   onCommit: (v: string) => void;
   highlight?: boolean;
-  display?: 'input' | 'text';
+  display?: 'input' | 'text' | 'chip';
 }) {
   const [editing, setEditing] = useState(false);
+
+  if (display === 'chip') {
+    return (
+      <input
+        className={`st-date${highlight ? ' is-overdue' : ''}${value ? '' : ' is-empty'}`}
+        type="date"
+        title={value ? 'Change date' : 'Set date'}
+        value={value ? value.slice(0, 10) : ''}
+        onChange={e => onCommit(e.target.value)}
+      />
+    );
+  }
 
   if (display === 'text' && !editing) {
     return (

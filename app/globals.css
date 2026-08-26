@@ -394,6 +394,72 @@ html, body {
   white-space: nowrap;
 }
 
+/* Inline deadline picker — a real <input type="date"> that reads as a quiet
+   rounded chip at rest and lights up on hover/focus, so a deadline can be
+   changed straight from the row without the field shouting in the line. */
+.st-date {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text-dim);
+  cursor: pointer;
+  outline: none;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.st-date:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.st-date:focus,
+.st-date:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+/* No date set yet — quieter still, but obviously clickable. */
+.st-date.is-empty {
+  color: var(--text-faint);
+}
+
+/* Past due: the chip itself carries the warning, matching the row's red rail. */
+.st-date.is-overdue {
+  color: var(--neg);
+  border-color: color-mix(in srgb, var(--neg) 42%, transparent);
+  background: color-mix(in srgb, var(--neg) 10%, transparent);
+}
+
+.st-date::-webkit-datetime-edit {
+  padding: 0;
+}
+
+.st-date::-webkit-calendar-picker-indicator {
+  opacity: 0.45;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 4px;
+  transition: opacity 140ms ease;
+}
+
+.st-date:hover::-webkit-calendar-picker-indicator,
+.st-date:focus::-webkit-calendar-picker-indicator {
+  opacity: 0.85;
+}
+
+/* The native calendar glyph is drawn dark — invert it on the dark theme. */
+[data-theme='midnight'] .st-date::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
 /* The ↗ on a link — quieter than the URL it follows. */
 .st-arrow {
   font-size: 9px;
@@ -612,6 +678,31 @@ html, body {
 }
 
 /* ===== Segmented Light / Dark theme control ================================= */
+/* Top-right header cluster — theme control + profile avatar on one baseline. */
+.topbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.topbar-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.topbar-avatar:hover {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
 .theme-seg {
   display: inline-flex;
   align-items: center;

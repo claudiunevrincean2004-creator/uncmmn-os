@@ -356,7 +356,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
                       <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px', color: 'var(--accent)' }} onClick={() => handleIterate(a)} title="Trigger iteration">↻ Iterate</button>
                     </td>
                     <CustomRowCells row={a} props={cprops} optionsByProp={optsByProp} onPatch={patch} size="md" />
-                    <td className="st-right"><InlineDate display="text" value={a.date_added} onCommit={d => patch(a.id, { date_added: d || undefined })} /></td>
+                    <td className="st-right"><InlineDate display="chip" value={a.date_added} onCommit={d => patch(a.id, { date_added: d || undefined })} /></td>
                     <td><button className="btn-danger row-action" style={{ padding: '2px 6px' }} onClick={() => deleteAd(a.id)} title="Delete ad creative" aria-label="Delete ad creative">✕</button></td>
                   </tr>
                 ))}

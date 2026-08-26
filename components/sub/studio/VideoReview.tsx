@@ -344,7 +344,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                       <td className="st-right">
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                           {overdue && <span className="st-overdue">OVERDUE</span>}
-                          <InlineDate display="text" value={v.deadline} onCommit={d => patch(v.id, { deadline: d || undefined })} highlight={overdue} />
+                          <InlineDate display="chip" value={v.deadline} onCommit={d => patch(v.id, { deadline: d || undefined })} highlight={overdue} />
                         </div>
                       </td>
                       <td><button className="btn-danger row-action" style={{ padding: '2px 6px' }} onClick={() => deleteVideo(v.id)} title="Delete video" aria-label="Delete video">✕</button></td>

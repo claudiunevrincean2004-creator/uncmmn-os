@@ -266,7 +266,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
                       <td className="st-right">
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                           {overdue && <span className="st-overdue">OVERDUE</span>}
-                          <InlineDate display="text" value={s.scheduled_date} onCommit={d => patch(s.id, { scheduled_date: d || undefined })} highlight={overdue} />
+                          <InlineDate display="chip" value={s.scheduled_date} onCommit={d => patch(s.id, { scheduled_date: d || undefined })} highlight={overdue} />
                         </div>
                       </td>
                       <td><button className="btn-danger row-action" style={{ padding: '2px 6px' }} onClick={() => deleteSequence(s.id)} title="Delete sequence" aria-label="Delete sequence">✕</button></td>
