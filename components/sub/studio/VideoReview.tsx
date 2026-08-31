@@ -5,21 +5,19 @@ import { StudioVideo, StudioComment, StudioActivity, StudioQuickLink, StudioDrop
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { usePagedRows } from '@/lib/use-paged-rows';
 import LoadMore from './LoadMore';
-import FilterField from './FilterField';
 import {
   VIDEO_FORMATS, VIDEO_STATUSES, VIDEO_STATUS_COLORS,
   PRIORITIES, PRIORITY_COLORS,
   isOverdue, logActivity, mergeOptions, inDateRange,
   getFieldOptions, colorMap, buildAddOptionRows,
 } from '@/lib/studio';
-import { EditPillSelect, MiniSelect, UrlCell, InlineDate, openDatePicker } from './cells';
+import { EditPillSelect, UrlCell, InlineDate, openDatePicker } from './cells';
 import TableToolbar, { rowAccent, openOnRowClick, TitleCell } from './table-ui';
 import Board, { type BoardCard } from './Board';
 import { type StudioView } from './ViewToggle';
-import SortControl from './SortControl';
+import { FilterMenu, FilterChips, SortMenu, type FilterDef } from './FilterMenu';
 import { SortOption, SortDir, sortRows } from '@/lib/sort';
 import ItemPanel, { FieldDef } from './ItemPanel';
-import DateRangePicker from './DateRangePicker';
 import QuickLinks from './QuickLinks';
 import { UserPicker, resolveAssignee, buildPipelineMentions } from './UserPicker';
 import FieldOptionsManager from './FieldOptionsManager';
@@ -27,6 +25,11 @@ import CopyLinkButton from '@/components/CopyLinkButton';
 import { itemUrl } from '@/lib/item-link';
 
 const DONE = ['Posted'];
+
+// Where sorting starts (and what "Reset sort" returns to) — the Sort button only
+// lights up once the user moves away from this.
+const DEFAULT_SORT_KEY = 'deadline';
+const DEFAULT_SORT_DIR: SortDir = 'asc';
 
 // Video status transitions that ping #main-ig-updates (see /api/video-notify).
 // Briefing / Editing / Ready to Post / Posted are intentionally silent.
@@ -85,8 +88,8 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   const [fFormat, setFFormat] = usePersistedState<string>('studio_v_format', 'All');
   const [fPriority, setFPriority] = usePersistedState<string>('studio_v_priority', 'All');
   const [search, setSearch] = useState('');
-  const [sortKey, setSortKey] = usePersistedState<string>('studio_v_sortkey', 'deadline');
-  const [sortDir, setSortDir] = usePersistedState<SortDir>('studio_v_sortdir', 'asc');
+  const [sortKey, setSortKey] = usePersistedState<string>('studio_v_sortkey', DEFAULT_SORT_KEY);
+  const [sortDir, setSortDir] = usePersistedState<SortDir>('studio_v_sortdir', DEFAULT_SORT_DIR);
   const [dateFrom, setDateFrom] = usePersistedState<string>('studio_v_from', '');
   const [dateTo, setDateTo] = usePersistedState<string>('studio_v_to', '');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -229,6 +232,18 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   const formatPresent = present(videos.map(v => v.format));
   const priorityPresent = present(videos.map(v => v.priority || 'Normal'));
 
+  // The conditions the Filter popover offers, in menu order. Each one is a view
+  // onto the state this component already owns — same 'All' sentinel, same
+  // from/to ISO pair — so collapsing the bar changed nothing about how rows are
+  // narrowed, and they still stack with AND in the `filtered` memo below.
+  const filterDefs: FilterDef[] = useMemo(() => [
+    { kind: 'select', key: 'status', label: 'Status', value: fStatus, options: statusPresent, anyLabel: 'Any status', onChange: setFStatus },
+    { kind: 'select', key: 'assigned', label: 'Assignee', value: fAssigned, options: assignedPresent, anyLabel: 'Anyone', onChange: setFAssigned },
+    { kind: 'select', key: 'format', label: 'Format', value: fFormat, options: formatPresent, anyLabel: 'Any format', onChange: setFFormat },
+    { kind: 'select', key: 'priority', label: 'Priority', value: fPriority, options: priorityPresent, anyLabel: 'Any priority', onChange: setFPriority },
+    { kind: 'date', key: 'deadline', label: 'Deadline', from: dateFrom, to: dateTo, onChange: (f, t) => { setDateFrom(f); setDateTo(t); } },
+  ], [fStatus, fAssigned, fFormat, fPriority, dateFrom, dateTo, statusPresent, assignedPresent, formatPresent, priorityPresent, setFStatus, setFAssigned, setFFormat, setFPriority, setDateFrom, setDateTo]);
+
   // Status/Priority sort by pipeline position (Briefing → … → Posted), taken from
   // the same admin-ordered option lists the pills render from.
   const sortOptions: SortOption<StudioVideo>[] = useMemo(() => [
@@ -306,12 +321,9 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
           actionLabel="Add Video"
           onAction={() => { setDraft(EMPTY_DRAFT); setAddOpen(true); }}
         >
-          <MiniSelect size="md" allLabel="All status" value={fStatus} options={statusPresent} onChange={setFStatus} />
-          <MiniSelect size="md" allLabel="Everyone" value={fAssigned} options={assignedPresent} onChange={setFAssigned} />
-          <MiniSelect size="md" allLabel="All formats" value={fFormat} options={formatPresent} onChange={setFFormat} />
-          <MiniSelect size="md" allLabel="All priorities" value={fPriority} options={priorityPresent} onChange={setFPriority} />
-          <SortControl size="md" options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
-          <FilterField label="Date"><DateRangePicker size="md" from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
+          <FilterMenu defs={filterDefs} />
+          <SortMenu options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} defaultKey={DEFAULT_SORT_KEY} defaultDir={DEFAULT_SORT_DIR} />
+          <FilterChips defs={filterDefs} />
         </TableToolbar>
 
         {filtered.length === 0 ? (

@@ -952,6 +952,292 @@ html, body {
   color: var(--accent);
 }
 
+/* ===== Collapsed Filter / Sort controls (Notion-style database views) ======
+   Two buttons in the toolbar, each opening a popover. Active state is never
+   hidden: the button lights up and carries a count/label, and every narrowing
+   filter also gets its own removable chip beside it. */
+.fs-wrap {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.fs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+
+.fs-btn:hover { color: var(--text); border-color: var(--text-faint); }
+
+.fs-btn:focus-visible,
+.fs-chip-x:focus-visible,
+.fs-row-x:focus-visible,
+.fs-menu-item:focus-visible,
+.fs-add:focus-visible,
+.fs-clear:focus-visible,
+.fs-dir button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Applied state — the whole point of collapsing safely. */
+.fs-btn.is-on {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--accent);
+}
+
+.fs-btn-val { font-weight: 600; }
+
+.fs-badge {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+
+/* --- The popover ---------------------------------------------------------- */
+.fs-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 1400;
+  width: max-content;
+  min-width: 260px;
+  max-width: min(440px, calc(100vw - 24px));
+  padding: 8px;
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.32);
+}
+
+.fs-pop-sort { min-width: 210px; }
+
+.fs-rows { display: flex; flex-direction: column; gap: 6px; }
+
+.fs-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.fs-conj {
+  width: 42px;
+  flex-shrink: 0;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+}
+
+.fs-row select.fs-input {
+  width: auto;
+  padding: 7px 10px;
+  font-size: 12px;
+  border-radius: 9px;
+  background: var(--surface-2);
+}
+
+.fs-row .fs-prop { min-width: 92px; }
+.fs-row .fs-val { min-width: 120px; flex: 1 1 120px; }
+
+.fs-row-x,
+.fs-chip-x {
+  border: none;
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1;
+  border-radius: 6px;
+  padding: 4px;
+  flex-shrink: 0;
+}
+
+.fs-row-x:hover,
+.fs-chip-x:hover { color: var(--neg); background: var(--surface-2); }
+
+/* --- Property picker / sort list ------------------------------------------ */
+.fs-menu { display: flex; flex-direction: column; gap: 1px; }
+
+.fs-menu-head {
+  padding: 4px 8px 6px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+  font-weight: 600;
+}
+
+.fs-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.fs-menu-item:hover { background: var(--surface-2); color: var(--text); }
+
+.fs-menu-item.is-on {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.fs-tick { font-size: 11px; }
+
+.fs-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.fs-add:hover { background: var(--surface-2); color: var(--text); }
+
+.fs-empty { padding: 8px 10px; font-size: 11px; color: var(--text-faint); }
+
+.fs-dir {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 0.5px solid var(--border);
+}
+
+.fs-dir button {
+  flex: 1;
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--text-dim);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.fs-dir button:hover { color: var(--text); }
+
+.fs-dir button.active {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.fs-foot {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 0.5px solid var(--border);
+}
+
+.fs-clear {
+  border: none;
+  background: none;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.fs-clear:hover { color: var(--neg); background: var(--surface-2); }
+
+/* --- Active-filter chips in the bar --------------------------------------- */
+.fs-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 240px;
+  padding: 5px 6px 5px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  font-size: 11px;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.fs-chip-prop { color: var(--text-dim); }
+
+.fs-chip-val {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fs-chip-x { color: color-mix(in srgb, var(--accent) 70%, transparent); padding: 2px; }
+
+/* Narrow screens: popovers anchor to the toolbar's left edge and stay inside
+   the viewport instead of running off it. */
+@media (max-width: 720px) {
+  .fs-pop {
+    left: 0;
+    right: auto;
+    min-width: 0;
+    width: max-content;
+    max-width: calc(100vw - 24px);
+  }
+  .fs-row { gap: 5px; }
+  .fs-row .fs-val { flex-basis: 100%; }
+}
+
+/* The nested date-range calendar stacks its presets above the grid on phones so
+   the two-column popover can't push past the screen edge. */
+@media (max-width: 560px) {
+  .drp-pop {
+    flex-direction: column;
+    max-width: calc(100vw - 28px);
+  }
+  .drp-presets {
+    flex-direction: row !important;
+    flex-wrap: wrap;
+    border-right: none !important;
+    border-bottom: 0.5px solid var(--border);
+  }
+}
+
 /* ===== Research — the swipe file =========================================== */
 
 /* Research cards carry more visual weight than a table's first row, so the

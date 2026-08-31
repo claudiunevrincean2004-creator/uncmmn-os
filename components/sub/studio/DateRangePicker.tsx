@@ -57,6 +57,13 @@ function labelFor(from: string, to: string, presets: Preset[]): string {
   return 'All time';
 }
 
+// The active range as human text ("All time" / "Last 30 days" / "Jun 1 – Jun 30").
+// Exported so the Studio filter bars can label a date condition's chip with the
+// exact same words the picker's own trigger shows.
+export function rangeLabel(from: string, to: string): string {
+  return labelFor(from, to, buildPresets());
+}
+
 // `size` is presentation only, matching MiniSelect: 'sm' is the dense legacy
 // trigger, 'md' the roomier one the Studio filter bars use so every control in
 // that row is the same height and weight.
@@ -139,6 +146,7 @@ export default function DateRangePicker({ from, to, onChange, align = 'left', si
 
       {open && (
         <div
+          className="drp-pop"
           style={{
             position: 'absolute', top: 'calc(100% + 6px)', left: align === 'left' ? 0 : undefined, right: align === 'right' ? 0 : undefined, zIndex: 1500,
             display: 'flex', background: 'var(--surface)', border: '0.5px solid var(--border)',
@@ -146,7 +154,7 @@ export default function DateRangePicker({ from, to, onChange, align = 'left', si
           }}
         >
           {/* Presets */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: 8, borderRight: '0.5px solid var(--border)', minWidth: 132 }}>
+          <div className="drp-presets" style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: 8, borderRight: '0.5px solid var(--border)', minWidth: 132 }}>
             {presets.map(p => {
               const on = activePresetKey === p.key;
               return (

@@ -25,6 +25,8 @@ export type IconName =
   | 'check'       // Approved / ready to post
   | 'folder'      // A linked Drive folder
   | 'list'        // List view
+  | 'filter'      // Filter menu — funnel
+  | 'sort'        // Sort menu — up/down arrows
   | 'trash';      // Destructive action
 
 const PATHS: Record<IconName, ReactNode> = {
@@ -108,6 +110,13 @@ const PATHS: Record<IconName, ReactNode> = {
     <path d="M3 7.2A2.7 2.7 0 0 1 5.7 4.5h3.1a2 2 0 0 1 1.55.74l1.05 1.3a2 2 0 0 0 1.55.74h5.35A2.7 2.7 0 0 1 21 9.98v6.32a2.7 2.7 0 0 1-2.7 2.7H5.7A2.7 2.7 0 0 1 3 16.3z" />
   ),
   list: <path d="M4 6.5h16M4 12h16M4 17.5h16" />,
+  filter: <path d="M3.6 5.4h16.8l-6.6 7.9v5.4l-3.6 2.1v-7.5z" />,
+  sort: (
+    <>
+      <path d="M7 20V4.6M3.6 8 7 4.6 10.4 8" />
+      <path d="M17 4v15.4M13.6 16 17 19.4 20.4 16" />
+    </>
+  ),
   trash: (
     <>
       <path d="M4 6.5h16" />
