@@ -42,7 +42,12 @@ const SUBTABS: { key: SubTab; label: string }[] = [
 
 // Same card shape the Studio tabs use, except the value is a preformatted
 // string — these are money figures, not counts.
-interface StatCard { label: string; value: string; color: string; icon: IconName; hint: string; money?: boolean }
+interface StatCard {
+  label: string; value: string; color: string; icon: IconName; hint: string; money?: boolean;
+  /** A rule worth being able to look up, but not worth permanent screen space —
+   *  rendered as the small ⓘ beside the label. */
+  note?: string;
+}
 
 interface Props {
   people: FinancePerson[];
@@ -79,7 +84,11 @@ export default function FinanceTab({ people, payments, profiles, onReload }: Pro
       .reduce((s, p) => s + (Number(p.amount) || 0), 0);
     const awaiting = scoped.filter(p => p.status === 'ready_to_pay').length;
     return [
-      { label: `Outstanding · ${name}`, value: formatUSD(outstanding), color: '#f59e0b', icon: 'coins', hint: `Not yet paid, by due date — ${name}`, money: true },
+      {
+        label: `Outstanding · ${name}`, value: formatUSD(outstanding), color: '#f59e0b', icon: 'coins',
+        hint: `Not yet paid, by due date — ${name}`, money: true,
+        note: 'Unpaid payments with no due date always count as outstanding, in every period.',
+      },
       { label: `Paid · ${name}`, value: formatUSD(paid), color: '#10b981', icon: 'check', hint: `Paid, by paid date — ${name}`, money: true },
       { label: `Awaiting Action · ${name}`, value: String(awaiting), color: '#eab308', icon: 'clock', hint: `Sitting at Ready to Pay — ${name}` },
     ];
@@ -87,52 +96,56 @@ export default function FinanceTab({ people, payments, profiles, onReload }: Pro
 
   return (
     <div style={{ position: 'relative' }}>
-      {/* Period picker. Right-aligned at every width, and its panel is
-          right-anchored to match, so on a phone it opens inward instead of off
-          the edge of the screen. */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-        <ChoiceMenu
-          label="Period"
-          icon="clock"
-          heading="Show"
-          ariaLabel="Reporting period"
-          options={PERIOD_OPTIONS}
-          value={period}
-          onChange={k => setPeriod(k as PeriodKey)}
-          defaultKey={DEFAULT_PERIOD}
-          align="right"
-        />
-      </div>
-
       {/* Summary row — same markup and tokens as the Studio stat cards, so the
           card's colour rides down as --stat-color and tints the icon tile in
           both aurora and midnight without a second copy. */}
-      <div className="studio-stats">
+      <div className="studio-stats is-tight">
         {stats.map(item => (
           <div key={item.label} className="studio-stat" style={{ '--stat-color': item.color } as React.CSSProperties} title={item.hint}>
             <span className="studio-stat-icon"><Icon name={item.icon} size={19} /></span>
             <div className="studio-stat-body">
-              <div className="studio-stat-label is-wrap">{item.label}</div>
+              <div className="studio-stat-label is-wrap">
+                {item.label}
+                {item.note && (
+                  <span className="stat-info" title={item.note} aria-label={item.note} role="note" tabIndex={0}>ⓘ</span>
+                )}
+              </div>
               <div className={item.money ? 'studio-stat-num is-money' : 'studio-stat-num'} title={item.value}>{item.value}</div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Which dates these figures actually hang on. Without this, a reader has
-          no way to tell whether "Paid · Last month" means billed last month or
-          settled last month. */}
-      <div style={{ fontSize: 11, color: 'var(--text-faint)', margin: '-6px 0 18px', lineHeight: 1.5 }}>
+      {/* Which dates these figures hang on — kept to one quiet line, because
+          without it there's no telling whether "Paid · Last month" means billed
+          last month or settled last month. */}
+      <div style={{ fontSize: 11, color: 'var(--text-faint)', margin: '0 0 14px', lineHeight: 1.45 }}>
         <strong style={{ color: 'var(--text-dim)', fontWeight: 600 }}>{periodRangeLabel(period)}</strong>
-        {' · '}Paid figures are dated by <strong style={{ color: 'var(--text-dim)', fontWeight: 600 }}>paid date</strong>; outstanding and awaiting action by <strong style={{ color: 'var(--text-dim)', fontWeight: 600 }}>due date</strong>. Unpaid payments with no due date always count.
+        {' · '}paid by payment date, outstanding by due date
       </div>
 
-      <div className="subtab-row">
+      {/* Tabs left, period picker opposite them — the picker no longer costs a
+          row of its own above the cards. It wraps under the tabs on narrow
+          screens (see .subtab-aside). */}
+      <div className="subtab-row is-split">
         {SUBTABS.map(t => (
           <button key={t.key} className={`subtab-underline${sub === t.key ? ' active' : ''}`} onClick={() => setSub(t.key)}>
             {t.label}
           </button>
         ))}
+        <div className="subtab-aside">
+          <ChoiceMenu
+            label="Period"
+            icon="clock"
+            heading="Show"
+            ariaLabel="Reporting period"
+            options={PERIOD_OPTIONS}
+            value={period}
+            onChange={k => setPeriod(k as PeriodKey)}
+            defaultKey={DEFAULT_PERIOD}
+            align="right"
+          />
+        </div>
       </div>
 
       {sub === 'payments' && (

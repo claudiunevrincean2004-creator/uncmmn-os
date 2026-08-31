@@ -762,6 +762,10 @@ html, body {
 }
 
 /* A lone card keeps a card's width on the left instead of spanning the row. */
+/* Cards immediately followed by a caption line don't need the full 18px — the
+   caption belongs to the cards, so it sits close to them. */
+.studio-stats.is-tight { margin-bottom: 8px; }
+
 .studio-stats.is-single {
   grid-template-columns: minmax(190px, 240px);
   justify-content: start;
@@ -841,6 +845,28 @@ html, body {
   line-height: 1.35;
 }
 
+/* Small info affordance beside a stat label — for a rule that's worth being able
+   to look up but not worth permanent screen space. Focusable, so the tooltip is
+   reachable by keyboard and not mouse-only. */
+.stat-info {
+  display: inline-block;
+  margin-left: 5px;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--text-faint);
+  cursor: help;
+  vertical-align: baseline;
+  transition: color 140ms ease;
+}
+
+.stat-info:hover { color: var(--text-dim); }
+
+.stat-info:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
 /* Money figures ("$12,345.67") are far longer than the counts these cards were
    built for, so they step down a size and truncate rather than spilling out of
    a 190px card. Counts on the same row keep the full 32px. */
@@ -869,6 +895,35 @@ html, body {
   gap: 22px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 18px;
+}
+
+/* Split variant — tabs on the left, one control opposite them, instead of that
+   control taking a whole row of its own above the cards.
+   flex-end, not center: an active tab's underline is positioned `bottom: -1px`
+   on the button, so the button's bottom edge has to keep meeting the row's
+   border. The aside is nudged off that border by its own padding (below) to sit
+   optically centred on the tab text rather than sinking to the line. */
+.subtab-row.is-split {
+  align-items: flex-end;
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+/* 3px lands the control's centre within half a pixel of the tab text's centre:
+   the tabs carry 11px of bottom padding above the border, the control is ~33px
+   tall, so bottom-aligning it 3px up centres the two on each other. */
+.subtab-aside {
+  margin-left: auto;
+  padding-bottom: 3px;
+}
+
+@media (max-width: 640px) {
+  /* Narrow: the control wraps onto its own line under the tabs and keeps to the
+     right, with a little breathing room above the border it now shares. */
+  .subtab-aside {
+    padding-bottom: 10px;
+    padding-top: 2px;
+  }
 }
 
 .subtab-underline {

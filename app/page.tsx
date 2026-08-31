@@ -726,7 +726,10 @@ export default function Home() {
               `role === 'admin'` here, canAccess() in the sidebar, and the editor
               bounce above. An editor or clipper can neither see nor reach it. */}
           {client && mainPage === 'finance' && role === 'admin' && (
-            <div style={{ padding: '16px 24px' }}>
+            // Tighter top padding than the other tabs: Finance opens on stat
+            // cards rather than a toolbar, and the standard 16px left too much
+            // air between the page title and the first card.
+            <div style={{ padding: '8px 24px 16px' }}>
               <FinanceTab
                 people={financePeople}
                 payments={financePayments}
