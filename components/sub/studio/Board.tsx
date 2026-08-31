@@ -43,8 +43,6 @@ export interface BoardCard {
   /** Draws the date in --neg (past deadline). */
   dateOverdue?: boolean;
   assignedToUserId?: string | null;
-  /** Owning account, drawn as a quiet metadata chip. Omit to hide it. */
-  account?: string | null;
   /** Arbitrary payload for a board that supplies its own `renderCard`. */
   data?: unknown;
 }
@@ -110,7 +108,7 @@ function CardBody({
   onAssigneeChange?: (id: string, userId: string | null) => void;
   onDateChange?: (id: string, value?: string) => void;
 }) {
-  const showFormat = !!formatField || !!card.format || !!card.account;
+  const showFormat = !!formatField || !!card.format;
   const showDate = !!onDateChange || !!card.date;
   const showWho = !!onAssigneeChange || !!card.assignedToUserId;
 
@@ -135,7 +133,6 @@ function CardBody({
           ) : card.format ? (
             <span className="board-card-pill" style={pillStyle(formatField?.colors[card.format] || '#6b7280')}>{card.format}</span>
           ) : null}
-          {card.account && <span className="acct-chip">{card.account}</span>}
         </div>
       )}
 

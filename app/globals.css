@@ -952,36 +952,6 @@ html, body {
   color: var(--accent);
 }
 
-/* ===== Account chip — quiet "who is this for" metadata ======================
-   Deliberately the faintest label on a row/card: no accent colour, no fill
-   beyond --surface-2, uppercase micro-type. It marks ownership without
-   competing with the title, status pill or deadline. */
-.acct-chip {
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-  max-width: 120px;
-  padding: 2px 7px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface-2);
-  font-size: 9.5px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.5;
-}
-
-/* On a board card the chip trails the format pill on the same line. */
-.board-card-format .acct-chip {
-  margin-left: 8px;
-  vertical-align: middle;
-}
-
 /* ===== Collapsed Filter / Sort controls (Notion-style database views) ======
    Two buttons in the toolbar, each opening a popover. Active state is never
    hidden: the button lights up and carries a count/label, and every narrowing

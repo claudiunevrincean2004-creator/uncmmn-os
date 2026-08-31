@@ -81,8 +81,10 @@ create table if not exists revenue_entries (
 );
 
 -- Studio — Video Review
--- `account` names which account the video is for ('Nathan', 'Eden') — the list
--- lives in lib/studio.ts → ACCOUNTS. See supabase/studio_videos_account.sql.
+-- `account` names which account the video is for ('Nathan', 'Eden'). The UI for
+-- it was pulled, so nothing reads or writes this today — the column and its data
+-- are kept deliberately (see supabase/studio_videos_account.sql) so the repo
+-- still matches production.
 create table if not exists studio_videos (
   id uuid primary key default gen_random_uuid(),
   title text not null,

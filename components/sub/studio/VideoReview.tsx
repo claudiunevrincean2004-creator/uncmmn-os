@@ -7,11 +7,11 @@ import { usePagedRows } from '@/lib/use-paged-rows';
 import LoadMore from './LoadMore';
 import {
   VIDEO_FORMATS, VIDEO_STATUSES, VIDEO_STATUS_COLORS,
-  PRIORITIES, PRIORITY_COLORS, ACCOUNTS, DEFAULT_ACCOUNT,
+  PRIORITIES, PRIORITY_COLORS,
   isOverdue, logActivity, mergeOptions, inDateRange,
   getFieldOptions, colorMap, buildAddOptionRows,
 } from '@/lib/studio';
-import { EditPillSelect, MiniSelect, UrlCell, InlineDate, openDatePicker } from './cells';
+import { EditPillSelect, UrlCell, InlineDate, openDatePicker } from './cells';
 import TableToolbar, { rowAccent, openOnRowClick, TitleCell } from './table-ui';
 import Board, { type BoardCard } from './Board';
 import { type StudioView } from './ViewToggle';
@@ -47,7 +47,6 @@ const FIELD_FALLBACKS: Record<string, { values: string[]; colors?: Record<string
 // the user clicks Create; closing/cancelling resets back to this.
 interface VideoDraft {
   title: string;
-  account: string;
   format: string;
   assigned_to_user_id: string;
   status: string;
@@ -59,7 +58,6 @@ interface VideoDraft {
 }
 const EMPTY_DRAFT: VideoDraft = {
   title: '',
-  account: DEFAULT_ACCOUNT,
   format: '',
   assigned_to_user_id: '',
   status: 'Briefing',
@@ -86,7 +84,6 @@ interface Props {
 export default function VideoReview({ videos, comments, activity, quickLinks, dropdownOptions, profiles, isAdmin, openItemId, onOpened, onReload }: Props) {
   const [view, setView] = usePersistedState<StudioView>('studio_v_view', 'table');
   const [fStatus, setFStatus] = usePersistedState<string>('studio_v_status', 'All');
-  const [fAccount, setFAccount] = usePersistedState<string>('studio_v_account', 'All');
   const [fAssigned, setFAssigned] = usePersistedState<string>('studio_v_assigned', 'All');
   const [fFormat, setFFormat] = usePersistedState<string>('studio_v_format', 'All');
   const [fPriority, setFPriority] = usePersistedState<string>('studio_v_priority', 'All');
@@ -177,7 +174,6 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
     setCreating(true);
     const row = {
       title: draft.title.trim() || 'Untitled Video',
-      account: draft.account || null,
       format: draft.format || null,
       assigned_to_user_id: draft.assigned_to_user_id || null,
       status: draft.status || 'Briefing',
@@ -232,10 +228,6 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   // so nothing becomes unreachable. Selecting a no-match status falls through to
   // the empty state below.
   const statusPresent = ['All', ...Array.from(new Set([...statusValues, ...videos.map(v => v.status).filter(Boolean) as string[]]))];
-  // Like status, the account filter lists the FULL defined set (so Eden is
-  // selectable before a single Eden video exists), unioned with any stray value
-  // already on a row so nothing becomes unreachable.
-  const accountPresent = ['All', ...Array.from(new Set([...ACCOUNTS, ...videos.map(v => v.account).filter(Boolean) as string[]]))];
   const assignedPresent = present(videos.map(v => resolveAssignee(v.assigned_to_user_id, profiles) || undefined));
   const formatPresent = present(videos.map(v => v.format));
   const priorityPresent = present(videos.map(v => v.priority || 'Normal'));
@@ -246,12 +238,11 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   // narrowed, and they still stack with AND in the `filtered` memo below.
   const filterDefs: FilterDef[] = useMemo(() => [
     { kind: 'select', key: 'status', label: 'Status', value: fStatus, options: statusPresent, anyLabel: 'Any status', onChange: setFStatus },
-    { kind: 'select', key: 'account', label: 'Account', value: fAccount, options: accountPresent, anyLabel: 'All accounts', onChange: setFAccount },
     { kind: 'select', key: 'assigned', label: 'Assignee', value: fAssigned, options: assignedPresent, anyLabel: 'Anyone', onChange: setFAssigned },
     { kind: 'select', key: 'format', label: 'Format', value: fFormat, options: formatPresent, anyLabel: 'Any format', onChange: setFFormat },
     { kind: 'select', key: 'priority', label: 'Priority', value: fPriority, options: priorityPresent, anyLabel: 'Any priority', onChange: setFPriority },
     { kind: 'date', key: 'deadline', label: 'Deadline', from: dateFrom, to: dateTo, onChange: (f, t) => { setDateFrom(f); setDateTo(t); } },
-  ], [fStatus, fAccount, fAssigned, fFormat, fPriority, dateFrom, dateTo, statusPresent, accountPresent, assignedPresent, formatPresent, priorityPresent, setFStatus, setFAccount, setFAssigned, setFFormat, setFPriority, setDateFrom, setDateTo]);
+  ], [fStatus, fAssigned, fFormat, fPriority, dateFrom, dateTo, statusPresent, assignedPresent, formatPresent, priorityPresent, setFStatus, setFAssigned, setFFormat, setFPriority, setDateFrom, setDateTo]);
 
   // Status/Priority sort by pipeline position (Briefing → … → Posted), taken from
   // the same admin-ordered option lists the pills render from.
@@ -269,27 +260,22 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
     const q = search.trim().toLowerCase();
     if (q) r = r.filter(v => (v.title || '').toLowerCase().includes(q));
     if (fStatus !== 'All') r = r.filter(v => v.status === fStatus);
-    if (fAccount !== 'All') r = r.filter(v => (v.account || '') === fAccount);
     if (fAssigned !== 'All') r = r.filter(v => (resolveAssignee(v.assigned_to_user_id, profiles) || '') === fAssigned);
     if (fFormat !== 'All') r = r.filter(v => (v.format || '') === fFormat);
     if (fPriority !== 'All') r = r.filter(v => (v.priority || 'Normal') === fPriority);
     if (dateFrom || dateTo) r = r.filter(v => inDateRange(v.deadline, dateFrom, dateTo));
     return sortRows(r, sortOptions, sortKey, sortDir);
-  }, [videos, search, fStatus, fAccount, fAssigned, fFormat, fPriority, sortKey, sortDir, dateFrom, dateTo, profiles, sortOptions]);
+  }, [videos, search, fStatus, fAssigned, fFormat, fPriority, sortKey, sortDir, dateFrom, dateTo, profiles, sortOptions]);
 
   // "Load more" pagination — resets to the first page when filters/sort change,
   // not on data refresh (so editing a cell doesn't collapse the list).
   const { visible, hasMore, remaining, loadMore } = usePagedRows(
     filtered,
-    [search, fStatus, fAccount, fAssigned, fFormat, fPriority, sortKey, sortDir, dateFrom, dateTo].join('|'),
+    [search, fStatus, fAssigned, fFormat, fPriority, sortKey, sortDir, dateFrom, dateTo].join('|'),
   );
 
   const fields: FieldDef[] = useMemo(() => [
     { key: 'title', label: 'Title / Desc', type: 'textarea', placeholder: 'Title / description' },
-    // No `field` key on purpose: that routes to MiniSelect rather than
-    // EditSelect, so the panel offers ACCOUNTS and nothing else — no "+ Add
-    // new…", no free text.
-    { key: 'account', label: 'Account', type: 'select', options: ACCOUNTS },
     { key: 'format', label: 'Format', type: 'pill', field: 'video_format', options: formatValues, colors: formatColors, allowAdd: isAdmin, allowEmpty: true },
     { key: 'assigned_to_user_id', label: 'Assigned To', type: 'user' },
     { key: 'status', label: 'Status', type: 'pill', field: 'video_status', options: statusValues, colors: statusColors, allowAdd: isAdmin },
@@ -317,7 +303,6 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
     date: v.deadline,
     dateOverdue: isOverdue(v.deadline, v.status, DONE),
     assignedToUserId: v.assigned_to_user_id,
-    account: v.account,
   })), [filtered]);
 
   return (
@@ -404,7 +389,6 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                     >
                       <td style={{ minWidth: 240 }}>
                         <TitleCell title={v.title} onOpen={() => setSelectedId(v.id)}>
-                          {v.account && <span className="acct-chip">{v.account}</span>}
                           <CopyLinkButton type="video" id={v.id} />
                         </TitleCell>
                       </td>
@@ -475,9 +459,6 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <DraftField label="Title / Desc">
                 <textarea className="form-input" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} placeholder="Title / description" rows={2} style={{ resize: 'vertical', fontSize: 12, lineHeight: 1.4, width: '100%' }} />
-              </DraftField>
-              <DraftField label="Account">
-                <MiniSelect size="md" value={draft.account} options={ACCOUNTS} onChange={a => setDraft(d => ({ ...d, account: a }))} />
               </DraftField>
               <DraftField label="Format">
                 <EditPillSelect field="video_format" value={draft.format} options={formatValues} colors={formatColors} onChange={f => setDraft(d => ({ ...d, format: f }))} onAddOption={addOption} allowAdd={isAdmin} allowEmpty />
