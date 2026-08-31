@@ -27,7 +27,7 @@ export type IconName =
   | 'list'        // List view
   | 'filter'      // Filter menu — funnel
   | 'sort'        // Sort menu — up/down arrows
-  | 'wallet'      // Finance — a card wallet
+  | 'dollar'      // Finance — bare dollar sign
   | 'coins'       // Money owed / outstanding
   | 'trash';      // Destructive action
 
@@ -119,11 +119,15 @@ const PATHS: Record<IconName, ReactNode> = {
       <path d="M17 4v15.4M13.6 16 17 19.4 20.4 16" />
     </>
   ),
-  wallet: (
+  // Bare glyph, not a circled/badged one — the nav icons are all open line
+  // drawings, and an enclosing ring would read heavier than its neighbours.
+  // Same 24 grid and 3–21 optical bounds as the rest of the set; it inherits
+  // size, stroke width and currentColor from <Icon>, so nothing about the
+  // sidebar's treatment changes.
+  dollar: (
     <>
-      <path d="M3 7.6A2.6 2.6 0 0 1 5.6 5h11.2A2.6 2.6 0 0 1 19.4 7.6v1.1" />
-      <path d="M3 7.6v8.8A2.6 2.6 0 0 0 5.6 19h12.8a2.6 2.6 0 0 0 2.6-2.6v-5.2a2.6 2.6 0 0 0-2.6-2.6H5.6A2.6 2.6 0 0 1 3 6" />
-      <path d="M16.8 13.3h.01" />
+      <path d="M12 3v18" />
+      <path d="M16.2 6.6H9.9a2.7 2.7 0 0 0 0 5.4h4.2a2.7 2.7 0 0 1 0 5.4H7" />
     </>
   ),
   coins: (
