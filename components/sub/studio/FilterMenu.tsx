@@ -1,6 +1,6 @@
 'use client';
-import { useRef, useState } from 'react';
-import Icon from '@/components/Icon';
+import { useEffect, useRef, useState } from 'react';
+import Icon, { type IconName } from '@/components/Icon';
 import { useDismiss } from '@/lib/use-dismiss';
 import DateRangePicker, { rangeLabel } from './DateRangePicker';
 import { SortOption, SortDir, dirLabel, resolveOption } from '@/lib/sort';
@@ -342,6 +342,146 @@ export function SortMenu<T>({
               </button>
             </div>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Single-choice menu
+// ---------------------------------------------------------------------------
+
+export interface ChoiceOption { key: string; label: string }
+
+/**
+ * A one-of-N picker wearing the same clothes as the Filter and Sort popovers
+ * above: the `.fs-btn` trigger, the `.fs-pop` panel, `.fs-menu-item` rows with
+ * their hover / `.is-on` selected state, and the same `.fs-tick` checkmark on
+ * the active option.
+ *
+ * NOT a native <select>. A native one renders as the OS menu — on macOS that
+ * means a system popup that ignores our tokens entirely and reads as foreign
+ * next to the Filter and Sort buttons sitting beside it.
+ *
+ * Keyboard: ↓/↑ move (wrapping), Home/End jump to the ends, Enter or Space
+ * choose (they are real buttons, so that comes for free), Escape closes and
+ * returns focus to the trigger, Tab closes. Focus rings come from the shared
+ * `.fs-menu-item:focus-visible` rule, so they match every other control here.
+ */
+export function ChoiceMenu({
+  options, value, onChange, label, icon, heading, ariaLabel, defaultKey, align = 'left',
+}: {
+  options: ChoiceOption[];
+  value: string;
+  onChange: (key: string) => void;
+  /** Fixed word on the trigger; the chosen option reads after it. */
+  label: string;
+  icon?: IconName;
+  heading?: string;
+  ariaLabel: string;
+  /** Matching this leaves the trigger quiet; anything else lights it up. */
+  defaultKey?: string;
+  /** 'right' anchors the panel to the trigger's right edge, so a right-aligned
+   *  trigger opens INWARD and can't run off a narrow viewport. */
+  align?: 'left' | 'right';
+}) {
+  const [open, setOpen] = useState(false);
+  // Which row the arrow keys are currently on. -1 while closed.
+  const [activeIdx, setActiveIdx] = useState(-1);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  // Outside click + Escape, the same hook the popovers above use.
+  useDismiss(wrapRef, () => setOpen(false), { active: open });
+
+  const selectedIdx = Math.max(0, options.findIndex(o => o.key === value));
+  const active = options[selectedIdx] ?? options[0];
+  const isDefault = defaultKey !== undefined && value === defaultKey;
+
+  // Opening parks the keyboard on whatever is currently chosen, so ↓ moves on
+  // from where you are rather than jumping to the top of the list.
+  function openMenu() { setActiveIdx(selectedIdx); setOpen(true); }
+  function close(focusTrigger: boolean) {
+    setOpen(false);
+    setActiveIdx(-1);
+    if (focusTrigger) btnRef.current?.focus();
+  }
+
+  useEffect(() => {
+    if (open && activeIdx >= 0) itemRefs.current[activeIdx]?.focus();
+  }, [open, activeIdx]);
+
+  function onListKeyDown(e: React.KeyboardEvent) {
+    const last = options.length - 1;
+    switch (e.key) {
+      case 'ArrowDown': e.preventDefault(); setActiveIdx(i => (i >= last ? 0 : i + 1)); break;
+      case 'ArrowUp': e.preventDefault(); setActiveIdx(i => (i <= 0 ? last : i - 1)); break;
+      case 'Home': e.preventDefault(); setActiveIdx(0); break;
+      case 'End': e.preventDefault(); setActiveIdx(last); break;
+      case 'Tab': close(false); break;
+      case 'Escape':
+        // Handled here rather than by useDismiss so focus lands back on the
+        // trigger; stopPropagation keeps the hook's own Escape from also firing
+        // and blurring what we just focused.
+        e.preventDefault();
+        e.stopPropagation();
+        close(true);
+        break;
+    }
+  }
+
+  return (
+    <div className="fs-wrap" ref={wrapRef}>
+      <button
+        ref={btnRef}
+        type="button"
+        className={isDefault ? 'fs-btn' : 'fs-btn is-on'}
+        onClick={() => (open ? close(false) : openMenu())}
+        onKeyDown={e => {
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); openMenu(); }
+        }}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title={`${label}: ${active.label}`}
+      >
+        {icon && <Icon name={icon} size={14} />}
+        {label}
+        {/* The chosen option stays on the trigger at ALL times, default included
+            — with a scoped figure on screen, which window you're looking at is
+            never something to have to open a menu to find out. */}
+        <span className="fs-btn-val">· {active.label}</span>
+        <span className="fs-caret" aria-hidden>▾</span>
+      </button>
+
+      {open && (
+        <div
+          className={align === 'right' ? 'fs-pop fs-pop-sort fs-pop-right' : 'fs-pop fs-pop-sort'}
+          role="menu"
+          aria-label={ariaLabel}
+          onKeyDown={onListKeyDown}
+        >
+          {heading && <div className="fs-menu-head">{heading}</div>}
+          <div className="fs-menu">
+            {options.map((o, i) => (
+              <button
+                key={o.key}
+                ref={el => { itemRefs.current[i] = el; }}
+                type="button"
+                role="menuitemradio"
+                aria-checked={o.key === value}
+                className={o.key === value ? 'fs-menu-item is-on' : 'fs-menu-item'}
+                // Roving tabindex: one stop for the whole menu, arrows do the rest.
+                tabIndex={i === activeIdx ? 0 : -1}
+                onMouseEnter={() => setActiveIdx(i)}
+                onClick={() => { onChange(o.key); close(true); }}
+              >
+                {o.label}
+                {o.key === value && <span className="fs-tick" aria-hidden>✓</span>}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>

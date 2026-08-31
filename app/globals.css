@@ -830,6 +830,17 @@ html, body {
   color: var(--text);
 }
 
+/* A label naming the active period ("OUTSTANDING · LAST 12 MONTHS") is far
+   longer than a bare metric name, so it wraps instead of ellipsing away the very
+   word that says what you're looking at. Grid rows stretch, so the cards beside
+   it match height automatically. */
+.studio-stat-label.is-wrap {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.35;
+}
+
 /* Money figures ("$12,345.67") are far longer than the counts these cards were
    built for, so they step down a size and truncate rather than spilling out of
    a 190px card. Counts on the same row keep the full 32px. */
@@ -1082,6 +1093,24 @@ html, body {
 }
 
 .fs-pop-sort { min-width: 210px; }
+
+/* Right-anchored panel. A trigger sitting at the right edge of its row would
+   otherwise open rightward off a narrow viewport — anchoring to its right edge
+   makes the panel grow INWARD instead, at every width. The max-width above
+   (min(440px, 100vw - 24px)) keeps it inside the viewport regardless. */
+.fs-pop-right {
+  left: auto;
+  right: 0;
+}
+
+/* Disclosure chevron on a menu trigger. Muted, and it inherits the button's
+   colour when the trigger lights up, so it never fights the label. */
+.fs-caret {
+  font-size: 9px;
+  line-height: 1;
+  opacity: 0.55;
+  margin-left: -2px;
+}
 
 .fs-rows { display: flex; flex-direction: column; gap: 6px; }
 

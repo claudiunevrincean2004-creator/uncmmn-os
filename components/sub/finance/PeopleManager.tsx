@@ -36,23 +36,30 @@ const EMPTY_DRAFT: PersonDraft = {
 
 interface Props {
   people: FinancePerson[];
-  /** Read-only here — used for each person's outstanding total and to block a
-   *  delete that would orphan payments. */
+  /** Scoped to the tab's period — drives the Outstanding column, so the roster
+   *  agrees with the stat cards above it. */
   payments: FinancePayment[];
+  /** EVERY payment, period ignored. The delete guard must use this: person_id is
+   *  `on delete restrict`, so judging by the current window alone would offer a
+   *  delete for someone whose history simply sits outside it, and the database
+   *  would then refuse the write. */
+  allPayments: FinancePayment[];
+  /** The active period, to label the Outstanding column honestly. */
+  periodName: string;
   /** OS logins, for the optional profile link. Plenty of people we pay have none. */
   profiles: Profile[];
   onReload: () => void;
 }
 
-export default function PeopleManager({ people, payments, profiles, onReload }: Props) {
+export default function PeopleManager({ people, payments, allPayments, periodName, profiles, onReload }: Props) {
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState<PersonDraft>(EMPTY_DRAFT);
   const [creating, setCreating] = useState(false);
 
-  // Per-person unpaid total and payment count, so the roster says who is owed
-  // what without opening anything.
+  // Per-person unpaid total for the active period, so the roster says who is
+  // owed what without opening anything.
   const totals = useMemo(() => {
     const m: Record<string, { outstanding: number; count: number }> = {};
     payments.forEach(p => {
@@ -63,6 +70,13 @@ export default function PeopleManager({ people, payments, profiles, onReload }: 
     });
     return m;
   }, [payments]);
+
+  // Payments per person across ALL time — what the delete guard reads.
+  const everCount = useMemo(() => {
+    const m: Record<string, number> = {};
+    allPayments.forEach(p => { if (p.person_id) m[p.person_id] = (m[p.person_id] || 0) + 1; });
+    return m;
+  }, [allPayments]);
 
   async function patch(id: string, p: Partial<FinancePerson>) {
     const { error } = await supabase.from('finance_people').update(p).eq('id', id);
@@ -106,9 +120,9 @@ export default function PeopleManager({ people, payments, profiles, onReload }: 
   // to drop someone who still has payment history. Catch that here and say so in
   // plain words, then point at the alternative — mark them Inactive.
   async function deletePerson(id: string) {
-    const t = totals[id];
-    if (t && t.count > 0) {
-      alert(`This person has ${t.count} payment${t.count === 1 ? '' : 's'} on record, so they can't be deleted — that history would be lost. Set their status to Inactive instead.`);
+    const n = everCount[id] || 0;
+    if (n > 0) {
+      alert(`This person has ${n} payment${n === 1 ? '' : 's'} on record, so they can't be deleted — that history would be lost. Set their status to Inactive instead.`);
       return;
     }
     const { error } = await supabase.from('finance_people').delete().eq('id', id);
@@ -178,7 +192,7 @@ export default function PeopleManager({ people, payments, profiles, onReload }: 
                     <th>Role</th>
                     <th>Payment Link</th>
                     <th>Status</th>
-                    <th className="st-center">Outstanding</th>
+                    <th className="st-center" title={`Unpaid total in ${periodName}`}>Outstanding</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -215,7 +229,7 @@ export default function PeopleManager({ people, payments, profiles, onReload }: 
                         <td className="st-center">
                           <span
                             style={{ fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: t && t.outstanding > 0 ? 'var(--text)' : 'var(--text-faint)' }}
-                            title={t ? `${t.count} payment${t.count === 1 ? '' : 's'} on record` : 'No payments yet'}
+                            title={t ? `${t.count} payment${t.count === 1 ? '' : 's'} in ${periodName}` : `No payments in ${periodName}`}
                           >
                             {formatUSD(t?.outstanding ?? 0)}
                           </span>

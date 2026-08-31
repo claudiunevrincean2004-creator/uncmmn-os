@@ -49,14 +49,19 @@ const EMPTY_DRAFT: PaymentDraft = {
 };
 
 interface Props {
+  /** ALREADY scoped to the tab's period by FinanceTab — this component filters
+   *  and sorts what it's given and never re-applies the period itself, so the
+   *  stat cards above and these rows are always the same set of payments. */
   payments: FinancePayment[];
   people: FinancePerson[];
+  /** The active period, for the empty state ("No payments in This month"). */
+  periodName: string;
   /** Jump to the People view — offered from the empty state when nobody exists yet. */
   onManagePeople: () => void;
   onReload: () => void;
 }
 
-export default function PaymentsTable({ payments, people, onManagePeople, onReload }: Props) {
+export default function PaymentsTable({ payments, people, periodName, onManagePeople, onReload }: Props) {
   const [fPerson, setFPerson] = usePersistedState<string>('finance_p_person', 'All');
   const [fType, setFType] = usePersistedState<string>('finance_p_type', 'All');
   const [fStatus, setFStatus] = usePersistedState<string>('finance_p_status', 'All');
@@ -268,7 +273,7 @@ export default function PaymentsTable({ payments, people, onManagePeople, onRelo
                 No one to pay yet.{' '}
                 <button className="btn-ghost" style={{ fontSize: 11, padding: '5px 12px', marginLeft: 6 }} onClick={onManagePeople}>Add a person first</button>
               </>
-            ) : 'No payments match. Add a payment or adjust filters.'}
+            ) : `No payments in ${periodName}. Widen the period, adjust filters, or add a payment.`}
           </div>
         ) : (
           <>
