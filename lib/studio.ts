@@ -3,6 +3,18 @@ import { supabase } from './supabase';
 
 export const VIDEO_FORMATS = ['Short', 'Long Form', 'Reel', 'Story', 'Other'];
 
+// The accounts Video Review produces for — Nathan's own and Eden's. THE list:
+// the Add form, the detail panel, the row/card chips and the Account filter all
+// read it from here, so adding a third account is this one line and nothing
+// else. Stored as plain text in studio_videos.account (see
+// supabase/studio_videos_account.sql), not a foreign key — these are a fixed
+// app-owned list, not customer records.
+export const ACCOUNTS = ['Nathan', 'Eden'];
+
+// What a new video defaults to, and what every pre-existing row was backfilled
+// to by the migration.
+export const DEFAULT_ACCOUNT = ACCOUNTS[0];
+
 // Hardcoded team list (editable later). Used for "Assigned To".
 export const TEAM = ['Unassigned', 'Nathan', 'Editor', 'Videographer', 'Scriptwriter', 'Thumbnail Designer'];
 

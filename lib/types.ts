@@ -126,6 +126,7 @@ export interface StudioVideo {
   raw_files_url?: string;
   final_url?: string;                // the Instagram cut (also the main-table column)
   tiktok_final_url?: string;         // the TikTok cut — different CTA; side panel only
+  account?: string;                  // which account this video is for (lib/studio → ACCOUNTS)
   deadline?: string;
   notes?: string;
   revision_count: number;

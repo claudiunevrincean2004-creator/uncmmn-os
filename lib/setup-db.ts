@@ -196,6 +196,7 @@ alter table revenue_entries disable row level security;`);
     parts.push(`create table if not exists studio_videos (
   id uuid primary key default gen_random_uuid(),
   title text not null,
+  account text,
   format text,
   assigned_to text,
   assigned_to_user_id uuid,
