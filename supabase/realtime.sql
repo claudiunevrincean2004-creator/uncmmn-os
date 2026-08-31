@@ -30,6 +30,7 @@ from unnest(array[
   'trial_reel_source', 'trial_reel_production',
   'clipper_accounts', 'clipper_content',
   'clip_source', 'clip_snippet',
+  'finance_people', 'finance_payments',
   'studio_comments', 'studio_activity', 'comment_reads', 'comment_reactions',
   'studio_quick_links', 'studio_dropdown_options',
   'custom_properties', 'custom_property_options', 'profiles'
@@ -71,6 +72,10 @@ begin
     -- Clip Library
     'clip_source',
     'clip_snippet',
+    -- Finance (admin-only). Realtime re-checks each subscriber's SELECT policy,
+    -- and these policies are is_admin(), so a non-admin session receives nothing.
+    'finance_people',
+    'finance_payments',
     -- Comments, activity & inbox
     'studio_comments',          -- comments, replies, inbox badge, unread banner
     'studio_activity',          -- side-panel activity log
@@ -129,6 +134,8 @@ end $$;
 --   alter publication supabase_realtime add table clipper_content;
 --   alter publication supabase_realtime add table clip_source;
 --   alter publication supabase_realtime add table clip_snippet;
+--   alter publication supabase_realtime add table finance_people;
+--   alter publication supabase_realtime add table finance_payments;
 --   alter publication supabase_realtime add table studio_comments;
 --   alter publication supabase_realtime add table studio_activity;
 --   alter publication supabase_realtime add table comment_reads;

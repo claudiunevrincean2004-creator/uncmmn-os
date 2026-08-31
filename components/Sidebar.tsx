@@ -25,6 +25,9 @@ const NAV: NavItem[] = [
   { key: 'studio', label: 'Studio', icon: 'playSquare' },
   { key: 'cliplibrary', label: 'Clip Library', icon: 'stack' },
   { key: 'drive', label: 'Assets', icon: 'archive' },
+  // Admin-only, gated by canAccess exactly like Clippers — an editor or clipper
+  // never sees this entry, because the filter below drops it before render.
+  { key: 'finance', label: 'Finance', icon: 'wallet' },
 ];
 
 /** Parked nav entries — restore one by moving it back into NAV. */

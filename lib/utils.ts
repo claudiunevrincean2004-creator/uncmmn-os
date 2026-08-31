@@ -54,3 +54,23 @@ export function avg(arr: number[]): number {
   if (!arr.length) return 0;
   return arr.reduce((a, b) => a + b, 0) / arr.length;
 }
+
+// Money with cents — "$1,234.56". The Finance tab is USD-only by design, so
+// this never takes a currency argument (finance_payments keeps its `currency`
+// column at its 'USD' default; no UI reads it).
+export function formatUSD(n: number | null | undefined): string {
+  const v = Number(n);
+  if (n == null || isNaN(v)) return '$0.00';
+  return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// "1,234.56" / "$40" / "40.5" → a cents-rounded number. Returns null when
+// there's nothing usable, so a caller can leave the stored value alone rather
+// than writing a 0 over a real figure. Pairs with formatUSD above.
+export function parseUSD(raw: string): number | null {
+  const cleaned = (raw || '').replace(/[$,\s]/g, '');
+  if (!cleaned) return null;
+  const n = Number(cleaned);
+  if (!isFinite(n) || n < 0) return null;
+  return Math.round(n * 100) / 100;
+}

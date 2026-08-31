@@ -33,6 +33,10 @@ export interface SelectFilterDef {
   options: string[];
   /** How 'All' reads inside the popover ("Any status"). */
   anyLabel?: string;
+  /** Display text per stored option value, where the two differ
+   *  ('ready_to_pay' → "Ready to Pay"). Applies to the popover AND the chip, so
+   *  the two always read the same. */
+  optionLabels?: Record<string, string>;
   onChange: (v: string) => void;
 }
 
@@ -55,7 +59,8 @@ export function isFilterActive(d: FilterDef): boolean {
 
 /** The condition's value as it reads on a chip. */
 function filterValueLabel(d: FilterDef): string {
-  return d.kind === 'date' ? rangeLabel(d.from, d.to) : d.value;
+  if (d.kind === 'date') return rangeLabel(d.from, d.to);
+  return d.optionLabels?.[d.value] ?? d.value;
 }
 
 /** Reset one condition to "no constraint", through the tab's own setter. */
@@ -106,7 +111,12 @@ export function FilterChips({ defs }: { defs: FilterDef[] }) {
  * the tabs already do, since each `defs` entry narrows the same row list in
  * turn. Changes apply immediately; there is no Apply button.
  */
-export function FilterMenu({ defs }: { defs: FilterDef[] }) {
+export function FilterMenu({ defs, noun = 'videos' }: {
+  defs: FilterDef[];
+  /** Plural noun for the empty-state heading ("Filter payments by…"). Defaults
+   *  to the Studio tables' own wording so existing callers are untouched. */
+  noun?: string;
+}) {
   const [open, setOpen] = useState(false);
   // Conditions the user added in this popover that aren't narrowing yet (value
   // still "Any"). Active ones don't need tracking — they show themselves.
@@ -185,7 +195,7 @@ export function FilterMenu({ defs }: { defs: FilterDef[] }) {
                       aria-label={`${d.label} value`}
                     >
                       {d.options.map(o => (
-                        <option key={o} value={o}>{o === 'All' ? (d.anyLabel ?? 'Any') : o}</option>
+                        <option key={o} value={o}>{o === 'All' ? (d.anyLabel ?? 'Any') : (d.optionLabels?.[o] ?? o)}</option>
                       ))}
                     </select>
                   ) : (
@@ -213,7 +223,7 @@ export function FilterMenu({ defs }: { defs: FilterDef[] }) {
           {rows.length === 0 || picking ? (
             unused.length ? (
               <div className="fs-menu">
-                {rows.length === 0 && <div className="fs-menu-head">Filter videos by…</div>}
+                {rows.length === 0 && <div className="fs-menu-head">Filter {noun} by…</div>}
                 {unused.map(u => (
                   <button key={u.key} type="button" className="fs-menu-item" onClick={() => addRow(u.key)}>
                     {u.label}

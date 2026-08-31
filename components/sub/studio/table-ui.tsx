@@ -64,8 +64,10 @@ interface ToolbarProps {
   onViewChange?: (v: StudioView) => void;
   /** Rows after filtering — what the count reports. */
   count: number;
-  /** Singular noun; pluralised with a trailing "s". */
+  /** Singular noun; pluralised with a trailing "s" unless countPlural is given. */
   countNoun: string;
+  /** Explicit plural, for nouns a trailing "s" gets wrong ("person" → "people"). */
+  countPlural?: string;
   /** Bare label — the button draws its own "+", so don't prefix one. */
   actionLabel: string;
   onAction: () => void;
@@ -85,6 +87,7 @@ export default function TableToolbar({
   onViewChange,
   count,
   countNoun,
+  countPlural,
   actionLabel,
   onAction,
   children,
@@ -110,7 +113,7 @@ export default function TableToolbar({
 
       <div className="studio-toolbar-end">
         <span className="studio-count">
-          {count} {count === 1 ? countNoun : `${countNoun}s`}
+          {count} {count === 1 ? countNoun : (countPlural ?? `${countNoun}s`)}
         </span>
         <button className="btn-primary" style={{ fontSize: 12, padding: '8px 16px', display: 'inline-flex', alignItems: 'center', gap: 7 }} onClick={onAction}>
           <span aria-hidden style={{ fontSize: 13, lineHeight: 1 }}>+</span>{actionLabel}

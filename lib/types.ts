@@ -51,7 +51,7 @@ export interface RevenueEntry {
   created_at?: string;
 }
 
-export type MainPage = 'dashboard' | 'content' | 'research' | 'drive' | 'studio' | 'clippers' | 'trialreels' | 'cliplibrary';
+export type MainPage = 'dashboard' | 'content' | 'research' | 'drive' | 'studio' | 'clippers' | 'trialreels' | 'cliplibrary' | 'finance';
 
 // A long-form piece in the Clip Library (Overview sheet). name is the unique key.
 export interface ClipSource {
@@ -329,5 +329,44 @@ export interface ResearchItem {
   reason?: string;
   hot: boolean;
   status: ResearchStatus;
+  created_at?: string;
+}
+
+// ── Finance (admin-only) ───────────────────────────────────────────────────
+// Payments to editors and other short-form contributors. Gated exactly like the
+// Clippers tab (see lib/auth-config.ts) — and the tables themselves are
+// admin-only at the RLS layer, which is stricter than the studio_* tables:
+// editors have logins, so "authenticated" would expose everyone's pay to
+// everyone. See supabase/finance.sql.
+
+// One row per person who gets paid. Payment details live HERE, not on each
+// payment row — a payment references its person.
+export interface FinancePerson {
+  id: string;
+  name: string;
+  role?: string | null;          // free text: 'Editor', 'Clipper', 'Designer'…
+  payment_link?: string | null;  // their Wise/PayPal/Revolut link — never bank details
+  notes?: string | null;
+  status?: string | null;        // 'active' | 'inactive'
+  // Optional link to an OS login. Plenty of people we pay have no account, so
+  // this is never required and never used for access control.
+  profile_id?: string | null;
+  created_at?: string;
+}
+
+// One row per payment owed. Amounts are USD; `currency` exists in the schema at
+// its 'USD' default but no UI reads or writes it.
+export interface FinancePayment {
+  id: string;
+  person_id?: string | null;
+  type?: string | null;          // 'trial' | 'retainer' | 'one_off'
+  amount: number;
+  currency?: string | null;
+  status?: string | null;        // 'pending' | 'ready_to_pay' | 'paid'
+  due_date?: string | null;
+  paid_date?: string | null;
+  invoice_url?: string | null;
+  description?: string | null;
+  notes?: string | null;
   created_at?: string;
 }

@@ -10,10 +10,19 @@ export type Role = 'admin' | 'editor' | 'clipper';
 export const EDITOR_ALLOWED: MainPage[] = ['studio', 'drive', 'trialreels'];
 
 // Access tiers:
-//  - admin   → every tab, including the admin-only Clippers management tab.
+//  - admin   → every tab, including the admin-only Clippers and Finance tabs.
 //  - editor  → only EDITOR_ALLOWED (Studio, Assets). Unchanged from before.
 //  - clipper → most restricted: NO admin tabs at all (Phase 1). Their own portal
 //              is Phase 2; for now a clipper sees a minimal placeholder, not the app.
+//
+// Finance ('finance') is admin-only by the SAME mechanism as Clippers: it is
+// simply absent from EDITOR_ALLOWED, so this one function locks it out of the
+// sidebar (Sidebar filters NAV through canAccess) and out of the route (page.tsx
+// renders the tab behind `role === 'admin'` and bounces editors off it). There is
+// no separate finance role and no second gating path — profiles.role is it.
+// The tables are ALSO admin-only at the RLS layer (supabase/finance.sql), which
+// is stricter than the studio_* tables: editors have logins, so "authenticated"
+// would expose everyone's pay to everyone.
 export function canAccess(role: Role, page: MainPage): boolean {
   if (role === 'admin') return true;
   if (role === 'editor') return EDITOR_ALLOWED.includes(page);

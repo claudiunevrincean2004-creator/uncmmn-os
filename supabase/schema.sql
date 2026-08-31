@@ -200,6 +200,42 @@ create table if not exists studio_activity (
   created_at timestamptz default now()
 );
 
+-- Finance — payments to editors and other short-form contributors (ADMIN ONLY).
+-- Payment details live on finance_people, once per person; a payment row
+-- references its person and never carries a copy of the link.
+create table if not exists finance_people (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  role text,                       -- free text: 'Editor', 'Clipper', 'Designer'…
+  payment_link text,               -- their Wise/PayPal/Revolut link — NEVER bank details
+  notes text,
+  status text default 'active',    -- 'active' | 'inactive'
+  -- Optional: plenty of people paid here have no OS login. Never required, and
+  -- never consulted for access control.
+  profile_id uuid references profiles(id) on delete set null,
+  created_at timestamptz default now()
+);
+
+create table if not exists finance_payments (
+  id uuid primary key default gen_random_uuid(),
+  -- restrict, not cascade: deleting someone must never silently erase what they
+  -- were paid. Mark them inactive instead.
+  person_id uuid references finance_people(id) on delete restrict,
+  type text,                       -- 'trial' | 'retainer' | 'one_off'
+  amount numeric not null,
+  currency text default 'USD',     -- everything is USD; no UI reads this column
+  status text,                     -- 'pending' | 'ready_to_pay' | 'paid'
+  due_date date,
+  paid_date date,
+  invoice_url text,
+  description text,
+  notes text,
+  created_at timestamptz default now()
+);
+create index if not exists finance_payments_person_idx on finance_payments (person_id);
+create index if not exists finance_payments_status_idx on finance_payments (status);
+create index if not exists finance_payments_due_date_idx on finance_payments (due_date);
+
 -- Disable RLS for simplicity (enable and add policies for production)
 alter table clients disable row level security;
 alter table posts disable row level security;
@@ -241,3 +277,16 @@ create policy "Allow all for anon" on studio_quick_links for all using (true) wi
 alter table studio_dropdown_options enable row level security;
 drop policy if exists "Allow all for anon" on studio_dropdown_options;
 create policy "Allow all for anon" on studio_dropdown_options for all using (true) with check (true);
+
+-- Finance: ADMIN ONLY, deliberately stricter than the studio_* tables above.
+-- Editors have logins, so a `to authenticated` policy would expose everyone's
+-- pay to everyone. public.is_admin() comes from auth_setup.sql — run that first.
+alter table finance_people enable row level security;
+drop policy if exists "finance_people_admin_all" on finance_people;
+create policy "finance_people_admin_all" on finance_people
+  for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+alter table finance_payments enable row level security;
+drop policy if exists "finance_payments_admin_all" on finance_payments;
+create policy "finance_payments_admin_all" on finance_payments
+  for all to authenticated using (public.is_admin()) with check (public.is_admin());

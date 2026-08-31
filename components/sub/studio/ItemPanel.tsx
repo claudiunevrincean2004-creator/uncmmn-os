@@ -5,7 +5,7 @@ import { StudioComment, StudioActivity, Profile, CommentReaction } from '@/lib/t
 import { formatActivityTime } from '@/lib/studio';
 import { useDismiss } from '@/lib/use-dismiss';
 import { nextChannelName } from '@/lib/use-realtime';
-import { InlineText, EditableText, MiniSelect, PillSelect, EditSelect, EditPillSelect, InlineDate, InlineNumber, MaybeUrl, MaybeUrlCell, UrlCell, isHttpUrl, shortUrl } from './cells';
+import { InlineText, EditableText, MiniSelect, PillSelect, EditSelect, EditPillSelect, InlineDate, InlineNumber, InlineMoney, MaybeUrl, MaybeUrlCell, UrlCell, isHttpUrl, shortUrl } from './cells';
 import { UserPicker, profileName } from './UserPicker';
 import Avatar from '@/components/Avatar';
 import MentionTextarea from '@/components/MentionTextarea';
@@ -36,7 +36,7 @@ function groupReactions(rows: CommentReaction[], currentUserId: string | null, p
 export interface FieldDef {
   key: string;
   label: string;
-  type: 'text' | 'textarea' | 'select' | 'pill' | 'url' | 'maybe-url' | 'date' | 'number' | 'readonly' | 'readonly-multiline' | 'readonly-url' | 'readonly-url-short' | 'readonly-maybe-url' | 'user';
+  type: 'text' | 'textarea' | 'select' | 'pill' | 'url' | 'maybe-url' | 'date' | 'number' | 'money' | 'readonly' | 'readonly-multiline' | 'readonly-url' | 'readonly-url-short' | 'readonly-maybe-url' | 'user';
   options?: string[];
   colors?: Record<string, string>;
   /** Display text per stored option value, for fields whose DB values aren't
@@ -68,8 +68,16 @@ interface Props {
   values: Record<string, any>;
   onChangeField: (key: string, value: any) => void;
   onAddOption: (field: string, value: string) => void;
-  comments: StudioComment[];
-  activity: StudioActivity[];
+  /**
+   * false → render the properties ONLY: no comment thread, no activity log, and
+   * no comment_reactions subscription. Finance uses this, because comments and
+   * activity live in studio_comments / studio_activity, which every authenticated
+   * user can read — the one place a payment discussion must never end up. Every
+   * Studio tab leaves this at its default and is unaffected.
+   */
+  showComments?: boolean;
+  comments?: StudioComment[];
+  activity?: StudioActivity[];
   profiles?: Profile[];
   isAdmin?: boolean;
   onReload: () => void;
@@ -88,6 +96,10 @@ function FieldControl({ field, values, onChangeField, onAddOption, profiles }: {
       return <EditableText value={value} onCommit={v => onChangeField(field.key, v)} placeholder={field.placeholder} />;
     case 'number':
       return <InlineNumber value={Number(value) || 0} onCommit={v => onChangeField(field.key, v)} width={80} />;
+    case 'money':
+      // USD with cents, resting as formatted text — same control the Finance
+      // table uses, so the panel and the row can't drift.
+      return <InlineMoney value={value == null || value === '' ? null : Number(value)} onCommit={v => onChangeField(field.key, v)} />;
     case 'date':
       return <InlineDate value={value} onCommit={v => onChangeField(field.key, v || undefined)} />;
     case 'user':
@@ -97,10 +109,10 @@ function FieldControl({ field, values, onChangeField, onAddOption, profiles }: {
     case 'select':
       return field.field
         ? <EditSelect field={field.field} value={value} options={field.options || []} onChange={v => onChangeField(field.key, v)} onAddOption={onAddOption} placeholder="—" width="100%" allowAdd={field.allowAdd} />
-        : <MiniSelect value={value} options={field.options || []} onChange={v => onChangeField(field.key, v)} placeholder="—" width="100%" />;
+        : <MiniSelect value={value} options={field.options || []} labels={field.optionLabels} onChange={v => onChangeField(field.key, v)} placeholder="—" width="100%" />;
     case 'pill':
       return field.field
-        ? <EditPillSelect size="md" field={field.field} value={value || ''} options={field.options || []} colors={field.colors || {}} onChange={v => onChangeField(field.key, v)} onAddOption={onAddOption} allowAdd={field.allowAdd} allowEmpty={field.allowEmpty} />
+        ? <EditPillSelect size="md" field={field.field} value={value || ''} options={field.options || []} colors={field.colors || {}} labels={field.optionLabels} onChange={v => onChangeField(field.key, v)} onAddOption={onAddOption} allowAdd={field.allowAdd} allowEmpty={field.allowEmpty} />
         : <PillSelect size="md" value={value} options={field.options || []} colors={field.colors || {}} labels={field.optionLabels} onChange={v => onChangeField(field.key, v)} />;
     case 'url':
       // Same renderer the main tables use: the resting state is the clickable,
@@ -137,7 +149,7 @@ function FieldControl({ field, values, onChangeField, onAddOption, profiles }: {
   }
 }
 
-export default function ItemPanel({ itemType, linkType, itemId, title, commentsLabel = 'Comments', onDelete, fields, values, onChangeField, onAddOption, comments, activity, profiles = [], isAdmin = false, onReload, onClose }: Props) {
+export default function ItemPanel({ itemType, linkType, itemId, title, commentsLabel = 'Comments', onDelete, fields, values, onChangeField, onAddOption, showComments = true, comments = [], activity = [], profiles = [], isAdmin = false, onReload, onClose }: Props) {
   const [newComment, setNewComment] = useState('');
   // Whether the new-comment box is focused — drives whether Add is on screen.
   const [composerActive, setComposerActive] = useState(false);
@@ -231,6 +243,9 @@ export default function ItemPanel({ itemType, linkType, itemId, title, commentsL
   visibleCommentIds.current = new Set(itemCommentIdsKey ? itemCommentIdsKey.split(',') : []);
 
   useEffect(() => {
+    // Nothing to keep live on a comment-free panel (Finance) — and no reason to
+    // open a socket for a table it never reads.
+    if (!showComments) return;
     const channel = supabase
       .channel(nextChannelName(`uncmmn-os-reactions:${itemType}:${itemId}`))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'comment_reactions' }, payload => {
@@ -256,7 +271,7 @@ export default function ItemPanel({ itemType, linkType, itemId, title, commentsL
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [itemType, itemId]);
+  }, [itemType, itemId, showComments]);
 
   // Add or remove the current user's `emoji` reaction on a comment. Optimistic: the
   // pill updates immediately and the row is written behind it; the insert's real id
@@ -582,7 +597,9 @@ export default function ItemPanel({ itemType, linkType, itemId, title, commentsL
         })}
       </div>
 
-      {/* Comments */}
+      {/* Comments + Activity. Both live in shared, authenticated-readable tables,
+          so a surface that must not leak (Finance) opts out of the pair. */}
+      {showComments && <>
       <div className="panel-section">
         <div className="panel-section-title">
           {commentsLabel} {itemComments.length > 0 && <span>· {itemComments.length}</span>}
@@ -685,6 +702,7 @@ export default function ItemPanel({ itemType, linkType, itemId, title, commentsL
           </div>
         )}
       </div>
+      </>}
       </div>
     </>
   );

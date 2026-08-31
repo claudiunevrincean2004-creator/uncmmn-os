@@ -479,6 +479,46 @@ html, body {
   background: color-mix(in srgb, var(--neg) 10%, transparent);
 }
 
+/* Money cell (Finance amounts) — the same quiet, click-to-edit resting state as
+   .st-date, but sized and aligned for a figure rather than a chip. Tabular
+   numerals keep a column of amounts on one vertical rhythm; theme colours come
+   entirely from the shared tokens, so aurora and midnight both work with no
+   second copy. */
+.st-money {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  display: inline-block;
+  min-width: 96px;
+  height: 26px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0 8px;
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 24px;
+  color: var(--text);
+  cursor: pointer;
+  outline: none;
+  text-align: right;
+  white-space: nowrap;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.st-money:hover {
+  border-color: var(--border);
+  background: var(--surface-2);
+}
+
+.st-money:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
 /* Centre the date text in the chip and strip the shadow-DOM padding that would
    otherwise push it off-centre. */
 .st-date::-webkit-datetime-edit {
@@ -790,6 +830,16 @@ html, body {
   color: var(--text);
 }
 
+/* Money figures ("$12,345.67") are far longer than the counts these cards were
+   built for, so they step down a size and truncate rather than spilling out of
+   a 190px card. Counts on the same row keep the full 32px. */
+.studio-stat-num.is-money {
+  font-size: 26px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 640px) {
   .studio-stats {
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -798,6 +848,7 @@ html, body {
   .studio-stat { padding: 13px 14px; gap: 11px; }
   .studio-stat-icon { width: 34px; height: 34px; border-radius: 10px; }
   .studio-stat-num { font-size: 26px; }
+  .studio-stat-num.is-money { font-size: 21px; }
 }
 
 /* ===== Studio sub-tabs — underlined text tabs =============================== */

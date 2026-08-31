@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { pillStyle, shortDate } from '@/lib/studio';
+import { formatUSD, parseUSD } from '@/lib/utils';
 
 // Inline text/textarea editor with uniform keyboard behavior across every table:
 //   • Enter           → commit the value and blur (single-line and multi-line)
@@ -191,6 +192,7 @@ export function MiniSelect({
   width,
   size = 'sm',
   allLabel,
+  labels,
 }: {
   value?: string;
   options: string[];
@@ -199,6 +201,9 @@ export function MiniSelect({
   width?: number | string;
   size?: 'sm' | 'md';
   allLabel?: string;
+  /** Display text per stored value, where the two differ (a person's uuid →
+   *  their name, 'one_off' → "One-off"). */
+  labels?: Record<string, string>;
 }) {
   const md = size === 'md';
   return (
@@ -213,7 +218,7 @@ export function MiniSelect({
       onChange={e => onChange(e.target.value)}
     >
       {placeholder && <option value="">{placeholder}</option>}
-      {options.map(o => <option key={o} value={o}>{o === 'All' && allLabel ? allLabel : o}</option>)}
+      {options.map(o => <option key={o} value={o}>{labels?.[o] ?? (o === 'All' && allLabel ? allLabel : o)}</option>)}
     </select>
   );
 }
@@ -281,6 +286,7 @@ export function EditPillSelect({
   allowAdd = true,
   allowEmpty = false,
   size = 'sm',
+  labels,
 }: {
   field: string;
   options: string[];
@@ -291,6 +297,9 @@ export function EditPillSelect({
   allowAdd?: boolean;
   allowEmpty?: boolean;
   size?: 'sm' | 'md';
+  /** Display text per stored value, where the two differ ('ready_to_pay' →
+   *  "Ready to Pay"). Same contract as PillSelect's `labels`. */
+  labels?: Record<string, string>;
 }) {
   const md = size === 'md';
   const color = colors[value] || '#6b7280';
@@ -316,7 +325,7 @@ export function EditPillSelect({
       title="Click to change"
     >
       {allowEmpty && <option value="" style={{ background: 'var(--surface-2)', color: 'var(--text)', fontWeight: 600 }}>—</option>}
-      {opts.map(o => <option key={o} value={o} style={{ background: 'var(--surface-2)', color: 'var(--text)', fontWeight: 600 }}>{o}</option>)}
+      {opts.map(o => <option key={o} value={o} style={{ background: 'var(--surface-2)', color: 'var(--text)', fontWeight: 600 }}>{labels?.[o] ?? o}</option>)}
       {allowAdd && <option value={ADD_NEW} style={{ background: 'var(--surface-2)', color: 'var(--text)', fontWeight: 600 }}>+ Add new…</option>}
     </select>
   );
@@ -498,6 +507,67 @@ export function InlineNumber({
       onChange={e => setV(e.target.value)}
       onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
       onBlur={() => { const n = Math.max(0, parseInt(v) || 0); if (n !== value) onCommit(n); }}
+    />
+  );
+}
+
+// Money cell — reads as "$1,234.56", clicks open a plain number input.
+//
+// Separate from InlineNumber because that one is a spinner-style integer field
+// (parseInt, min 0) built for revision counts; money needs cents and needs to
+// REST as formatted text, so a column of amounts scans as a column of amounts.
+// Commit on blur/Enter, revert on Escape; an unparseable entry reverts rather
+// than writing a 0 over a real figure.
+export function InlineMoney({
+  value,
+  onCommit,
+  placeholder = '—',
+}: {
+  value?: number | null;
+  onCommit: (v: number) => void;
+  placeholder?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [v, setV] = useState(value == null ? '' : String(value));
+  useEffect(() => { if (!editing) setV(value == null ? '' : String(value)); }, [value, editing]);
+  const skipCommit = useRef(false);
+
+  function commit() {
+    setEditing(false);
+    if (skipCommit.current) { skipCommit.current = false; setV(value == null ? '' : String(value)); return; }
+    const n = parseUSD(v);
+    if (n === null || n === value) { setV(value == null ? '' : String(value)); return; }
+    onCommit(n);
+  }
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        className="st-money"
+        title="Click to edit"
+        onClick={() => setEditing(true)}
+      >
+        {value == null ? placeholder : formatUSD(value)}
+      </button>
+    );
+  }
+
+  return (
+    <input
+      autoFocus
+      className="form-input"
+      type="text"
+      inputMode="decimal"
+      value={v}
+      placeholder="0.00"
+      style={{ width: 96, padding: '4px 7px', fontSize: 12, textAlign: 'right' }}
+      onChange={e => setV(e.target.value)}
+      onKeyDown={e => {
+        if (e.key === 'Escape') { skipCommit.current = true; e.currentTarget.blur(); }
+        else if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); }
+      }}
+      onBlur={commit}
     />
   );
 }

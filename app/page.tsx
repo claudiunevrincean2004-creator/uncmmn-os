@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Role, canAccess } from '@/lib/auth-config';
 import { checkSchema, getMigrationSQL } from '@/lib/setup-db';
-import { Client, Post, DriveFolder, SubscriberSnapshot, ResearchItem, StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile, ClipperAccount, ClipperContent, TrialReelSource, TrialReelProduction, ClipSource, ClipSnippet, MainPage } from '@/lib/types';
+import { Client, Post, DriveFolder, SubscriberSnapshot, ResearchItem, StudioVideo, StudioSequence, StudioSession, StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile, ClipperAccount, ClipperContent, TrialReelSource, TrialReelProduction, ClipSource, ClipSnippet, FinancePerson, FinancePayment, MainPage } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { useRealtimeSync, byField, type RealtimeBinding } from '@/lib/use-realtime';
 
@@ -20,6 +20,7 @@ import AssigneeSettings from '@/components/sub/studio/AssigneeSettings';
 import ClippersTab from '@/components/sub/ClippersTab';
 import TrialReelsTab from '@/components/sub/TrialReelsTab';
 import ClipLibraryTab from '@/components/sub/ClipLibraryTab';
+import FinanceTab from '@/components/sub/FinanceTab';
 import StarLogo from '@/components/StarLogo';
 import Avatar from '@/components/Avatar';
 import InboxPanel from '@/components/InboxPanel';
@@ -45,6 +46,7 @@ const PAGE_LABELS: Record<MainPage, string> = {
   trialreels: 'Trial Reels',
   cliplibrary: 'Clip Library',
   clippers: 'Clippers',
+  finance: 'Finance',
 };
 
 const PAGE_SUBTITLES: Record<MainPage, string> = {
@@ -56,6 +58,7 @@ const PAGE_SUBTITLES: Record<MainPage, string> = {
   trialreels: 'Recreate high-converting reels',
   cliplibrary: 'Clips from long-form content',
   clippers: 'Distribution team',
+  finance: 'Payments to editors & contributors',
 };
 
 export default function Home() {
@@ -81,6 +84,10 @@ export default function Home() {
   const [trialReelProductions, setTrialReelProductions] = useState<TrialReelProduction[]>([]);
   const [clipSources, setClipSources] = useState<ClipSource[]>([]);
   const [clipSnippets, setClipSnippets] = useState<ClipSnippet[]>([]);
+  // Finance (admin-only). On a non-admin session RLS returns nothing, so these
+  // simply stay empty — the tab is never mounted for them anyway.
+  const [financePeople, setFinancePeople] = useState<FinancePerson[]>([]);
+  const [financePayments, setFinancePayments] = useState<FinancePayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [schemaMissing, setSchemaMissing] = useState<{ missing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[]; adColumnsMissing: string[]; sessionColumnsMissing: string[]; commentColumnsMissing: string[]; dropdownColsMissing: boolean } | null>(null);
   const [showMigrationSQL, setShowMigrationSQL] = useState(false);
@@ -212,7 +219,7 @@ export default function Home() {
 
   // Migrate stale persisted page values from prior builds
   useEffect(() => {
-    if (!(['dashboard', 'content', 'research', 'drive', 'studio', 'clippers', 'trialreels', 'cliplibrary'] as const).includes(mainPage)) {
+    if (!(['dashboard', 'content', 'research', 'drive', 'studio', 'clippers', 'trialreels', 'cliplibrary', 'finance'] as const).includes(mainPage)) {
       setMainPage('dashboard');
     }
   }, [mainPage, setMainPage]);
@@ -237,13 +244,17 @@ export default function Home() {
       safeSelect('profiles', 'created_at'),
     ]);
 
-    const [ca, cc, trs, trp, cls, cln] = await Promise.all([
+    const [ca, cc, trs, trp, cls, cln, fpe, fpa] = await Promise.all([
       safeSelect('clipper_accounts', 'created_at'),
       safeSelect('clipper_content', 'created_at', false),
       safeSelect('trial_reel_source', 'created_at', false),
       safeSelect('trial_reel_production', 'created_at', false),
       safeSelect('clip_source', 'name'),
       safeSelect('clip_snippet', 'created_at'),
+      // Admin-only at the RLS layer: a non-admin session gets an empty list
+      // here rather than an error, so nothing else on the page is affected.
+      safeSelect('finance_people', 'name'),
+      safeSelect('finance_payments', 'created_at', false),
     ]);
 
     let active = (c as Client[])[0] || null;
@@ -279,6 +290,8 @@ export default function Home() {
     setTrialReelProductions(trp as TrialReelProduction[]);
     setClipSources(cls as ClipSource[]);
     setClipSnippets(cln as ClipSnippet[]);
+    setFinancePeople(fpe as FinancePerson[]);
+    setFinancePayments(fpa as FinancePayment[]);
     setLoading(false);
   }, []);
 
@@ -343,6 +356,10 @@ export default function Home() {
     // Clip Library
     { table: 'clip_source', setRows: setClipSources, sort: byField('name') },
     { table: 'clip_snippet', setRows: setClipSnippets, sort: byField('created_at') },
+    // Finance — realtime re-checks each subscriber's SELECT policy, and the
+    // finance policies are admin-only, so a non-admin session receives nothing.
+    { table: 'finance_people', setRows: setFinancePeople, sort: byField('name') },
+    { table: 'finance_payments', setRows: setFinancePayments, sort: byField('created_at', false) },
     // Comments & inbox — a new comment updates the panel, the sidebar badge and
     // the unread banner together, because all three read this one list.
     { table: 'studio_comments', setRows: setStudioComments, sort: byField('created_at') },
@@ -701,6 +718,19 @@ export default function Home() {
                 snippets={clipSnippets}
                 openItemId={clipOpenId}
                 onDeepLinkConsumed={() => setClipOpenId(undefined)}
+                onReload={loadData}
+              />
+            </div>
+          )}
+          {/* Admin-only, the SAME shape as the Clippers gate directly below:
+              `role === 'admin'` here, canAccess() in the sidebar, and the editor
+              bounce above. An editor or clipper can neither see nor reach it. */}
+          {client && mainPage === 'finance' && role === 'admin' && (
+            <div style={{ padding: '16px 24px' }}>
+              <FinanceTab
+                people={financePeople}
+                payments={financePayments}
+                profiles={studioProfiles}
                 onReload={loadData}
               />
             </div>

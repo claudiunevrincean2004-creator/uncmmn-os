@@ -11,6 +11,10 @@ export async function checkSchema(): Promise<{ missing: string[]; postColumnsMis
     'trial_reel_source', 'trial_reel_production',
     'clip_source', 'clip_snippet',
     'comment_reads',
+    // Finance (admin-only). The probe is a `select id limit 0` — on a non-admin
+    // session RLS returns an empty set, NOT PGRST205, so an editor never sees a
+    // false "Database setup required" banner for these.
+    'finance_people', 'finance_payments',
   ];
 
   // Existence probe column, per table. Everything is keyed by `id` except
@@ -474,6 +478,58 @@ alter table clip_snippet add column if not exists format text;
 alter table clip_snippet enable row level security;
 drop policy if exists "Allow all for anon" on clip_snippet;
 create policy "Allow all for anon" on clip_snippet for all using (true) with check (true);
+notify pgrst, 'reload schema';`);
+  }
+
+  // Finance — payments to editors and other short-form contributors.
+  // Admin-only at the RLS layer (public.is_admin(), from auth_setup.sql), which
+  // is deliberately STRICTER than the studio_* tables: editors have logins, so a
+  // `to authenticated` policy would expose everyone's pay to everyone.
+  // Full annotated version lives in supabase/finance.sql.
+  if (missing.includes('finance_people')) {
+    parts.push(`create table if not exists finance_people (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  role text,
+  -- Their Wise / PayPal / Revolut link. NEVER bank details.
+  payment_link text,
+  notes text,
+  status text default 'active',
+  -- Optional: plenty of people paid here have no OS login. Never required, and
+  -- never consulted for access control.
+  profile_id uuid references profiles(id) on delete set null,
+  created_at timestamptz default now()
+);
+alter table finance_people enable row level security;
+drop policy if exists "finance_people_admin_all" on finance_people;
+create policy "finance_people_admin_all" on finance_people
+  for all to authenticated using (public.is_admin()) with check (public.is_admin());`);
+  }
+
+  if (missing.includes('finance_payments')) {
+    parts.push(`create table if not exists finance_payments (
+  id uuid primary key default gen_random_uuid(),
+  -- restrict, not cascade: deleting someone must never silently erase what they
+  -- were paid. Mark them inactive instead.
+  person_id uuid references finance_people(id) on delete restrict,
+  type text,                       -- 'trial' | 'retainer' | 'one_off'
+  amount numeric not null,
+  currency text default 'USD',     -- everything is USD; no UI reads this
+  status text,                     -- 'pending' | 'ready_to_pay' | 'paid'
+  due_date date,
+  paid_date date,
+  invoice_url text,
+  description text,
+  notes text,
+  created_at timestamptz default now()
+);
+create index if not exists finance_payments_person_idx on finance_payments (person_id);
+create index if not exists finance_payments_status_idx on finance_payments (status);
+create index if not exists finance_payments_due_date_idx on finance_payments (due_date);
+alter table finance_payments enable row level security;
+drop policy if exists "finance_payments_admin_all" on finance_payments;
+create policy "finance_payments_admin_all" on finance_payments
+  for all to authenticated using (public.is_admin()) with check (public.is_admin());
 notify pgrst, 'reload schema';`);
   }
 
