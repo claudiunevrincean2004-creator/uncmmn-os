@@ -58,6 +58,67 @@ export const PERSON_STATUS_COLORS: Record<string, string> = {
   inactive: '#6b7280',
 };
 
+// ── How a person gets paid ──────────────────────────────────────────────────
+// Most contributors can't generate a payment link — they have a bank account and
+// nothing else — so 'bank' is the default rather than an afterthought.
+export const PAYMENT_METHODS = ['link', 'bank', 'other'];
+
+export const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  link: 'Payment link',
+  bank: 'Bank transfer',
+  other: 'Other',
+};
+
+export const PAYMENT_METHOD_COLORS: Record<string, string> = {
+  link: '#14b8a6',   // teal
+  bank: '#3b82f6',   // blue
+  other: '#6b7280',  // gray
+};
+
+/** Short form for a table cell. */
+export const PAYMENT_METHOD_SHORT: Record<string, string> = {
+  link: 'Link',
+  bank: 'Bank',
+  other: 'Other',
+};
+
+export const DEFAULT_PAYMENT_METHOD = 'bank';
+
+/**
+ * The one resolution of "how do I actually pay this person", shared by the
+ * People table's Payment column and the payment panel's Pay Via section — so a
+ * roster row and the panel Maciek settles from can never describe it
+ * differently.
+ *
+ * `value` is what a Copy button puts on the clipboard: the link for 'link', the
+ * bank block for 'bank', the notes for 'other'. Empty when nothing is on file,
+ * which is what drives the "no details yet" prompt rather than a bare dash.
+ */
+export function paymentDetails(person: FinancePerson | undefined | null): {
+  method: string;
+  methodLabel: string;
+  color: string;
+  value: string;
+  notes: string;
+  hasDetails: boolean;
+} {
+  const method = (person?.payment_method || DEFAULT_PAYMENT_METHOD).trim();
+  const notes = (person?.payment_notes || '').trim();
+  const value = (
+    method === 'link' ? person?.payment_link
+    : method === 'bank' ? person?.bank_details
+    : person?.payment_notes
+  ) || '';
+  return {
+    method,
+    methodLabel: PAYMENT_METHOD_LABELS[method] ?? method,
+    color: PAYMENT_METHOD_COLORS[method] ?? PAYMENT_METHOD_COLORS.other,
+    value: value.trim(),
+    notes,
+    hasDetails: value.trim().length > 0,
+  };
+}
+
 /** Display name for a payment's person_id. Null when it maps to no one. */
 export function personName(personId: string | null | undefined, people: FinancePerson[]): string | null {
   if (!personId) return null;

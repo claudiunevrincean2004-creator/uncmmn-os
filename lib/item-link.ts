@@ -35,9 +35,22 @@ export function itemUrl(type: ItemType, id: string): string {
 export async function copyItemLink(type: ItemType, id: string): Promise<boolean> {
   const url = itemUrl(type, id);
   if (!url) return false;
+  return copyText(url);
+}
+
+/**
+ * Put arbitrary text on the clipboard. The async Clipboard API is only available
+ * in secure contexts, so fall back to a hidden textarea + execCommand
+ * (deprecated but still the only option on plain-http hosts). Resolves false
+ * when both paths fail so the caller can say so instead of claiming success.
+ *
+ * Deliberately never logs the text — callers pass bank details through here.
+ */
+export async function copyText(text: string): Promise<boolean> {
+  if (!text) return false;
   try {
     if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(text);
       return true;
     }
   } catch {
@@ -45,7 +58,7 @@ export async function copyItemLink(type: ItemType, id: string): Promise<boolean>
   }
   try {
     const ta = document.createElement('textarea');
-    ta.value = url;
+    ta.value = text;
     ta.setAttribute('readonly', '');
     ta.style.position = 'fixed';
     ta.style.opacity = '0';

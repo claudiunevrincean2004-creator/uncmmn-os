@@ -36,7 +36,13 @@ function groupReactions(rows: CommentReaction[], currentUserId: string | null, p
 export interface FieldDef {
   key: string;
   label: string;
-  type: 'text' | 'textarea' | 'select' | 'pill' | 'url' | 'maybe-url' | 'date' | 'number' | 'money' | 'readonly' | 'readonly-multiline' | 'readonly-url' | 'readonly-url-short' | 'readonly-maybe-url' | 'user';
+  type: 'text' | 'textarea' | 'select' | 'pill' | 'url' | 'maybe-url' | 'date' | 'number' | 'money' | 'readonly' | 'readonly-multiline' | 'readonly-url' | 'readonly-url-short' | 'readonly-maybe-url' | 'user' | 'custom';
+  /**
+   * `type: 'custom'` only — render the row's value yourself. For a property that
+   * is genuinely richer than a field (Finance's Pay Via block: a method pill,
+   * the details, a copy button and a link to where they're edited).
+   */
+  render?: (values: Record<string, any>) => ReactNode;
   options?: string[];
   colors?: Record<string, string>;
   /** Display text per stored option value, for fields whose DB values aren't
@@ -100,6 +106,8 @@ interface Props {
 function FieldControl({ field, values, onChangeField, onAddOption, profiles }: { field: FieldDef; values: Record<string, any>; onChangeField: (k: string, v: any) => void; onAddOption: (f: string, v: string) => void; profiles: Profile[] }) {
   const value = values[field.key];
   switch (field.type) {
+    case 'custom':
+      return <>{field.render?.(values)}</>;
     case 'text':
       return <InlineText value={value} onCommit={v => onChangeField(field.key, v)} placeholder={field.placeholder} style={{ width: '100%' }} />;
     case 'textarea':

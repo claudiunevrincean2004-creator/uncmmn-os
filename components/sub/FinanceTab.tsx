@@ -101,6 +101,13 @@ export default function FinanceTab({ people, payments, profiles, onReload }: Pro
   // would hide the exact rows this warning exists to get fixed.
   const undated = useMemo(() => payments.filter(missingPaidDate), [payments]);
   const [showUndated, setShowUndated] = useState(false);
+  // One-shot navigation between the two sub-tabs: a payment's Pay Via section
+  // sends you to its person, and a person's history sends you back to a payment
+  // (or to their payments). Each is consumed by the receiving table and cleared,
+  // so returning to a tab later never re-triggers it.
+  const [openPersonId, setOpenPersonId] = useState<string | null>(null);
+  const [openPaymentId, setOpenPaymentId] = useState<string | null>(null);
+  const [personFilter, setPersonFilter] = useState<string | null>(null);
   // Fixing the last one empties the list, which drops the table straight back to
   // the period — no stale "0 rows" view to dismiss by hand.
   const undatedOpen = showUndated && undated.length > 0;
@@ -240,6 +247,10 @@ export default function FinanceTab({ people, payments, profiles, onReload }: Pro
           people={people}
           periodName={periodName}
           onManagePeople={() => setSub('people')}
+          onOpenPerson={id => { setOpenPersonId(id); setSub('people'); }}
+          openPaymentId={openPaymentId}
+          personFilter={personFilter}
+          onNavConsumed={() => { setOpenPaymentId(null); setPersonFilter(null); }}
           onReload={onReload}
         />
       )}
@@ -254,6 +265,13 @@ export default function FinanceTab({ people, payments, profiles, onReload }: Pro
           allPayments={payments}
           periodName={periodName}
           profiles={profiles}
+          openPersonId={openPersonId}
+          onOpened={() => setOpenPersonId(null)}
+          // Opening one payment from a person's history widens the period to All
+          // time first: their history ignores the picker, so a row from another
+          // month would otherwise land on a table that doesn't contain it.
+          onOpenPayment={id => { setDateFrom(''); setDateTo(''); setOpenPaymentId(id); setSub('payments'); }}
+          onViewPayments={name => { setDateFrom(''); setDateTo(''); setPersonFilter(name); setSub('payments'); }}
           onReload={onReload}
         />
       )}

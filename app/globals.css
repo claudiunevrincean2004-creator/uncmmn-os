@@ -1755,7 +1755,257 @@ html, body {
 
 .panel-notify-btn:disabled { opacity: 0.55; cursor: default; }
 
-/* ===== Dropdown — the app's one option picker ===============================
+/* ===== Finance payment details =============================================
+   How a person gets paid: a method chip, the value itself, and one-click copy.
+   Rendered ONLY inside the admin-gated Finance tab — never exported, never
+   logged, never sent to Slack. Every colour is a token or the method's own,
+   which rides in as --pay-color. */
+.pay-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--pay-color, var(--text-dim));
+  background: color-mix(in srgb, var(--pay-color, var(--text-faint)) 14%, transparent);
+  border: 0.5px solid color-mix(in srgb, var(--pay-color, var(--text-faint)) 35%, transparent);
+}
+
+.pay-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pay-missing {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+/* --- Copy control --- */
+.copy-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.copy-value.is-icon {
+  padding: 3px 6px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.copy-value:hover { color: var(--text); border-color: var(--text-faint); }
+
+.copy-value.is-ok {
+  color: var(--pos);
+  border-color: color-mix(in srgb, var(--pos) 45%, transparent);
+  background: color-mix(in srgb, var(--pos) 12%, transparent);
+}
+
+.copy-value:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* --- Pay Via, in the payment panel --- */
+.pay-via {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.pay-via-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pay-via-link {
+  font-size: 12px;
+  color: var(--accent);
+  word-break: break-all;
+}
+
+/* An IBAN is read digit by digit, so it gets a monospaced block rather than a
+   wrapped sentence — and keeps the line breaks it was entered with. */
+.pay-via-block {
+  width: 100%;
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.pay-via-missing,
+.pay-via-empty {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--warn);
+}
+
+.pay-via-notes {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+}
+
+.pay-via-edit {
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.pay-via-edit:hover { text-decoration: underline; }
+.pay-via-edit:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+/* ===== Payment history — a person's payments inside their panel =============
+   A list, not a second table: four columns, no totals. */
+.pay-hist { width: 100%; }
+
+.pay-hist-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+
+.pay-hist-count {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 10px;
+  letter-spacing: 0;
+  color: var(--text-dim);
+}
+
+.pay-hist-empty {
+  padding: 14px 0;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.pay-hist-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.pay-hist-row {
+  display: grid;
+  grid-template-columns: minmax(64px, auto) 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 11px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.pay-hist-row:last-child { border-bottom: none; }
+.pay-hist-row:hover { background: var(--surface-2); }
+.pay-hist-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.pay-hist-amount {
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.pay-hist-type {
+  font-size: 11px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Same colour source as the payments table's status pill (PAYMENT_STATUS_COLORS),
+   so a status reads identically in both places. */
+.pay-hist-pill {
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--pay-color, var(--text-dim));
+  background: color-mix(in srgb, var(--pay-color, var(--text-faint)) 14%, transparent);
+  border: 0.5px solid color-mix(in srgb, var(--pay-color, var(--text-faint)) 35%, transparent);
+}
+
+.pay-hist-date {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.pay-hist-all {
+  margin-top: 9px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.pay-hist-all:hover { text-decoration: underline; }
+.pay-hist-all:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+@media (max-width: 640px) {
+  /* Type is the first thing to give up when the panel narrows — amount, status
+     and date are what you scan for. */
+  .pay-hist-row { grid-template-columns: minmax(60px, auto) auto 1fr; gap: 8px; }
+  .pay-hist-type { display: none; }
+  .pay-hist-date { text-align: right; }
+}
+
+/* The panel footer holds more than one block now (Slack state, then history). */
+.panel-footer { flex-direction: column; gap: 18px; }
+
+/* ===== Dropdown — the app's one option picker ===/* ===== Dropdown — the app's one option picker ===============================
    Replaces every native <select>. The panel is a plain .fs-pop with .fs-menu-item
    rows, so a dropdown and the Filter/Sort popovers are visibly the same control.
    The trigger comes in two shapes: a coloured pill (tables, detail panels) and a

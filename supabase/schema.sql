@@ -207,7 +207,14 @@ create table if not exists finance_people (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   role text,                       -- free text: 'Editor', 'Clipper', 'Designer'…
-  payment_link text,               -- their Wise/PayPal/Revolut link — NEVER bank details
+  -- How they get paid: 'link' | 'bank' | 'other'. Most contributors can't
+  -- generate a payment link, so 'bank' is the default.
+  payment_method text default 'bank',
+  payment_link text,               -- their Wise/PayPal/Revolut link ('link')
+  -- IBAN / account number / SWIFT / holder name, free text ('bank'). Admin-only
+  -- at the RLS layer below; rendered only in the Finance tab, never in Slack.
+  bank_details text,
+  payment_notes text,              -- preferred currency, required reference, etc.
   notes text,
   status text default 'active',    -- 'active' | 'inactive'
   -- Optional: plenty of people paid here have no OS login. Never required, and
@@ -250,6 +257,11 @@ alter table finance_payments
   check (status is distinct from 'paid' or paid_date is not null);
 -- Top-up for an install that predates the Slack ping bookkeeping.
 alter table finance_payments add column if not exists notified_at timestamptz;
+-- Top-ups for an install that predates the payment-details columns.
+alter table finance_people add column if not exists payment_method text default 'bank';
+alter table finance_people add column if not exists bank_details text;
+alter table finance_people add column if not exists payment_notes text;
+
 create index if not exists finance_payments_person_idx on finance_payments (person_id);
 create index if not exists finance_payments_status_idx on finance_payments (status);
 create index if not exists finance_payments_due_date_idx on finance_payments (due_date);

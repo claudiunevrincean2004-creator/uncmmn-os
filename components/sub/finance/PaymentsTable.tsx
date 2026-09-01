@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { FinancePayment, FinancePerson, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
@@ -11,8 +11,9 @@ import { financeApproverMention } from '@/lib/team-slack';
 import {
   PAYMENT_TYPES, PAYMENT_TYPE_LABELS, PAYMENT_TYPE_COLORS,
   PAYMENT_STATUSES, PAYMENT_STATUS_LABELS, PAYMENT_STATUS_COLORS,
-  personFor, personName,
+  personFor, personName, paymentDetails, PAYMENT_METHOD_COLORS,
 } from '@/lib/finance';
+import CopyValue from './CopyValue';
 
 // Everything below the surface is borrowed wholesale from Video Review — the
 // same toolbar, the same collapsed Filter/Sort popovers, the same table shell,
@@ -97,10 +98,17 @@ interface Props {
   periodName: string;
   /** Jump to the People view — offered from the empty state when nobody exists yet. */
   onManagePeople: () => void;
+  /** Open one person's record — the Pay Via section's "Edit on <name>" link. */
+  onOpenPerson: (personId: string) => void;
+  /** Open this payment on arrival (from a person's history list). One-shot. */
+  openPaymentId?: string | null;
+  /** Apply this person NAME to the person filter once, then clear it. */
+  personFilter?: string | null;
+  onNavConsumed?: () => void;
   onReload: () => void;
 }
 
-export default function PaymentsTable({ payments, people, profiles, focus, periodName, onManagePeople, onReload }: Props) {
+export default function PaymentsTable({ payments, people, profiles, focus, periodName, onManagePeople, onOpenPerson, openPaymentId, personFilter, onNavConsumed, onReload }: Props) {
   const [fPerson, setFPerson] = usePersistedState<string>('finance_p_person', 'All');
   const [fType, setFType] = usePersistedState<string>('finance_p_type', 'All');
   const [fStatus, setFStatus] = usePersistedState<string>('finance_p_status', 'All');
@@ -119,6 +127,16 @@ export default function PaymentsTable({ payments, people, profiles, focus, perio
   // itself saved fine and a modal would imply otherwise.
   const [toast, setToast] = useState<{ msg: string; isError: boolean } | null>(null);
   const [resending, setResending] = useState(false);
+
+  // Arriving from a person's panel: open one payment, and/or narrow to that
+  // person. One-shot, cleared through onNavConsumed so a later visit to the tab
+  // doesn't re-apply it.
+  useEffect(() => {
+    if (!openPaymentId && !personFilter) return;
+    if (openPaymentId) setSelectedId(openPaymentId);
+    if (personFilter) setFPerson(personFilter);
+    onNavConsumed?.();
+  }, [openPaymentId, personFilter, onNavConsumed, setFPerson]);
 
   function showToast(msg: string, isError = false) {
     setToast({ msg, isError });
@@ -401,16 +419,21 @@ export default function PaymentsTable({ payments, people, profiles, focus, perio
     { key: 'invoice_url', label: 'Invoice', type: 'url' },
     { key: 'description', label: 'Description', type: 'textarea', placeholder: 'What this payment covers' },
     { key: 'notes', label: 'Notes', type: 'textarea', placeholder: 'Internal notes' },
-    // Read-only: the payment link lives on the PERSON, never on the payment.
-    { key: 'person_payment_link', label: 'Pay Via', type: 'readonly-url-short' },
+    // Read-only ON PURPOSE: payment details belong to the person, not to each
+    // payment, so editing them here would let two payments to the same person
+    // disagree about where the money goes. The link below says where they ARE
+    // edited, so read-only doesn't read as broken.
+    {
+      key: 'pay_via', label: 'Pay Via', type: 'custom',
+      render: () => <PayVia person={selectedPerson} onEdit={onOpenPerson} />,
+    },
     { key: 'person_role', label: 'Role', type: 'readonly' },
-  ], [assignable]);
+  ], [assignable, selectedPerson, onOpenPerson]);
 
   // The row plus the two person-derived, read-only rows above. Never written
   // back — the panel only calls onChangeField for editable fields.
   const panelValues = useMemo(() => (selected ? {
     ...selected,
-    person_payment_link: selectedPerson?.payment_link ?? '',
     person_role: selectedPerson?.role ?? '',
   } : {}), [selected, selectedPerson]);
 
@@ -701,6 +724,58 @@ export default function PaymentsTable({ payments, people, profiles, focus, perio
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * How to actually pay this payment's person — the row Maciek works from.
+ *
+ * Reads through paymentDetails(), the same resolution the People table's Payment
+ * column uses, so the roster and this panel can never describe someone's method
+ * differently. Read-only here by design; the "Edit on <name>" link is what keeps
+ * that from reading as a dead end.
+ *
+ * SECURITY: this is the only place bank details render outside the person
+ * record, and both sit behind the admin-only Finance tab and its RLS policy.
+ * Nothing here is exported, logged, or sent to Slack.
+ */
+function PayVia({
+  person,
+  onEdit,
+}: {
+  person: FinancePerson | undefined;
+  onEdit: (personId: string) => void;
+}) {
+  if (!person) {
+    return <span className="pay-via-empty">No person assigned to this payment yet.</span>;
+  }
+  const d = paymentDetails(person);
+  return (
+    <div className="pay-via">
+      <div className="pay-via-head">
+        <span className="pay-chip" style={{ '--pay-color': d.color } as React.CSSProperties}>{d.methodLabel}</span>
+        {d.hasDetails && <CopyValue value={d.value} label="Copy" what={`${d.methodLabel.toLowerCase()} for ${person.name || 'this person'}`} />}
+      </div>
+
+      {d.hasDetails ? (
+        d.method === 'link'
+          ? <a className="pay-via-link" href={d.value} target="_blank" rel="noopener noreferrer">{d.value}</a>
+          // Bank blocks are multi-line by nature (holder, IBAN, SWIFT) — shown
+          // as written, in a monospaced block so an IBAN can be read digit by
+          // digit rather than as a wrapped sentence.
+          : <div className="pay-via-block">{d.value}</div>
+      ) : (
+        <div className="pay-via-missing">
+          No payment details on file — add them on the person record.
+        </div>
+      )}
+
+      {d.notes && d.method !== 'other' && <div className="pay-via-notes">{d.notes}</div>}
+
+      <button type="button" className="pay-via-edit" onClick={() => onEdit(person.id)}>
+        Edit on {person.name || 'this person'} →
+      </button>
     </div>
   );
 }

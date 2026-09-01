@@ -39,6 +39,24 @@ alter table public.finance_people add column if not exists notes text;
 alter table public.finance_people add column if not exists status text default 'active';
 alter table public.finance_people add column if not exists profile_id uuid references public.profiles(id) on delete set null;
 
+-- HOW this person actually gets paid. Most contributors can't generate a payment
+-- link — they have a bank account and nothing else — so the link column alone
+-- was never enough.
+--   'link'  → payment_link holds a Wise/PayPal/Revolut request
+--   'bank'  → bank_details holds IBAN / account number / SWIFT / holder name
+--   'other' → payment_notes explains it
+-- bank_details is free text on purpose: IBAN, routing+account, SWIFT and a
+-- holder name have no single shape across countries, and a schema that guesses
+-- wrong is worse than a box you can paste into.
+--
+-- SECURITY: these columns are readable ONLY through the admin-only RLS policy
+-- below. They are rendered nowhere but the Finance tab, and never travel to
+-- Slack — see app/api/finance-notify/route.ts, which carries a summary and a
+-- link and nothing else.
+alter table public.finance_people add column if not exists payment_method text default 'bank';
+alter table public.finance_people add column if not exists bank_details text;
+alter table public.finance_people add column if not exists payment_notes text;
+
 alter table public.finance_people enable row level security;
 drop policy if exists "finance_people_admin_all" on public.finance_people;
 create policy "finance_people_admin_all" on public.finance_people

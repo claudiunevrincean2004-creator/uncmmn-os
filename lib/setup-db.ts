@@ -491,8 +491,14 @@ notify pgrst, 'reload schema';`);
   id uuid primary key default gen_random_uuid(),
   name text not null,
   role text,
-  -- Their Wise / PayPal / Revolut link. NEVER bank details.
-  payment_link text,
+  -- How they get paid: 'link' | 'bank' | 'other'. Most contributors can't
+  -- generate a payment link, so 'bank' is the default.
+  payment_method text default 'bank',
+  payment_link text,               -- Wise / PayPal / Revolut request ('link')
+  -- IBAN / account number / SWIFT / holder name, free text ('bank'). Admin-only
+  -- at the RLS layer below; rendered only in the Finance tab, never in Slack.
+  bank_details text,
+  payment_notes text,              -- preferred currency, required reference, etc.
   notes text,
   status text default 'active',
   -- Optional: plenty of people paid here have no OS login. Never required, and

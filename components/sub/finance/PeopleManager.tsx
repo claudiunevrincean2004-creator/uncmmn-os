@@ -1,11 +1,17 @@
 'use client';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { FinancePerson, FinancePayment, Profile } from '@/lib/types';
 import { formatUSD } from '@/lib/utils';
-import { PERSON_STATUSES, PERSON_STATUS_LABELS, PERSON_STATUS_COLORS } from '@/lib/finance';
+import {
+  PERSON_STATUSES, PERSON_STATUS_LABELS, PERSON_STATUS_COLORS,
+  PAYMENT_METHODS, PAYMENT_METHOD_LABELS, PAYMENT_METHOD_COLORS, PAYMENT_METHOD_SHORT,
+  DEFAULT_PAYMENT_METHOD, paymentDetails,
+  PAYMENT_STATUS_LABELS, PAYMENT_STATUS_COLORS, PAYMENT_TYPE_LABELS, anchorDate,
+} from '@/lib/finance';
+import CopyValue from './CopyValue';
 
-import { EditPillSelect, InlineText, UrlCell } from '../studio/cells';
+import { EditPillSelect, InlineText } from '../studio/cells';
 import TableToolbar, { rowAccent, openOnRowClick, TitleCell } from '../studio/table-ui';
 import ItemPanel, { FieldDef } from '../studio/ItemPanel';
 import { UserPicker } from '../studio/UserPicker';
@@ -20,7 +26,10 @@ import { UserPicker } from '../studio/UserPicker';
 interface PersonDraft {
   name: string;
   role: string;
+  payment_method: string;
   payment_link: string;
+  bank_details: string;
+  payment_notes: string;
   status: string;
   profile_id: string;
   notes: string;
@@ -28,7 +37,12 @@ interface PersonDraft {
 const EMPTY_DRAFT: PersonDraft = {
   name: '',
   role: '',
+  // Most contributors can't generate a payment link, so the form opens on the
+  // common case rather than on the exception.
+  payment_method: DEFAULT_PAYMENT_METHOD,
   payment_link: '',
+  bank_details: '',
+  payment_notes: '',
   status: 'active',
   profile_id: '',
   notes: '',
@@ -48,15 +62,27 @@ interface Props {
   periodName: string;
   /** OS logins, for the optional profile link. Plenty of people we pay have none. */
   profiles: Profile[];
+  /** Open this person's panel on arrival — set when a payment's Pay Via section
+   *  sends the user here to edit the details. One-shot; cleared via onOpened. */
+  openPersonId?: string | null;
+  onOpened?: () => void;
+  /** Jump to a single payment (from the person's history list). */
+  onOpenPayment: (paymentId: string) => void;
+  /** Jump to the Payments table, filtered to this person by name. */
+  onViewPayments: (personName: string) => void;
   onReload: () => void;
 }
 
-export default function PeopleManager({ people, payments, allPayments, periodName, profiles, onReload }: Props) {
+export default function PeopleManager({ people, payments, allPayments, periodName, profiles, openPersonId, onOpened, onOpenPayment, onViewPayments, onReload }: Props) {
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState<PersonDraft>(EMPTY_DRAFT);
   const [creating, setCreating] = useState(false);
+
+  // Arriving from a payment's "Edit on <name>" link. Same one-shot idiom the
+  // Studio tables use for Slack deep links.
+  useEffect(() => { if (openPersonId) { setSelectedId(openPersonId); onOpened?.(); } }, [openPersonId, onOpened]);
 
   // Per-person unpaid total for the active period, so the roster says who is
   // owed what without opening anything.
@@ -81,7 +107,9 @@ export default function PeopleManager({ people, payments, allPayments, periodNam
   async function patch(id: string, p: Partial<FinancePerson>) {
     const { error } = await supabase.from('finance_people').update(p).eq('id', id);
     if (error) {
-      console.error('[Finance] failed to update person', { id, patch: p, error });
+      // Log which FIELDS failed, never their values — a patch here can carry
+      // bank details, and a console line is a view like any other.
+      console.error('[Finance] failed to update person', { id, fields: Object.keys(p), error });
       alert(`Couldn't save changes: ${error.message}`);
     }
     onReload();
@@ -95,7 +123,12 @@ export default function PeopleManager({ people, payments, allPayments, periodNam
     const row = {
       name,
       role: draft.role.trim() || null,
-      payment_link: draft.payment_link.trim() || null,
+      payment_method: draft.payment_method || DEFAULT_PAYMENT_METHOD,
+      // Only the field the chosen method actually uses is written. Switching
+      // method in the form and back must not quietly persist the other one.
+      payment_link: draft.payment_method === 'link' ? (draft.payment_link.trim() || null) : null,
+      bank_details: draft.payment_method === 'bank' ? (draft.bank_details.trim() || null) : null,
+      payment_notes: draft.payment_notes.trim() || null,
       status: draft.status || 'active',
       profile_id: draft.profile_id || null,
       notes: draft.notes.trim() || null,
@@ -103,7 +136,9 @@ export default function PeopleManager({ people, payments, allPayments, periodNam
     const { error } = await supabase.from('finance_people').insert([row]);
     setCreating(false);
     if (error) {
-      console.error('[Finance] failed to create person', { row, error });
+      // Fields, never values: `row` carries bank details, and a console line is
+      // a view like any other. Same rule as patch() above.
+      console.error('[Finance] failed to create person', { fields: Object.keys(row), error });
       alert(`Couldn't add person: ${error.message}`);
       return;
     }
@@ -153,10 +188,39 @@ export default function PeopleManager({ people, payments, allPayments, periodNam
 
   const selected = selectedId ? people.find(p => p.id === selectedId) ?? null : null;
 
+  // This person's FULL history, newest first — deliberately from allPayments,
+  // not the period-scoped list, because a person's record is their whole record.
+  // No refetch: these rows are already in state, so this is a filter.
+  const history = useMemo(() => {
+    if (!selected) return [];
+    return allPayments
+      .filter(p => p.person_id === selected.id)
+      // anchorDate is the tab's one filing rule — paid_date once paid, due_date
+      // before that — so this list orders the same way the cards count.
+      .sort((a, b) => (anchorDate(b) || '').localeCompare(anchorDate(a) || ''));
+  }, [allPayments, selected]);
+
   const fields: FieldDef[] = useMemo(() => [
     { key: 'name', label: 'Name', type: 'text', placeholder: 'Full name' },
     { key: 'role', label: 'Role', type: 'text', placeholder: 'Editor, Clipper, Designer…' },
-    { key: 'payment_link', label: 'Payment Link', type: 'url' },
+    {
+      key: 'payment_method', label: 'Pay By', type: 'pill', field: 'finance_payment_method',
+      options: PAYMENT_METHODS, colors: PAYMENT_METHOD_COLORS, optionLabels: PAYMENT_METHOD_LABELS,
+      allowAdd: false,
+    },
+    // Each detail field shows only for the method that uses it — an IBAN box on
+    // someone paid by link is noise, and a link box on someone paid by transfer
+    // is a dead end. Notes always show: currency and reference apply either way.
+    {
+      key: 'payment_link', label: 'Payment Link', type: 'url',
+      visibleIf: v => (v.payment_method || DEFAULT_PAYMENT_METHOD) === 'link',
+    },
+    {
+      key: 'bank_details', label: 'Bank Details', type: 'textarea',
+      placeholder: 'Account holder, IBAN / account number, SWIFT…',
+      visibleIf: v => (v.payment_method || DEFAULT_PAYMENT_METHOD) === 'bank',
+    },
+    { key: 'payment_notes', label: 'Payment Notes', type: 'textarea', placeholder: 'Preferred currency, required reference…' },
     { key: 'status', label: 'Status', type: 'pill', field: 'finance_person_status', options: PERSON_STATUSES, colors: PERSON_STATUS_COLORS, optionLabels: PERSON_STATUS_LABELS, allowAdd: false },
     // Optional: many people we pay have no OS login at all, so this is never
     // required and is never consulted for access.
@@ -190,7 +254,7 @@ export default function PeopleManager({ people, payments, allPayments, periodNam
                   <tr>
                     <th style={{ minWidth: 200 }}>Name</th>
                     <th>Role</th>
-                    <th>Payment Link</th>
+                    <th>Payment</th>
                     <th>Status</th>
                     <th className="st-center" title={`Unpaid total in ${periodName}`}>Outstanding</th>
                     <th></th>
@@ -213,7 +277,24 @@ export default function PeopleManager({ people, payments, allPayments, periodNam
                         <td>
                           <InlineText value={p.role || ''} onCommit={v => patch(p.id, { role: v || null })} placeholder="—" style={{ width: 150 }} />
                         </td>
-                        <td><UrlCell value={p.payment_link || undefined} onCommit={u => patch(p.id, { payment_link: u || null })} /></td>
+                        <td>{/* Method at a glance plus one-click copy of the
+                              underlying value — the details themselves stay in
+                              the panel rather than sitting in a scannable
+                              column. */}
+                          {(() => {
+                            const d = paymentDetails(p);
+                            return (
+                              <div className="pay-cell">
+                                <span className="pay-chip" style={{ '--pay-color': d.color } as React.CSSProperties}>
+                                  {PAYMENT_METHOD_SHORT[d.method] ?? d.method}
+                                </span>
+                                {d.hasDetails
+                                  ? <CopyValue value={d.value} variant="icon" what={`${d.methodLabel.toLowerCase()} for ${p.name || 'this person'}`} />
+                                  : <span className="pay-missing" title="No payment details on file">Not set</span>}
+                              </div>
+                            );
+                          })()}
+                        </td>
                         <td>
                           <EditPillSelect
                             size="md"
@@ -260,6 +341,13 @@ export default function PeopleManager({ people, payments, allPayments, periodNam
           title={selected.name || 'Unnamed'}
           fields={fields}
           values={selected}
+          footer={
+            <PaymentHistory
+              rows={history}
+              onOpen={onOpenPayment}
+              onViewAll={() => onViewPayments(selected.name || '')}
+            />
+          }
           // Blank ('' from a text field) and undefined (a cleared date) both have
           // to reach Postgres as an explicit null — an undefined value would be
           // dropped from the JSON body, making the write a silent no-op.
@@ -288,8 +376,23 @@ export default function PeopleManager({ people, payments, allPayments, periodNam
               <DraftField label="Role">
                 <input className="form-input" value={draft.role} onChange={e => setDraft(d => ({ ...d, role: e.target.value }))} placeholder="Editor, Clipper, Designer…" style={{ width: '100%', fontSize: 12 }} />
               </DraftField>
-              <DraftField label="Payment Link">
-                <input className="form-input" value={draft.payment_link} onChange={e => setDraft(d => ({ ...d, payment_link: e.target.value }))} placeholder="https://wise.com/pay/…" style={{ width: '100%', fontSize: 12 }} />
+              <DraftField label="Pay By">
+                <EditPillSelect field="finance_payment_method" value={draft.payment_method} options={PAYMENT_METHODS} colors={PAYMENT_METHOD_COLORS} labels={PAYMENT_METHOD_LABELS} onChange={m => setDraft(d => ({ ...d, payment_method: m }))} allowAdd={false} />
+              </DraftField>
+              {/* Only the field the chosen method uses — see createPerson, which
+                  writes only that one. */}
+              {draft.payment_method === 'link' && (
+                <DraftField label="Payment Link">
+                  <input className="form-input" value={draft.payment_link} onChange={e => setDraft(d => ({ ...d, payment_link: e.target.value }))} placeholder="https://wise.com/pay/…" style={{ width: '100%', fontSize: 12 }} />
+                </DraftField>
+              )}
+              {draft.payment_method === 'bank' && (
+                <DraftField label="Bank Details">
+                  <textarea className="form-input" value={draft.bank_details} onChange={e => setDraft(d => ({ ...d, bank_details: e.target.value }))} placeholder={'Account holder\nIBAN / account number\nSWIFT / sort code'} rows={3} style={{ resize: 'vertical', fontSize: 12, lineHeight: 1.45, width: '100%' }} />
+                </DraftField>
+              )}
+              <DraftField label="Payment Notes">
+                <textarea className="form-input" value={draft.payment_notes} onChange={e => setDraft(d => ({ ...d, payment_notes: e.target.value }))} placeholder="Preferred currency, required reference…" rows={2} style={{ resize: 'vertical', fontSize: 12, lineHeight: 1.4, width: '100%' }} />
               </DraftField>
               <DraftField label="Status">
                 <EditPillSelect field="finance_person_status" value={draft.status} options={PERSON_STATUSES} colors={PERSON_STATUS_COLORS} labels={PERSON_STATUS_LABELS} onChange={s => setDraft(d => ({ ...d, status: s }))} allowAdd={false} />
@@ -303,7 +406,7 @@ export default function PeopleManager({ people, payments, allPayments, periodNam
             </div>
 
             <div style={{ fontSize: 10, color: 'var(--text-faint)', marginTop: 12, lineHeight: 1.5 }}>
-              Payment links only — never bank details. An OS account is optional; plenty of people paid here have no login.
+              Payment details live only in this admin-only tab — they are never exported and never sent to Slack. An OS account is optional; plenty of people paid here have no login.
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
@@ -312,6 +415,68 @@ export default function PeopleManager({ people, payments, allPayments, periodNam
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+const HISTORY_LIMIT = 10;
+
+/**
+ * A person's payments, compact, inside their panel. A list — not a second
+ * payments table — so it carries the four things you'd scan for and nothing
+ * else. Deliberately NO totals: the roster's Outstanding column and the stat
+ * cards are where figures live, and a third place to add money up is a third
+ * place for it to disagree.
+ */
+function PaymentHistory({
+  rows,
+  onOpen,
+  onViewAll,
+}: {
+  rows: FinancePayment[];
+  onOpen: (paymentId: string) => void;
+  onViewAll: () => void;
+}) {
+  const shown = rows.slice(0, HISTORY_LIMIT);
+  return (
+    <div className="pay-hist">
+      <div className="pay-hist-head">
+        Payments
+        {rows.length > 0 && <span className="pay-hist-count">{rows.length}</span>}
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="pay-hist-empty">No payments yet</div>
+      ) : (
+        <>
+          <div className="pay-hist-list">
+            {shown.map(p => {
+              const status = p.status || 'pending';
+              const date = anchorDate(p);
+              return (
+                <button key={p.id} type="button" className="pay-hist-row" onClick={() => onOpen(p.id)}>
+                  <span className="pay-hist-amount">{formatUSD(p.amount)}</span>
+                  <span className="pay-hist-type">{p.type ? (PAYMENT_TYPE_LABELS[p.type] ?? p.type) : '—'}</span>
+                  {/* Same colour map the payments table's status pill reads. */}
+                  <span className="pay-hist-pill" style={{ '--pay-color': PAYMENT_STATUS_COLORS[status] } as React.CSSProperties}>
+                    {PAYMENT_STATUS_LABELS[status] ?? status}
+                  </span>
+                  <span className="pay-hist-date" title={status === 'paid' ? 'Paid date' : 'Due date'}>
+                    {date
+                      ? new Date(`${date}T00:00:00`).toLocaleDateString('default', { day: 'numeric', month: 'short', year: 'numeric' })
+                      : '—'}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {rows.length > HISTORY_LIMIT && (
+            <button type="button" className="pay-hist-all" onClick={onViewAll}>
+              View all {rows.length} in Payments →
+            </button>
+          )}
+        </>
       )}
     </div>
   );

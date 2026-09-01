@@ -345,7 +345,13 @@ export interface FinancePerson {
   id: string;
   name: string;
   role?: string | null;          // free text: 'Editor', 'Clipper', 'Designer'…
-  payment_link?: string | null;  // their Wise/PayPal/Revolut link — never bank details
+  /** 'link' | 'bank' | 'other' — which of the two fields below actually applies. */
+  payment_method?: string | null;
+  payment_link?: string | null;  // their Wise/PayPal/Revolut link ('link')
+  /** IBAN / account number / SWIFT / holder name. Admin-only; never leaves the
+   *  Finance tab, and never reaches Slack, an export or a log. */
+  bank_details?: string | null;
+  payment_notes?: string | null; // preferred currency, required reference, etc.
   notes?: string | null;
   status?: string | null;        // 'active' | 'inactive'
   // Optional link to an OS login. Plenty of people we pay have no account, so
