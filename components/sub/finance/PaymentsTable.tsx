@@ -228,7 +228,7 @@ export default function PaymentsTable({ payments, people, focus, periodName, onM
     { kind: 'select', key: 'person', label: 'Person', value: fPerson, options: personPresent, anyLabel: 'Anyone', onChange: setFPerson },
     { kind: 'select', key: 'type', label: 'Type', value: fType, options: typePresent, anyLabel: 'Any type', optionLabels: PAYMENT_TYPE_LABELS, onChange: setFType },
     { kind: 'select', key: 'status', label: 'Status', value: fStatus, options: statusPresent, anyLabel: 'Any status', optionLabels: PAYMENT_STATUS_LABELS, onChange: setFStatus },
-    { kind: 'date', key: 'due_date', label: 'Due Date', from: dateFrom, to: dateTo, dates: payments.map(p => p.due_date), onChange: (f, t) => { setDateFrom(f); setDateTo(t); } },
+    { kind: 'date', key: 'due_date', label: 'Due Date', from: dateFrom, to: dateTo, onChange: (f, t) => { setDateFrom(f); setDateTo(t); } },
   ], [fPerson, fType, fStatus, dateFrom, dateTo, personPresent, typePresent, statusPresent, setFPerson, setFType, setFStatus, setDateFrom, setDateTo]);
 
   // Sortable by due date and amount, as specified. Nothing else is offered —

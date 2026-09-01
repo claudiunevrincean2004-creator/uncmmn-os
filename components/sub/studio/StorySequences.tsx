@@ -238,7 +238,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
         >
           <MiniSelect size="md" allLabel="All status" value={fStatus} options={statusPresent} onChange={setFStatus} />
           <SortControl size="md" options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
-          <FilterField label="Date"><DateRangePicker size="md" label="Date" from={dateFrom} to={dateTo} dates={sequences.map(s => s.scheduled_date)} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
+          <FilterField label="Date"><DateRangePicker size="md" label="Date" from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
           <CustomFilterControls props={cprops} optionsByProp={optsByProp} filters={custFilters} setFilters={setCustFilters} />
         </TableToolbar>
 

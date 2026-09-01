@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { FinancePerson, FinancePayment, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { formatUSD } from '@/lib/utils';
-import { anchorDate, inPeriod, isPaidIn, missingPaidDate } from '@/lib/finance';
+import { inPeriod, isPaidIn, missingPaidDate } from '@/lib/finance';
 import { describeRange, presetRange } from '@/lib/date-range';
 import Icon, { type IconName } from '@/components/Icon';
 import DateRangePicker from './studio/DateRangePicker';
@@ -219,10 +219,6 @@ export default function FinanceTab({ people, payments, profiles, onReload }: Pro
             label="Period"
             from={dateFrom}
             to={dateTo}
-            // Both anchor columns, so the month list offers every month this tab
-            // can actually file a payment under — paid rows by paid_date,
-            // everything else by due_date, matching anchorDate().
-            dates={payments.map(anchorDate)}
             onChange={(f, t) => { setDateFrom(f); setDateTo(t); }}
           />
         </div>

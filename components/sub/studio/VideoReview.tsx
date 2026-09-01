@@ -276,7 +276,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
     { kind: 'select', key: 'assigned', label: 'Assignee', value: fAssigned, options: assignedPresent, anyLabel: 'Anyone', onChange: setFAssigned },
     { kind: 'select', key: 'format', label: 'Format', value: fFormat, options: formatPresent, anyLabel: 'Any format', onChange: setFFormat },
     { kind: 'select', key: 'priority', label: 'Priority', value: fPriority, options: priorityPresent, anyLabel: 'Any priority', onChange: setFPriority },
-    { kind: 'date', key: 'deadline', label: 'Deadline', from: dateFrom, to: dateTo, dates: rows.map(v => v.deadline), onChange: (f, t) => { setDateFrom(f); setDateTo(t); } },
+    { kind: 'date', key: 'deadline', label: 'Deadline', from: dateFrom, to: dateTo, onChange: (f, t) => { setDateFrom(f); setDateTo(t); } },
   ], [fStatus, fAssigned, fFormat, fPriority, dateFrom, dateTo, statusPresent, assignedPresent, formatPresent, priorityPresent, setFStatus, setFAssigned, setFFormat, setFPriority, setDateFrom, setDateTo]);
 
   // Status/Priority sort by pipeline position (Briefing → … → Posted), taken from

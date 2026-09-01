@@ -69,9 +69,10 @@ export function presetRange(key: PresetKey, now: Date = new Date()): DateRange {
   }
 }
 
-// ── Specific calendar months ────────────────────────────────────────────────
-// Keyed 'YYYY-MM'. A month option means that month START TO END — never a
-// trailing window anchored on today.
+// ── Whole calendar months ───────────────────────────────────────────────────
+// Keyed 'YYYY-MM'. No longer offered as a menu of their own — the custom range
+// covers that — but still used for LABELS: a custom range that happens to span
+// exactly one month reads as "July 2026" rather than "1 Jul – 31 Jul".
 
 export function monthRange(key: string): DateRange {
   const [y, m] = key.split('-').map(Number);
@@ -81,23 +82,6 @@ export function monthRange(key: string): DateRange {
 export function monthLabel(key: string): string {
   const [y, m] = key.split('-').map(Number);
   return `${MONTHS_FULL[m - 1]} ${y}`;
-}
-
-/**
- * The months actually represented in a column's values, newest first.
- *
- * Derived from the data rather than hardcoded, so the list stays correct as time
- * passes and never offers a month with nothing in it. Capped — anything older
- * than the cap is still reachable through the custom range.
- */
-export function monthsFromData(dates: (string | null | undefined)[], cap = 18): string[] {
-  const seen = new Set<string>();
-  for (const d of dates) {
-    if (!d) continue;
-    const key = d.slice(0, 7);
-    if (/^\d{4}-\d{2}$/.test(key)) seen.add(key);
-  }
-  return Array.from(seen).sort().reverse().slice(0, cap);
 }
 
 // ── Words ───────────────────────────────────────────────────────────────────

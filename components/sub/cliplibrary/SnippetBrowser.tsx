@@ -179,7 +179,7 @@ export default function SnippetBrowser({ snippets, sources, focusSource, onClear
           placeholder="Search all clips — description, source, or link…"
           style={{ fontSize: 12, padding: '6px 10px', width: 300 }}
         />
-        <DateRangePicker label="Added" from={dateFrom} to={dateTo} dates={snippets.map(s => s.date_added)} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} />
+        <DateRangePicker label="Added" from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} />
         <FormatFilter value={formatFilter} options={formats} onChange={setFormatFilter} />
         <SortControl options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
         {focusSource && !searching && (
