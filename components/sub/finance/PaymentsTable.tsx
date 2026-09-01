@@ -59,6 +59,22 @@ function paidDateForStatus(status: string, current: string): string {
   return current || todayISO();
 }
 
+// ── The invariant this tab defends ──────────────────────────────────────────
+// A paid payment MUST carry a paid date. Without one the row is anchored to no
+// month, so every dated period filters it out — which is how two such rows once
+// became invisible in the UI and therefore impossible to delete from it.
+//
+// Enforced in all three places a paid_date can be written (the Add form, the
+// detail panel and the table's own cell) and, so it cannot be bypassed at all,
+// by a CHECK constraint on finance_payments — see supabase/finance.sql.
+const PAID_NEEDS_DATE =
+  'A paid payment needs a paid date — it decides which month the money lands in.';
+
+/** The message to show, or null when the pair is legal. */
+function paidDateError(status: string, paidDate: string | null | undefined): string | null {
+  return status === 'paid' && !paidDate ? PAID_NEEDS_DATE : null;
+}
+
 interface Props {
   /** ALREADY scoped to the tab's period by FinanceTab — this component filters
    *  and sorts what it's given and never re-applies the period itself, so the
@@ -92,6 +108,7 @@ export default function PaymentsTable({ payments, people, focus, periodName, onM
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState<PaymentDraft>(EMPTY_DRAFT);
+  const [draftError, setDraftError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
   // Person id → name, and the reverse. Filtering is by NAME (what the user reads
@@ -135,6 +152,11 @@ export default function PaymentsTable({ payments, people, focus, periodName, onM
 
   async function createPayment() {
     if (creating) return;
+    // Blocked, not quietly defaulted: silently stamping today is how a payment
+    // made in August gets filed under September in the first place.
+    const invalid = paidDateError(draft.status, draft.paid_date);
+    if (invalid) { setDraftError(invalid); return; }
+    setDraftError(null);
     setCreating(true);
     const row = {
       person_id: draft.person_id || null,
@@ -144,8 +166,9 @@ export default function PaymentsTable({ payments, people, focus, periodName, onM
       due_date: draft.due_date || null,
       // Only ever written for a paid row — the field isn't even shown otherwise,
       // and a paid_date on a pending payment would be counted by nothing and
-      // read as a contradiction.
-      paid_date: draft.status === 'paid' ? (draft.paid_date || todayISO()) : null,
+      // read as a contradiction. Guaranteed non-empty for a paid row by the
+      // check above.
+      paid_date: draft.status === 'paid' ? draft.paid_date : null,
       invoice_url: draft.invoice_url.trim() || null,
       description: draft.description.trim() || null,
       // Currency stays at its 'USD' default — everything here is USD and no UI
@@ -165,6 +188,7 @@ export default function PaymentsTable({ payments, people, focus, periodName, onM
   function closeAdd() {
     setAddOpen(false);
     setDraft(EMPTY_DRAFT);
+    setDraftError(null);
   }
 
   async function deletePayment(id: string) {
@@ -260,8 +284,13 @@ export default function PaymentsTable({ payments, people, focus, periodName, onM
     { key: 'due_date', label: 'Due Date', type: 'date' },
     // Meaningless on anything but a paid row, so it isn't shown on one. Status
     // is what reveals it (and prefills today, via changeStatus) — the field
-    // itself stays fully editable so a payment made weeks ago can be backdated.
-    { key: 'paid_date', label: 'Paid Date', type: 'date', visibleIf: v => v.status === 'paid' },
+    // itself stays fully editable so a payment made weeks ago can be backdated,
+    // but it cannot be emptied while the row is paid.
+    {
+      key: 'paid_date', label: 'Paid Date', type: 'date',
+      visibleIf: v => v.status === 'paid',
+      validate: (value, v) => paidDateError(v.status, value),
+    },
     { key: 'invoice_url', label: 'Invoice', type: 'url' },
     { key: 'description', label: 'Description', type: 'textarea', placeholder: 'What this payment covers' },
     { key: 'notes', label: 'Notes', type: 'textarea', placeholder: 'Internal notes' },
@@ -383,7 +412,18 @@ export default function PaymentsTable({ payments, people, focus, periodName, onM
                                 plain dash rather than an editable blank that
                                 writes a date the stat cards would never read. */}
                             {status === 'paid' ? (
-                              <InlineDate display="text" value={p.paid_date || undefined} onCommit={d => patch(p.id, { paid_date: d || null })} />
+                              <InlineDate
+                                display="text"
+                                value={p.paid_date || undefined}
+                                // Editable, but never clearable while the row is
+                                // paid. onReload() re-reads so the cell snaps
+                                // back to the stored date rather than sitting
+                                // there looking empty after a refused edit.
+                                onCommit={d => {
+                                  if (!d) { alert(PAID_NEEDS_DATE); onReload(); return; }
+                                  patch(p.id, { paid_date: d });
+                                }}
+                              />
                             ) : (
                               <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>—</span>
                             )}
@@ -482,7 +522,7 @@ export default function PaymentsTable({ payments, people, focus, periodName, onM
                 />
               </DraftField>
               <DraftField label="Status">
-                <EditPillSelect field="finance_payment_status" value={draft.status} options={PAYMENT_STATUSES} colors={PAYMENT_STATUS_COLORS} labels={PAYMENT_STATUS_LABELS} onChange={s => setDraft(d => ({ ...d, status: s, paid_date: paidDateForStatus(s, d.paid_date) }))} allowAdd={false} />
+                <EditPillSelect field="finance_payment_status" value={draft.status} options={PAYMENT_STATUSES} colors={PAYMENT_STATUS_COLORS} labels={PAYMENT_STATUS_LABELS} onChange={s => { setDraft(d => ({ ...d, status: s, paid_date: paidDateForStatus(s, d.paid_date) })); setDraftError(null); }} allowAdd={false} />
               </DraftField>
               <DraftField label="Due Date">
                 <input className="form-input" type="date" value={draft.due_date} onChange={e => setDraft(d => ({ ...d, due_date: e.target.value }))} onClick={openDatePicker} style={{ width: 160, fontSize: 12 }} />
@@ -492,10 +532,24 @@ export default function PaymentsTable({ payments, people, focus, periodName, onM
                   because when it isn't, the whole point is to backdate it. */}
               {draft.status === 'paid' && (
                 <DraftField label="Paid Date">
-                  <input className="form-input" type="date" value={draft.paid_date} onChange={e => setDraft(d => ({ ...d, paid_date: e.target.value }))} onClick={openDatePicker} style={{ width: 160, fontSize: 12 }} />
-                  <div style={{ fontSize: 10, color: 'var(--text-faint)', marginTop: 5, lineHeight: 1.4 }}>
-                    Which month this lands in on the Paid card. Backdate it if the money moved earlier.
-                  </div>
+                  <input
+                    className={`form-input${draftError ? ' is-invalid' : ''}`}
+                    type="date"
+                    required
+                    aria-invalid={draftError ? true : undefined}
+                    aria-describedby={draftError ? 'paid-date-error' : undefined}
+                    value={draft.paid_date}
+                    onChange={e => { setDraft(d => ({ ...d, paid_date: e.target.value })); setDraftError(null); }}
+                    onClick={openDatePicker}
+                    style={{ width: 160, fontSize: 12 }}
+                  />
+                  {draftError ? (
+                    <div id="paid-date-error" className="form-error" role="alert">{draftError}</div>
+                  ) : (
+                    <div style={{ fontSize: 10, color: 'var(--text-faint)', marginTop: 5, lineHeight: 1.4 }}>
+                      Required. Decides which month this lands in on the Paid card — backdate it if the money moved earlier.
+                    </div>
+                  )}
                 </DraftField>
               )}
               <DraftField label="Invoice">

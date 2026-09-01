@@ -47,6 +47,9 @@ interface StatCard {
   /** A rule worth being able to look up, but not worth permanent screen space —
    *  rendered as the small ⓘ beside the label. */
   note?: string;
+  /** Muted second line under the figure — the count behind a money total, so
+   *  all three cards can lead with dollars and still say how many rows. */
+  sub?: string;
   /** Rows this card had to leave out because their data is incomplete. Rendered
    *  as a small amber pill under the figure that filters the table down to
    *  exactly those rows — visible and fixable, rather than silently dropped. */
@@ -98,7 +101,11 @@ export default function FinanceTab({ people, payments, profiles, onReload }: Pro
     const paid = scoped
       .filter(p => isPaidIn(p, range))
       .reduce((s, p) => s + (Number(p.amount) || 0), 0);
-    const awaiting = scoped.filter(p => p.status === 'ready_to_pay').length;
+    // Same rows as before — status only, anchored on due_date by `scoped` (a
+    // ready_to_pay row is not paid, so inPeriod files it under its due date).
+    // Only what the card LEADS with changes: dollars, like its two neighbours.
+    const awaitingRows = scoped.filter(p => p.status === 'ready_to_pay');
+    const awaiting = awaitingRows.reduce((s, p) => s + (Number(p.amount) || 0), 0);
     return [
       {
         label: `Outstanding · ${name}`, value: formatUSD(outstanding), color: '#f59e0b', icon: 'coins',
@@ -112,14 +119,29 @@ export default function FinanceTab({ people, payments, profiles, onReload }: Pro
         warn: undated.length ? {
           text: `${undated.length} paid payment${undated.length === 1 ? '' : 's'} missing a paid date`,
           title: undatedOpen
-            ? 'Showing them — click to go back to the period'
-            : 'Excluded from this total. Click to list them and fill the dates in.',
-          onClick: () => setShowUndated(v => !v),
+            ? 'Showing them — click to go back to the full list'
+            : 'Excluded from this total, and hidden by every dated period. Click to switch to All time and list them.',
+          onClick: () => {
+            // A row with no paid_date is anchored to no month, so EVERY bounded
+            // period filters it out (inPeriod → anchorDate is null → false for a
+            // paid row). Warning about rows the picker cannot reach is exactly
+            // what makes this read as a stale count. So the click moves the
+            // period to All time first — the one window that does contain them —
+            // and only then narrows to the list. Clearing the banner afterwards
+            // then lands on a view the rows are actually in, instead of back on
+            // a month that hides them again.
+            if (!undatedOpen) setPeriod('all');
+            setShowUndated(v => !v);
+          },
         } : undefined,
       },
-      { label: `Awaiting Action · ${name}`, value: String(awaiting), color: '#eab308', icon: 'clock', hint: `Sitting at Ready to Pay — ${name}` },
+      {
+        label: `Awaiting Action · ${name}`, value: formatUSD(awaiting), color: '#eab308', icon: 'clock',
+        hint: `Sitting at Ready to Pay, by due date — ${name}`, money: true,
+        sub: `${awaitingRows.length} payment${awaitingRows.length === 1 ? '' : 's'}`,
+      },
     ];
-  }, [scoped, period, range, undated, undatedOpen]);
+  }, [scoped, period, range, undated, undatedOpen, setPeriod]);
 
   return (
     <div style={{ position: 'relative' }}>
@@ -138,6 +160,7 @@ export default function FinanceTab({ people, payments, profiles, onReload }: Pro
                 )}
               </div>
               <div className={item.money ? 'studio-stat-num is-money' : 'studio-stat-num'} title={item.value}>{item.value}</div>
+              {item.sub && <div className="studio-stat-sub">{item.sub}</div>}
               {item.warn && (
                 <button
                   type="button"
@@ -196,7 +219,7 @@ export default function FinanceTab({ people, payments, profiles, onReload }: Pro
           payments={undatedOpen ? undated : scoped}
           focus={undatedOpen ? {
             label: `${undated.length} paid payment${undated.length === 1 ? '' : 's'} missing a paid date`,
-            hint: 'Not counted in any Paid total until each has a date. Set one below and it drops off this list.',
+            hint: 'Counted in no Paid total, and hidden by every dated period — so the period is now All time. Set a date below and the row drops off this list.',
             onClear: () => setShowUndated(false),
           } : null}
           people={people}

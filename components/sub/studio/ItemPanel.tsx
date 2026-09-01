@@ -47,6 +47,16 @@ export interface FieldDef {
   allowAdd?: boolean; // false → admin-managed options only (no inline add)
   allowEmpty?: boolean;
   visibleIf?: (values: Record<string, any>) => boolean;
+  /**
+   * Guard a value before it is written. Return a message to REJECT the edit —
+   * onChangeField is never called, the control snaps back to the stored value,
+   * and the message renders under the field. Return null to allow it.
+   *
+   * For invariants the database also enforces (Finance's "a paid payment must
+   * have a paid date"), so the user gets a sentence instead of a constraint
+   * violation from Postgres.
+   */
+  validate?: (value: any, values: Record<string, any>) => string | null;
 }
 
 interface Props {
@@ -167,10 +177,34 @@ export default function ItemPanel({ itemType, linkType, itemId, title, commentsL
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [replySaving, setReplySaving] = useState(false);
+  // Rejected edits, keyed by field. Only ever set by a FieldDef.validate that
+  // returned a message; cleared as soon as that field takes a legal value.
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Close on click-outside / Escape, committing pending field edits like the ✕ does
   useDismiss(panelRef, onClose);
+
+  /**
+   * Every field write goes through here. A FieldDef.validate that returns a
+   * message stops the write dead: onChangeField is never reached, so nothing is
+   * sent to the database, and the state change below re-renders the control
+   * from the UNCHANGED `values` — which is what snaps a cleared input back to
+   * what is actually stored.
+   */
+  function commitField(key: string, value: any) {
+    const def = fields.find(f => f.key === key);
+    const message = def?.validate ? def.validate(value, values) : null;
+    setFieldErrors(prev => {
+      if (message) return { ...prev, [key]: message };
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    if (message) return;
+    onChangeField(key, value);
+  }
 
   // Resolve the signed-in user so we can stamp new comments with their author id
   // and decide which comments they may edit/delete. Read-only — does not affect
@@ -588,10 +622,18 @@ export default function ItemPanel({ itemType, linkType, itemId, title, commentsL
         {fields.filter(f => !f.visibleIf || f.visibleIf(values)).map(f => {
           // Multi-line controls read from the top, so their label rides up too.
           const tall = f.type === 'textarea' || f.type === 'readonly-multiline';
+          const error = fieldErrors[f.key];
           return (
             <div key={f.key} className={tall ? 'panel-prop is-tall' : 'panel-prop'}>
               <div className="panel-prop-label">{f.label}</div>
-              <div className="panel-prop-value"><FieldControl field={f} values={values} onChangeField={onChangeField} onAddOption={onAddOption} profiles={profiles} /></div>
+              <div className="panel-prop-value">
+                <FieldControl field={f} values={values} onChangeField={commitField} onAddOption={onAddOption} profiles={profiles} />
+                {error && (
+                  // aria-live, because the control that triggered this keeps
+                  // focus — nothing else would announce the rejection.
+                  <div className="panel-prop-error" role="alert" aria-live="polite">{error}</div>
+                )}
+              </div>
             </div>
           );
         })}

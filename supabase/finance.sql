@@ -75,6 +75,28 @@ alter table public.finance_payments add column if not exists invoice_url text;
 alter table public.finance_payments add column if not exists description text;
 alter table public.finance_payments add column if not exists notes text;
 
+-- INVARIANT: a paid payment must say WHEN it was paid ------------------------
+-- A null paid_date anchors the row to no month, so every dated period in the UI
+-- filters it out — which is how such a row becomes invisible in the tab, and
+-- therefore impossible to delete from it. The UI blocks this in all three
+-- places a paid_date can be written; this is the half that cannot be bypassed.
+--
+-- `is distinct from` rather than `<> 'paid'` so a NULL status is judged
+-- explicitly (not paid → passes) instead of leaning on a NULL check result
+-- being treated as satisfied.
+--
+-- ⚠ CLEAN UP FIRST. This statement FAILS while any violating row remains:
+--     select id, amount, status, due_date, paid_date
+--     from public.finance_payments
+--     where status = 'paid' and paid_date is null;
+--   Give each one a real date, or drop them back to 'pending'. See the block at
+--   the bottom of this file.
+alter table public.finance_payments
+  drop constraint if exists finance_payments_paid_needs_date;
+alter table public.finance_payments
+  add constraint finance_payments_paid_needs_date
+  check (status is distinct from 'paid' or paid_date is not null);
+
 -- The three columns the tab filters and sorts on.
 create index if not exists finance_payments_person_idx on public.finance_payments (person_id);
 create index if not exists finance_payments_status_idx on public.finance_payments (status);
@@ -127,4 +149,30 @@ notify pgrst, 'reload schema';
 --   select tablename, policyname, qual
 --   from pg_policies
 --   where schemaname = 'public' and tablename in ('finance_people','finance_payments');
+--
+-- And the paid-date invariant is in place:
+--
+--   select conname, pg_get_constraintdef(oid)
+--   from pg_constraint
+--   where conrelid = 'public.finance_payments'::regclass
+--     and conname = 'finance_payments_paid_needs_date';
+-- ============================================================================
+
+-- ============================================================================
+-- CLEANUP — only needed once, BEFORE the constraint above will apply. Pick the
+-- one that matches what actually happened; do NOT run both.
+--
+--   -- 1. The money really did move, on the due date:
+--   update public.finance_payments
+--   set paid_date = due_date
+--   where status = 'paid' and paid_date is null and due_date is not null;
+--
+--   -- 2. It was never actually paid — send it back to the pipeline:
+--   update public.finance_payments
+--   set status = 'pending'
+--   where status = 'paid' and paid_date is null;
+--
+--   -- 3. The rows are junk (the two invisible test rows). Delete them:
+--   delete from public.finance_payments
+--   where status = 'paid' and paid_date is null;
 -- ============================================================================

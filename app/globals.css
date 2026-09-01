@@ -1091,6 +1091,20 @@ html, body {
   color: var(--text);
 }
 
+/* Muted count under a money figure ("3 payments"), so a card can lead with
+   dollars like its neighbours and still report how many rows are behind the
+   total. Sized well below the figure — it explains it, it doesn't compete. */
+.studio-stat-sub {
+  margin-top: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* A label naming the active period ("OUTSTANDING · LAST 12 MONTHS") is far
    longer than a bare metric name, so it wraps instead of ellipsing away the very
    word that says what you're looking at. Grid rows stretch, so the cards beside
@@ -2986,6 +3000,33 @@ html, body {
 .panel-prop-value {
   min-width: 0;
   font-size: 12px;
+}
+
+/* ===== Rejected edits =======================================================
+   One message shape for both surfaces: the detail panel (a write the panel
+   refused, rendered under the control that tried it) and the Add form (a field
+   that blocked Create). --neg carries the whole signal, so both themes are
+   covered by the token rather than a second colour. */
+.panel-prop-error,
+.form-error {
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--neg);
+}
+
+/* The field that caused it, outlined to match — so a message under a stack of
+   inputs still points at the right one. */
+.form-input.is-invalid {
+  border-color: var(--neg);
+  background: color-mix(in srgb, var(--neg) 7%, var(--surface));
+}
+
+.form-input.is-invalid:focus {
+  border-color: var(--neg);
+  outline: 2px solid color-mix(in srgb, var(--neg) 45%, transparent);
+  outline-offset: 1px;
 }
 
 /* A textarea or a long read-only block reads from the top, so its label does too. */

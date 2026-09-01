@@ -521,7 +521,14 @@ create policy "finance_people_admin_all" on finance_people
   invoice_url text,
   description text,
   notes text,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  -- A paid payment must say WHEN it was paid: a null paid_date anchors the row
+  -- to no month, so every dated period in the UI filters it out and the row
+  -- becomes invisible — and undeletable from the tab. Safe to declare inline
+  -- here: this block only runs when the table does not exist yet, so there are
+  -- no rows that could violate it.
+  constraint finance_payments_paid_needs_date
+    check (status is distinct from 'paid' or paid_date is not null)
 );
 create index if not exists finance_payments_person_idx on finance_payments (person_id);
 create index if not exists finance_payments_status_idx on finance_payments (status);
