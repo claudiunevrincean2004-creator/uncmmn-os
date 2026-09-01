@@ -1,6 +1,7 @@
 'use client';
 import { SortOption, SortDir, dirLabel, resolveOption } from '@/lib/sort';
 import FilterField from './FilterField';
+import Dropdown from './Dropdown';
 
 // The "Sort [Deadline ▾] [↑ Oldest]" control shared by every table: a dropdown of
 // that table's sortable properties plus a direction toggle. The direction label is
@@ -22,18 +23,14 @@ export default function SortControl<T>({
   const active = resolveOption(options, sortKey);
   return (
     <FilterField label="Sort">
-      <select
-        className="form-input"
-        style={md
-          ? { width: 'auto', padding: '8px 12px', fontSize: 12, borderRadius: 10, background: 'var(--surface)' }
-          : { width: 'auto', padding: '4px 7px', fontSize: 11 }}
+      <Dropdown
+        variant="input"
+        size={size}
         value={active.key}
-        onChange={e => onKeyChange(e.target.value)}
-      >
-        {options.map(o => (
-          <option key={o.key} value={o.key}>{o.label}</option>
-        ))}
-      </select>
+        options={options.map(o => ({ value: o.key, label: o.label }))}
+        onChange={onKeyChange}
+        ariaLabel="Sort by"
+      />
       <button
         className="btn-ghost"
         style={md

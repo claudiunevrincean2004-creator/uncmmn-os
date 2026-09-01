@@ -12,6 +12,7 @@ import {
   getFieldOptions, colorMap, buildAddOptionRows,
 } from '@/lib/studio';
 import { EditPillSelect, UrlCell, InlineDate, openDatePicker } from './cells';
+import Dropdown from './Dropdown';
 import TableToolbar, { rowAccent, openOnRowClick, TitleCell } from './table-ui';
 import Board, { type BoardCard } from './Board';
 import { type StudioView } from './ViewToggle';
@@ -564,18 +565,21 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
         <SelectionBar count={sel.count} offscreen={selectedOffscreen} busy={bulkBusy} onClear={sel.clear}>
           <label className="sel-bar-field">
             <span className="sel-bar-field-label">Status</span>
-            <select
+            <Dropdown
+              variant="input"
               className="sel-bar-select"
               // An action, not a current value: it never holds a selection, so
               // picking the same status twice in a row still fires twice.
               value=""
               disabled={bulkBusy}
-              aria-label={`Set status on ${sel.count} selected video${sel.count === 1 ? '' : 's'}`}
-              onChange={e => { const next = e.target.value; e.target.value = ''; bulkStatus(next); }}
-            >
-              <option value="">{bulkBusy ? 'Updating…' : 'Set status…'}</option>
-              {statusValues.map(o => <option key={o} value={o}>{o}</option>)}
-            </select>
+              ariaLabel={`Set status on ${sel.count} selected video${sel.count === 1 ? '' : 's'}`}
+              placeholder={bulkBusy ? 'Updating…' : 'Set status…'}
+              options={[
+                { value: '', label: bulkBusy ? 'Updating…' : 'Set status…' },
+                ...statusValues.map(o => ({ value: o, label: o, color: statusColors[o] })),
+              ]}
+              onChange={bulkStatus}
+            />
           </label>
         </SelectionBar>
       )}

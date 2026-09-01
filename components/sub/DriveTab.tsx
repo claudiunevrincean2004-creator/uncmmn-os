@@ -1,5 +1,6 @@
 'use client';
 import { useMemo, useState } from 'react';
+import Dropdown from './studio/Dropdown';
 import { supabase } from '@/lib/supabase';
 import { DriveFolder, Client } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
@@ -146,15 +147,14 @@ export default function DriveTab({ client, driveFolders, onReload }: Props) {
           />
         </div>
 
-        <select
-          className="form-input assets-select"
+        <Dropdown
+          variant="input"
+          className="assets-select"
           value={fCategory}
-          onChange={e => setFCategory(e.target.value)}
-          aria-label="Filter by category"
-        >
-          <option value="All">All categories</option>
-          {categories.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
+          options={[{ value: 'All', label: 'All categories' }, ...categories.map(c => ({ value: c, label: c }))]}
+          onChange={setFCategory}
+          ariaLabel="Filter by category"
+        />
 
         <div className="view-seg" role="group" aria-label="View">
           <button

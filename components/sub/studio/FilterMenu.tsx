@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import Icon, { type IconName } from '@/components/Icon';
 import { useDismiss } from '@/lib/use-dismiss';
 import DateRangePicker, { rangeLabel } from './DateRangePicker';
+import Dropdown from './Dropdown';
 import { SortOption, SortDir, dirLabel, resolveOption } from '@/lib/sort';
 
 // ============================================================================
@@ -177,27 +178,34 @@ export function FilterMenu({ defs, noun = 'videos' }: {
                 <div className="fs-row" key={d.key}>
                   <span className="fs-conj">{i === 0 ? 'Where' : 'And'}</span>
 
-                  <select
-                    className="form-input fs-input fs-prop"
-                    value={d.key}
-                    onChange={e => swapRow(d, e.target.value)}
-                    aria-label={`Filter property (currently ${d.label})`}
-                  >
-                    <option value={d.key}>{d.label}</option>
-                    {unused.map(u => <option key={u.key} value={u.key}>{u.label}</option>)}
-                  </select>
+                  <div className="fs-prop">
+                    <Dropdown
+                      variant="input"
+                      value={d.key}
+                      options={[
+                        { value: d.key, label: d.label },
+                        ...unused.map(u => ({ value: u.key, label: u.label })),
+                      ]}
+                      onChange={v => swapRow(d, v)}
+                      ariaLabel={`Filter property (currently ${d.label})`}
+                      width="100%"
+                    />
+                  </div>
 
                   {d.kind === 'select' ? (
-                    <select
-                      className="form-input fs-input fs-val"
-                      value={d.value}
-                      onChange={e => d.onChange(e.target.value)}
-                      aria-label={`${d.label} value`}
-                    >
-                      {d.options.map(o => (
-                        <option key={o} value={o}>{o === 'All' ? (d.anyLabel ?? 'Any') : (d.optionLabels?.[o] ?? o)}</option>
-                      ))}
-                    </select>
+                    <div className="fs-val">
+                      <Dropdown
+                        variant="input"
+                        value={d.value}
+                        options={d.options.map(o => ({
+                          value: o,
+                          label: o === 'All' ? (d.anyLabel ?? 'Any') : (d.optionLabels?.[o] ?? o),
+                        }))}
+                        onChange={d.onChange}
+                        ariaLabel={`${d.label} value`}
+                        width="100%"
+                      />
+                    </div>
                   ) : (
                     <div className="fs-val">
                       <DateRangePicker size="md" from={d.from} to={d.to} onChange={d.onChange} />

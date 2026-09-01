@@ -20,6 +20,7 @@ import { EditPillSelect, InlineDate, InlineMoney, UrlCell, openDatePicker } from
 import TableToolbar, { rowAccent, openOnRowClick, TitleCell } from '../studio/table-ui';
 import { FilterMenu, FilterChips, SortMenu, type FilterDef } from '../studio/FilterMenu';
 import ItemPanel, { FieldDef } from '../studio/ItemPanel';
+import Dropdown from '../studio/Dropdown';
 import LoadMore from '../studio/LoadMore';
 
 // A paid payment is "done" — it can't be overdue, exactly the way a Posted video
@@ -501,15 +502,17 @@ export default function PaymentsTable({ payments, people, focus, periodName, onM
 
             <div className="modal-body modal-form">
               <DraftField label="Person">
-                <select
-                  className="form-input"
-                  style={{ width: '100%', fontSize: 12 }}
+                <Dropdown
+                  variant="input"
+                  width="100%"
                   value={draft.person_id}
-                  onChange={e => setDraft(d => ({ ...d, person_id: e.target.value }))}
-                >
-                  <option value="">—</option>
-                  {assignable.map(p => <option key={p.id} value={p.id}>{p.name || 'Unnamed'}</option>)}
-                </select>
+                  options={[
+                    { value: '', label: '—' },
+                    ...assignable.map(p => ({ value: p.id, label: p.name || 'Unnamed' })),
+                  ]}
+                  onChange={v => setDraft(d => ({ ...d, person_id: v }))}
+                  ariaLabel="Person"
+                />
               </DraftField>
               <DraftField label="Type">
                 <EditPillSelect field="finance_payment_type" value={draft.type} options={PAYMENT_TYPES} colors={PAYMENT_TYPE_COLORS} labels={PAYMENT_TYPE_LABELS} onChange={t => setDraft(d => ({ ...d, type: t }))} allowAdd={false} allowEmpty />

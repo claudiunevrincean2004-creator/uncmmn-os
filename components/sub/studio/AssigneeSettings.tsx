@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Dropdown from './Dropdown';
 import { supabase } from '@/lib/supabase';
 import { Profile, ClipperAccount } from '@/lib/types';
 import { useDismiss } from '@/lib/use-dismiss';
@@ -139,19 +140,32 @@ export default function AssigneeSettings({
                       </div>
                       <div>
                         <div style={labelStyle}>Role</div>
-                        <select className="form-input" value={editRole} onChange={e => setEditRole(e.target.value)} style={{ width: '100%', fontSize: 12, marginTop: 3 }}>
-                          <option value="admin">Admin</option>
-                          <option value="editor">Editor</option>
-                          <option value="clipper">Clipper</option>
-                        </select>
+                        <Dropdown
+                          variant="input"
+                          value={editRole}
+                          options={[
+                            { value: 'admin', label: 'Admin' },
+                            { value: 'editor', label: 'Editor' },
+                            { value: 'clipper', label: 'Clipper' },
+                          ]}
+                          onChange={setEditRole}
+                          ariaLabel="Role"
+                          width="100%"
+                          style={{ marginTop: 3 }}
+                        />
                       </div>
                       {editRole === 'clipper' && (
                         <div>
                           <div style={labelStyle}>Clipper status</div>
-                          <select className="form-input" value={editClipperStatus} onChange={e => setEditClipperStatus(e.target.value)} style={{ width: '100%', fontSize: 12, marginTop: 3 }}>
-                            <option value="active">Active</option>
-                            <option value="inactive">Inactive</option>
-                          </select>
+                          <Dropdown
+                            variant="input"
+                            value={editClipperStatus}
+                            options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
+                            onChange={setEditClipperStatus}
+                            ariaLabel="Clipper status"
+                            width="100%"
+                            style={{ marginTop: 3 }}
+                          />
                         </div>
                       )}
                       {p.email && <div style={{ fontSize: 11, color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.email}</div>}

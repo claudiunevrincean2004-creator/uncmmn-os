@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
+import Dropdown from './studio/Dropdown';
 import { supabase } from '@/lib/supabase';
 import { Profile, ClipperAccount, ClipperContent } from '@/lib/types';
 import { profileName } from '@/lib/profile-name';
@@ -322,9 +323,14 @@ function ClipperDashboard({ clipper, accounts, content, onBack, onReload }: {
             </button>
           ))}
         </div>
-        <select className="form-input" style={{ width: 'auto', padding: '4px 8px', fontSize: 11, marginLeft: 'auto' }} value={period} onChange={e => setPeriod(e.target.value as Period)}>
-          {(Object.entries(PERIOD_LABELS) as [Period, string][]).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-        </select>
+        <Dropdown
+          variant="input"
+          value={period}
+          options={(Object.entries(PERIOD_LABELS) as [Period, string][]).map(([k, l]) => ({ value: k, label: l }))}
+          onChange={v => setPeriod(v as Period)}
+          ariaLabel="Period"
+          style={{ marginLeft: 'auto' }}
+        />
       </div>
 
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
@@ -383,13 +389,23 @@ function ClipperDashboard({ clipper, accounts, content, onBack, onReload }: {
           {/* Content table */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 10, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <select className="form-input" style={{ width: 'auto', padding: '4px 8px', fontSize: 11 }} value={tablePlatform} onChange={e => setTablePlatform(e.target.value as PlatformChoice)}>
-                {PLATFORM_CHOICES.map(p => <option key={p} value={p}>{p === 'All' ? 'All Platforms' : p}</option>)}
-              </select>
-              <select className="form-input" style={{ width: 'auto', padding: '4px 8px', fontSize: 11 }} value={sortKey} onChange={e => setSortKey(e.target.value as 'date' | 'views')}>
-                <option value="date">Date ↓ Newest</option>
-                <option value="views">Views ↓ High to Low</option>
-              </select>
+              <Dropdown
+                variant="input"
+                value={tablePlatform}
+                options={PLATFORM_CHOICES.map(p => ({ value: p, label: p === 'All' ? 'All Platforms' : p }))}
+                onChange={v => setTablePlatform(v as PlatformChoice)}
+                ariaLabel="Filter by platform"
+              />
+              <Dropdown
+                variant="input"
+                value={sortKey}
+                options={[
+                  { value: 'date', label: 'Date ↓ Newest' },
+                  { value: 'views', label: 'Views ↓ High to Low' },
+                ]}
+                onChange={v => setSortKey(v as 'date' | 'views')}
+                ariaLabel="Sort clips"
+              />
               <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{tableRows.length} post{tableRows.length === 1 ? '' : 's'}</span>
             </div>
             <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px' }} onClick={() => setEditing(null)}>+ Add Post</button>
@@ -551,17 +567,26 @@ function AccountEditor({ clipperId, row, onClose, onSaved }: {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={field}><div style={lbl}>Platform</div>
-            <select className="form-input" value={platform} onChange={e => setPlatform(e.target.value)} style={{ fontSize: 12 }}>
-              {PLATFORMS.map(p => <option key={p} value={p}>{capPlatform(p)}</option>)}
-            </select>
+            <Dropdown
+              variant="input"
+              value={platform}
+              options={PLATFORMS.map(p => ({ value: p, label: capPlatform(p) }))}
+              onChange={setPlatform}
+              ariaLabel="Platform"
+              width="100%"
+            />
           </div>
           <div style={field}><div style={lbl}>Handle</div><input className="form-input" value={handle} onChange={e => setHandle(e.target.value)} placeholder="@username" style={{ fontSize: 12 }} /></div>
           <div style={field}><div style={lbl}>Account URL</div><input className="form-input" value={accountUrl} onChange={e => setAccountUrl(e.target.value)} placeholder="https://…" style={{ fontSize: 12 }} /></div>
           <div style={field}><div style={lbl}>Status</div>
-            <select className="form-input" value={status} onChange={e => setStatus(e.target.value)} style={{ fontSize: 12 }}>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
+            <Dropdown
+              variant="input"
+              value={status}
+              options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
+              onChange={setStatus}
+              ariaLabel="Status"
+              width="100%"
+            />
           </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
@@ -630,10 +655,17 @@ function ContentEditor({ clipperId, accounts, row, onClose, onSaved }: {
             {accounts.length === 0 ? (
               <div style={{ fontSize: 12, color: '#f59e0b' }}>⚠️ Add an account first — a post must belong to one of this clipper&apos;s accounts.</div>
             ) : (
-              <select className="form-input" value={accountId} onChange={e => setAccountId(e.target.value)} style={{ fontSize: 12 }}>
-                <option value="">Select an account…</option>
-                {accounts.map(a => <option key={a.id} value={a.id}>{capPlatform(a.platform)} · {a.handle || a.account_url || a.id.slice(0, 6)}</option>)}
-              </select>
+              <Dropdown
+                variant="input"
+                value={accountId}
+                options={[
+                  { value: '', label: 'Select an account…' },
+                  ...accounts.map(a => ({ value: a.id, label: `${capPlatform(a.platform)} · ${a.handle || a.account_url || a.id.slice(0, 6)}` })),
+                ]}
+                onChange={setAccountId}
+                ariaLabel="Account"
+                width="100%"
+              />
             )}
           </div>
           <div style={field}><div style={lbl}>Link</div><input className="form-input" value={contentUrl} onChange={e => setContentUrl(e.target.value)} placeholder="https://…" style={{ fontSize: 12 }} /></div>

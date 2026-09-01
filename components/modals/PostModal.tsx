@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import Dropdown from '../sub/studio/Dropdown';
 import { supabase } from '@/lib/supabase';
 import { Post, Client } from '@/lib/types';
 import { useDismiss } from '@/lib/use-dismiss';
@@ -101,10 +102,15 @@ export default function PostModal({ post, client, onClose, onSaved }: Props) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
             <div>
               <label className="form-label">Platform</label>
-              <select className="form-input" value={platform} onChange={e => setPlatform(e.target.value)} style={inputStyle}>
-                <option value="">Select...</option>
-                {clientPlatforms.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
+              <Dropdown
+                variant="input"
+                value={platform}
+                options={[{ value: '', label: 'Select...' }, ...clientPlatforms.map(p => ({ value: p, label: p }))]}
+                onChange={setPlatform}
+                ariaLabel="Platform"
+                width="100%"
+                style={inputStyle}
+              />
             </div>
             <div>
               <label className="form-label">Format</label>

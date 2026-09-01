@@ -1,5 +1,6 @@
 'use client';
 import { useMemo, useState } from 'react';
+import Dropdown from './studio/Dropdown';
 import { supabase } from '@/lib/supabase';
 import { Post, Client, SubscriberSnapshot } from '@/lib/types';
 import { fn, er, avg } from '@/lib/utils';
@@ -328,16 +329,13 @@ export default function ContentTab({ client, posts, subscriberSnapshots, onReloa
         </div>
 
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
-          <select
-            className="form-input"
-            style={{ width: 'auto', padding: '4px 8px', fontSize: 11 }}
+          <Dropdown
+            variant="input"
             value={timePeriod}
-            onChange={e => setTimePeriod(e.target.value as TimePeriod)}
-          >
-            {(Object.entries(PERIOD_LABELS) as [TimePeriod, string][]).map(([k, l]) => (
-              <option key={k} value={k}>{l}</option>
-            ))}
-          </select>
+            options={(Object.entries(PERIOD_LABELS) as [TimePeriod, string][]).map(([k, l]) => ({ value: k, label: l }))}
+            onChange={v => setTimePeriod(v as TimePeriod)}
+            ariaLabel="Time period"
+          />
           <button
             className={`btn-compare${showCmp ? ' active' : ''}`}
             onClick={() => setShowCmp(v => !v)}
@@ -421,32 +419,27 @@ export default function ContentTab({ client, posts, subscriberSnapshots, onReloa
       {/* Posts table */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 10, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <select
-            className="form-input"
-            style={{ width: 'auto', padding: '4px 8px', fontSize: 11 }}
+          <Dropdown
+            variant="input"
             value={filterPillar}
-            onChange={e => setFilterPillar(e.target.value)}
-          >
-            {pillarsOptions.map(p => <option key={p} value={p}>{p === 'All' ? 'All Pillars' : p}</option>)}
-          </select>
-          <select
-            className="form-input"
-            style={{ width: 'auto', padding: '4px 8px', fontSize: 11 }}
+            options={pillarsOptions.map(p => ({ value: p, label: p === 'All' ? 'All Pillars' : p }))}
+            onChange={setFilterPillar}
+            ariaLabel="Filter by pillar"
+          />
+          <Dropdown
+            variant="input"
             value={filterFormat}
-            onChange={e => setFilterFormat(e.target.value)}
-          >
-            {formatsOptions.map(f => <option key={f} value={f}>{f === 'All' ? 'All Formats' : f}</option>)}
-          </select>
-          <select
-            className="form-input"
-            style={{ width: 'auto', padding: '4px 8px', fontSize: 11 }}
+            options={formatsOptions.map(f => ({ value: f, label: f === 'All' ? 'All Formats' : f }))}
+            onChange={setFilterFormat}
+            ariaLabel="Filter by format"
+          />
+          <Dropdown
+            variant="input"
             value={`${sortKey}-${sortDir}`}
-            onChange={e => {
-              const [k, d] = e.target.value.split('-') as [SortKey, SortDir];
-              setSortKey(k); setSortDir(d);
-            }}
-          >
-            {([
+            // The <optgroup> headings only ever repeated the option text
+            // ("Date" above "Date ↓ High to Low"), so flattening loses nothing —
+            // every value and label below is what the options carried before.
+            options={([
               { k: 'date', label: 'Date' },
               { k: 'views', label: 'Views' },
               { k: 'likes', label: 'Likes' },
@@ -455,13 +448,16 @@ export default function ContentTab({ client, posts, subscriberSnapshots, onReloa
               { k: 'saves', label: 'Saves' },
               { k: 'follows', label: 'Follows' },
               { k: 'er', label: 'ER%' },
-            ] as { k: SortKey; label: string }[]).map(opt => (
-              <optgroup key={opt.k} label={opt.label}>
-                <option value={`${opt.k}-desc`}>{opt.label} ↓ High to Low</option>
-                <option value={`${opt.k}-asc`}>{opt.label} ↑ Low to High</option>
-              </optgroup>
-            ))}
-          </select>
+            ] as { k: SortKey; label: string }[]).flatMap(opt => ([
+              { value: `${opt.k}-desc`, label: `${opt.label} ↓ High to Low` },
+              { value: `${opt.k}-asc`, label: `${opt.label} ↑ Low to High` },
+            ]))}
+            onChange={v => {
+              const [k, d] = v.split('-') as [SortKey, SortDir];
+              setSortKey(k); setSortDir(d);
+            }}
+            ariaLabel="Sort posts"
+          />
           <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{filtered.length} posts · avg {fn(avgViewsAllTime)} views</span>
         </div>
         <button className="btn-primary" style={{ fontSize: 11, padding: '5px 10px' }} onClick={() => { setEditPost(null); setShowModal(true); }}>+ Add Post</button>

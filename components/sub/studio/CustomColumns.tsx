@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Dropdown from './Dropdown';
 import { supabase } from '@/lib/supabase';
 import { CustomProperty, CustomPropertyOption } from '@/lib/types';
 import { pillStyle } from '@/lib/studio';
@@ -75,17 +76,20 @@ function CustomCell({
     ? pillStyle(selected.color)
     : { background: 'var(--surface-2)', color: 'var(--text-faint)', border: '1px solid var(--border)' };
   return (
-    <select
+    <Dropdown
+      variant="pill"
+      size={size}
       value={value || ''}
-      onChange={e => onChange(e.target.value)}
-      style={{ ...base, appearance: 'none', WebkitAppearance: 'none', borderRadius: md ? 999 : 20, padding: md ? '4px 12px' : '3px 9px', fontSize: md ? 11 : 10, fontWeight: md ? 600 : 700, cursor: 'pointer', outline: 'none', fontFamily: 'inherit' }}
+      // Keeps the "no value" grey when nothing is set, which the pill tint alone
+      // can't express — the empty row stays first, exactly as before.
+      style={selected?.color ? undefined : base}
+      options={[
+        { value: '', label: '—' },
+        ...options.map(o => ({ value: o.id, label: o.label, color: o.color || undefined })),
+      ]}
+      onChange={onChange}
       title="Set value"
-    >
-      <option value="" style={{ background: 'var(--surface-2)', color: 'var(--text)', fontWeight: 600 }}>—</option>
-      {options.map(o => (
-        <option key={o.id} value={o.id} style={{ background: 'var(--surface-2)', color: 'var(--text)', fontWeight: 600 }}>{o.label}</option>
-      ))}
-    </select>
+    />
   );
 }
 
@@ -116,16 +120,17 @@ export function CustomFilterControls({
   return (
     <>
       {props.map(p => (
-        <select
+        <Dropdown
           key={p.id}
-          className="form-input"
-          style={{ width: 'auto', padding: '4px 7px', fontSize: 11 }}
+          variant="input"
           value={filters[p.id] || 'All'}
-          onChange={e => setFilters({ ...filters, [p.id]: e.target.value })}
-        >
-          <option value="All">{p.name}: All</option>
-          {(optionsByProp[p.id] || []).map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-        </select>
+          options={[
+            { value: 'All', label: `${p.name}: All` },
+            ...(optionsByProp[p.id] || []).map(o => ({ value: o.id, label: o.label, color: o.color || undefined })),
+          ]}
+          onChange={v => setFilters({ ...filters, [p.id]: v })}
+          ariaLabel={`Filter by ${p.name}`}
+        />
       ))}
     </>
   );

@@ -1,5 +1,6 @@
 'use client';
 import { useState, useMemo, useRef, useEffect } from 'react';
+import Dropdown from './studio/Dropdown';
 import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabase';
 import { Client, ResearchItem, ResearchStatus, StudioComment, StudioActivity, Profile } from '@/lib/types';
@@ -393,14 +394,20 @@ export default function ResearchTab({ client, items, comments, activity, profile
           <div className="studio-filters">
             {/* width:auto matters — .form-input sets width:100%, and a bare
                 select without this override blows the toolbar onto three rows. */}
-            <select className="form-input" style={{ width: 'auto' }} value={reasonFilter} onChange={e => setReasonFilter(e.target.value)} aria-label="Filter by reason">
-              <option value="All">All reasons</option>
-              {reasonOptions.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
-            <select className="form-input" style={{ width: 'auto' }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Filter by status">
-              <option value="All">All status</option>
-              {STATUS_ORDER.map(s => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
-            </select>
+            <Dropdown
+              variant="input"
+              value={reasonFilter}
+              options={[{ value: 'All', label: 'All reasons' }, ...reasonOptions.map(r => ({ value: r, label: r }))]}
+              onChange={setReasonFilter}
+              ariaLabel="Filter by reason"
+            />
+            <Dropdown
+              variant="input"
+              value={statusFilter}
+              options={[{ value: 'All', label: 'All status' }, ...STATUS_ORDER.map(st => ({ value: st, label: STATUS_LABELS[st] }))]}
+              onChange={setStatusFilter}
+              ariaLabel="Filter by status"
+            />
             <div className="view-seg" role="group" aria-label="View">
               <button type="button" className={view === 'grid' ? 'active' : undefined} aria-pressed={view === 'grid'} onClick={() => setView('grid')} title="Grid view">
                 <Icon name="grid" size={14} />Grid
@@ -450,9 +457,13 @@ export default function ResearchTab({ client, items, comments, activity, profile
               style={{ minHeight: 62, resize: 'vertical', lineHeight: 1.45 }}
             />
             <div className="idea-form-foot">
-              <select className="form-input" value={reason} onChange={e => setReason(e.target.value)} style={{ width: 'auto' }}>
-                {REASONS.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
+              <Dropdown
+                variant="input"
+                value={reason}
+                options={REASONS.map(r => ({ value: r, label: r }))}
+                onChange={setReason}
+                ariaLabel="Reason"
+              />
               <button className="btn-primary" style={{ fontSize: 12, padding: '8px 16px', marginLeft: 'auto' }} onClick={saveItem} disabled={saving || !title.trim()}>
                 {saving ? 'Saving…' : 'Save idea'}
               </button>

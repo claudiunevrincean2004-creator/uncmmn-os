@@ -1,5 +1,6 @@
 'use client';
 import { DateFilter } from '@/lib/clip-library';
+import Dropdown from '../studio/Dropdown';
 
 // Segmented "This week / This month / All" quick filter (filters by date_added).
 export function DateQuickFilter({ value, onChange }: { value: DateFilter; onChange: (v: DateFilter) => void }) {
@@ -28,10 +29,13 @@ export function DateQuickFilter({ value, onChange }: { value: DateFilter; onChan
 export function FormatFilter({ value, options, onChange }: { value: string; options: string[]; onChange: (v: string) => void }) {
   if (options.length === 0) return null;
   return (
-    <select className="form-input" style={{ fontSize: 11, padding: '5px 8px' }} value={value} onChange={e => onChange(e.target.value)}>
-      <option value="">All formats</option>
-      {options.map(o => <option key={o} value={o}>{o}</option>)}
-    </select>
+    <Dropdown
+      variant="input"
+      value={value}
+      options={[{ value: '', label: 'All formats' }, ...options.map(o => ({ value: o, label: o }))]}
+      onChange={onChange}
+      ariaLabel="Filter by format"
+    />
   );
 }
 

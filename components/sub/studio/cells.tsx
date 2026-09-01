@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { pillStyle, shortDate } from '@/lib/studio';
+import { shortDate } from '@/lib/studio';
+import Dropdown, { toOptions, type DropdownOption } from './Dropdown';
 import { formatUSD, parseUSD } from '@/lib/utils';
 
 // Inline text/textarea editor with uniform keyboard behavior across every table:
@@ -58,25 +59,6 @@ export function InlineText({
   return <input {...shared} />;
 }
 
-
-// The one pill geometry in the app, so a Status/Format/Priority chip looks the
-// same in a Studio table as it does in that row's detail panel. 'md' is the
-// Studio shape — a soft rounded RECTANGLE, not a lozenge; 'sm' is the dense
-// legacy pill the non-Studio tables still use.
-export function pillShape(size: 'sm' | 'md'): React.CSSProperties {
-  const md = size === 'md';
-  return {
-    appearance: 'none',
-    WebkitAppearance: 'none',
-    borderRadius: md ? 6 : 20,
-    padding: md ? '4px 10px' : '3px 9px',
-    fontSize: md ? 11 : 10,
-    fontWeight: md ? 600 : 700,
-    cursor: 'pointer',
-    outline: 'none',
-    fontFamily: 'inherit',
-  };
-}
 
 // Display-then-edit text field for the detail panels. At rest it's plain read-only
 // text (line breaks preserved) with a ✎ beside it; clicking either the text or the
@@ -146,7 +128,32 @@ export function EditableText({
   );
 }
 
-// A select styled as a colored pill — click opens the dropdown to change.
+// ── The four option pickers ─────────────────────────────────────────────────
+// All four are thin adapters over the ONE shared <Dropdown/>. Their props,
+// option lists, "+ Add new…" gating and what they emit are unchanged — only the
+// native <select> underneath them is gone. Every existing call site is therefore
+// untouched, and no field gains or loses the ability to create options.
+
+const ADD_NEW = '__add_new__';
+
+/** The shared "+ Add new…" flow, identical to the one the selects ran. */
+function makeAddHandler(
+  field: string,
+  onChange: (v: string) => void,
+  onAddOption?: (field: string, value: string) => void,
+) {
+  return (v: string) => {
+    if (v === ADD_NEW) {
+      const entered = window.prompt(`Add new ${field.replace(/_/g, ' ')} option:`);
+      const t = entered?.trim();
+      if (t) { onAddOption?.(field, t); onChange(t); }
+      return;
+    }
+    onChange(v);
+  };
+}
+
+// A picker styled as a colored pill — click opens the dropdown to change.
 export function PillSelect({
   value,
   options,
@@ -163,22 +170,18 @@ export function PillSelect({
   /** Display text per stored value, where the two differ ('progress' → "In Progress"). */
   labels?: Record<string, string>;
 }) {
-  const color = colors[value] || '#6b7280';
   return (
-    <select
+    <Dropdown
+      variant="pill"
+      size={size}
       value={value}
-      onChange={e => onChange(e.target.value)}
-      style={{ ...pillStyle(color), ...pillShape(size) }}
-      title="Click to change"
-    >
-      {options.map(o => (
-        <option key={o} value={o} style={{ background: 'var(--surface-2)', color: 'var(--text)', fontWeight: 600 }}>{labels?.[o] ?? o}</option>
-      ))}
-    </select>
+      options={toOptions(options, labels, colors)}
+      onChange={onChange}
+    />
   );
 }
 
-// Plain select for non-pill dropdowns (Format, Assigned To, Platform…).
+// Plain picker for non-pill dropdowns (Format, Assigned To, Platform…).
 //
 // `size='md'` is the roomier Studio-toolbar form. `allLabel` renames the "All"
 // option so the resting dropdown reads as its own label ("All status",
@@ -193,6 +196,7 @@ export function MiniSelect({
   size = 'sm',
   allLabel,
   labels,
+  ariaLabel,
 }: {
   value?: string;
   options: string[];
@@ -204,26 +208,29 @@ export function MiniSelect({
   /** Display text per stored value, where the two differ (a person's uuid →
    *  their name, 'one_off' → "One-off"). */
   labels?: Record<string, string>;
+  ariaLabel?: string;
 }) {
-  const md = size === 'md';
+  const opts: DropdownOption[] = [
+    ...(placeholder ? [{ value: '', label: placeholder }] : []),
+    ...options.map(o => ({
+      value: o,
+      label: labels?.[o] ?? (o === 'All' && allLabel ? allLabel : o),
+    })),
+  ];
   return (
-    <select
-      className="form-input"
-      style={
-        md
-          ? { width: width ?? 'auto', padding: '8px 12px', fontSize: 12, borderRadius: 10, minWidth: 120 }
-          : { width: width ?? 'auto', padding: '4px 7px', fontSize: 11 }
-      }
+    <Dropdown
+      variant="input"
+      size={size}
       value={value ?? ''}
-      onChange={e => onChange(e.target.value)}
-    >
-      {placeholder && <option value="">{placeholder}</option>}
-      {options.map(o => <option key={o} value={o}>{labels?.[o] ?? (o === 'All' && allLabel ? allLabel : o)}</option>)}
-    </select>
+      options={opts}
+      onChange={onChange}
+      width={width}
+      minWidth={size === 'md' ? 120 : undefined}
+      placeholder={placeholder ?? '—'}
+      ariaLabel={ariaLabel}
+    />
   );
 }
-
-const ADD_NEW = '__add_new__';
 
 // Editable dropdown that lets the user add their own option via "+ Add new…".
 // `options` should already be the merged base + custom list for this field.
@@ -248,30 +255,24 @@ export function EditSelect({
 }) {
   // Always keep the current value selectable even if it isn't in the option list
   const opts = value && !options.includes(value) ? [value, ...options] : options;
-  function handle(v: string) {
-    if (v === ADD_NEW) {
-      const entered = window.prompt(`Add new ${field.replace(/_/g, ' ')} option:`);
-      const t = entered?.trim();
-      if (t) { onAddOption?.(field, t); onChange(t); }
-      return;
-    }
-    onChange(v);
-  }
+  const rows: DropdownOption[] = [
+    ...(placeholder ? [{ value: '', label: placeholder }] : []),
+    ...opts.map(o => ({ value: o, label: o })),
+    ...(allowAdd ? [{ value: ADD_NEW, label: '+ Add new…', isAction: true }] : []),
+  ];
   return (
-    <select
-      className="form-input"
-      style={{ width: width ?? 'auto', padding: '4px 7px', fontSize: 11 }}
+    <Dropdown
+      variant="input"
       value={value ?? ''}
-      onChange={e => handle(e.target.value)}
-    >
-      {placeholder && <option value="">{placeholder}</option>}
-      {opts.map(o => <option key={o} value={o}>{o}</option>)}
-      {allowAdd && <option value={ADD_NEW}>+ Add new…</option>}
-    </select>
+      options={rows}
+      onChange={makeAddHandler(field, onChange, onAddOption)}
+      width={width}
+      placeholder={placeholder ?? '—'}
+    />
   );
 }
 
-// Colored pill select that also supports adding custom options.
+// Colored pill picker that also supports adding custom options.
 //
 // `size` is presentation only — 'sm' is the dense legacy pill (still used by the
 // non-Studio tables), 'md' the softer, roomier one the Studio tables use.
@@ -301,33 +302,21 @@ export function EditPillSelect({
    *  "Ready to Pay"). Same contract as PillSelect's `labels`. */
   labels?: Record<string, string>;
 }) {
-  const md = size === 'md';
-  const color = colors[value] || '#6b7280';
   const opts = value && !options.includes(value) ? [value, ...options] : options;
-  function handle(v: string) {
-    if (v === ADD_NEW) {
-      const entered = window.prompt(`Add new ${field.replace(/_/g, ' ')} option:`);
-      const t = entered?.trim();
-      if (t) { onAddOption?.(field, t); onChange(t); }
-      return;
-    }
-    onChange(v);
-  }
+  const rows: DropdownOption[] = [
+    ...(allowEmpty ? [{ value: '', label: '—' }] : []),
+    ...toOptions(opts, labels, colors),
+    ...(allowAdd ? [{ value: ADD_NEW, label: '+ Add new…', isAction: true }] : []),
+  ];
   return (
-    <select
+    <Dropdown
+      variant="pill"
+      size={size}
       value={value}
-      onChange={e => handle(e.target.value)}
-      style={{
-        ...pillStyle(color),
-        ...pillShape(size),
-        maxWidth: md ? 190 : undefined,
-      }}
-      title="Click to change"
-    >
-      {allowEmpty && <option value="" style={{ background: 'var(--surface-2)', color: 'var(--text)', fontWeight: 600 }}>—</option>}
-      {opts.map(o => <option key={o} value={o} style={{ background: 'var(--surface-2)', color: 'var(--text)', fontWeight: 600 }}>{labels?.[o] ?? o}</option>)}
-      {allowAdd && <option value={ADD_NEW} style={{ background: 'var(--surface-2)', color: 'var(--text)', fontWeight: 600 }}>+ Add new…</option>}
-    </select>
+      options={rows}
+      onChange={makeAddHandler(field, onChange, onAddOption)}
+      maxWidth={size === 'md' ? 190 : undefined}
+    />
   );
 }
 
