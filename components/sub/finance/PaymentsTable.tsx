@@ -35,6 +35,7 @@ interface PaymentDraft {
   amount: string;
   status: string;
   due_date: string;
+  paid_date: string;
   invoice_url: string;
   description: string;
 }
@@ -44,9 +45,19 @@ const EMPTY_DRAFT: PaymentDraft = {
   amount: '',
   status: 'pending',
   due_date: '',
+  paid_date: '',
   invoice_url: '',
   description: '',
 };
+
+// The one rule for paid_date, shared by the Add form and the detail panel:
+// picking Paid reveals the field prefilled with today (a guess you can overwrite
+// to backdate a payment actually made weeks ago), and moving off Paid clears it
+// rather than leaving yesterday's stale date on a pending row.
+function paidDateForStatus(status: string, current: string): string {
+  if (status !== 'paid') return '';
+  return current || todayISO();
+}
 
 interface Props {
   /** ALREADY scoped to the tab's period by FinanceTab — this component filters
@@ -54,6 +65,14 @@ interface Props {
    *  stat cards above and these rows are always the same set of payments. */
   payments: FinancePayment[];
   people: FinancePerson[];
+  /**
+   * Set when the parent has swapped the period's rows for one specific problem
+   * set (today: paid payments with no paid_date, from the Paid card's warning).
+   * While it's set the table shows a banner and SUSPENDS its own saved filters —
+   * a persisted "Status: Pending" would otherwise hide every row the user just
+   * asked to see. Search and sort still apply; both are transient, not saved.
+   */
+  focus?: { label: string; hint: string; onClear: () => void } | null;
   /** The active period, for the empty state ("No payments in This month"). */
   periodName: string;
   /** Jump to the People view — offered from the empty state when nobody exists yet. */
@@ -61,7 +80,7 @@ interface Props {
   onReload: () => void;
 }
 
-export default function PaymentsTable({ payments, people, periodName, onManagePeople, onReload }: Props) {
+export default function PaymentsTable({ payments, people, focus, periodName, onManagePeople, onReload }: Props) {
   const [fPerson, setFPerson] = usePersistedState<string>('finance_p_person', 'All');
   const [fType, setFType] = usePersistedState<string>('finance_p_type', 'All');
   const [fStatus, setFStatus] = usePersistedState<string>('finance_p_status', 'All');
@@ -123,6 +142,10 @@ export default function PaymentsTable({ payments, people, periodName, onManagePe
       amount: parseUSD(draft.amount) ?? 0,
       status: draft.status || 'pending',
       due_date: draft.due_date || null,
+      // Only ever written for a paid row — the field isn't even shown otherwise,
+      // and a paid_date on a pending payment would be counted by nothing and
+      // read as a contradiction.
+      paid_date: draft.status === 'paid' ? (draft.paid_date || todayISO()) : null,
       invoice_url: draft.invoice_url.trim() || null,
       description: draft.description.trim() || null,
       // Currency stays at its 'USD' default — everything here is USD and no UI
@@ -200,6 +223,9 @@ export default function PaymentsTable({ payments, people, periodName, onManagePe
         (nameOf[p.person_id || ''] || '').toLowerCase().includes(q) ||
         (p.description || '').toLowerCase().includes(q));
     }
+    // A focused set is already the exact answer to a question the user just
+    // asked, so the saved filters sit this one out — see the `focus` prop.
+    if (focus) return sortRows(r, sortOptions, sortKey, sortDir);
     if (fPerson !== 'All') r = r.filter(p => (nameOf[p.person_id || ''] || '') === fPerson);
     if (fType !== 'All') r = r.filter(p => (p.type || '') === fType);
     // A row with no status renders as Pending (see the pill below), so it has to
@@ -207,11 +233,11 @@ export default function PaymentsTable({ payments, people, periodName, onManagePe
     if (fStatus !== 'All') r = r.filter(p => (p.status || 'pending') === fStatus);
     if (dateFrom || dateTo) r = r.filter(p => inDateRange(p.due_date || undefined, dateFrom, dateTo));
     return sortRows(r, sortOptions, sortKey, sortDir);
-  }, [payments, search, fPerson, fType, fStatus, dateFrom, dateTo, sortKey, sortDir, nameOf, sortOptions]);
+  }, [payments, search, focus, fPerson, fType, fStatus, dateFrom, dateTo, sortKey, sortDir, nameOf, sortOptions]);
 
   const { visible, hasMore, remaining, loadMore } = usePagedRows(
     filtered,
-    [search, fPerson, fType, fStatus, dateFrom, dateTo, sortKey, sortDir].join('|'),
+    [search, focus ? 'focus' : '', fPerson, fType, fStatus, dateFrom, dateTo, sortKey, sortDir].join('|'),
   );
 
   const selected = selectedId ? payments.find(p => p.id === selectedId) ?? null : null;
@@ -232,7 +258,10 @@ export default function PaymentsTable({ payments, people, periodName, onManagePe
     { key: 'amount', label: 'Amount', type: 'money' },
     { key: 'status', label: 'Status', type: 'pill', field: 'finance_payment_status', options: PAYMENT_STATUSES, colors: PAYMENT_STATUS_COLORS, optionLabels: PAYMENT_STATUS_LABELS, allowAdd: false },
     { key: 'due_date', label: 'Due Date', type: 'date' },
-    { key: 'paid_date', label: 'Paid Date', type: 'date' },
+    // Meaningless on anything but a paid row, so it isn't shown on one. Status
+    // is what reveals it (and prefills today, via changeStatus) — the field
+    // itself stays fully editable so a payment made weeks ago can be backdated.
+    { key: 'paid_date', label: 'Paid Date', type: 'date', visibleIf: v => v.status === 'paid' },
     { key: 'invoice_url', label: 'Invoice', type: 'url' },
     { key: 'description', label: 'Description', type: 'textarea', placeholder: 'What this payment covers' },
     { key: 'notes', label: 'Notes', type: 'textarea', placeholder: 'Internal notes' },
@@ -266,6 +295,19 @@ export default function PaymentsTable({ payments, people, periodName, onManagePe
           <FilterChips defs={filterDefs} />
         </TableToolbar>
 
+        {focus && (
+          <div className="table-notice">
+            <span className="table-notice-icon" aria-hidden="true">⚠</span>
+            <div className="table-notice-body">
+              <div className="table-notice-label">{focus.label}</div>
+              <div className="table-notice-hint">{focus.hint}</div>
+            </div>
+            <button type="button" className="table-notice-clear" onClick={focus.onClear}>
+              Back to {periodName.toLowerCase()}
+            </button>
+          </div>
+        )}
+
         {filtered.length === 0 ? (
           <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px 0', fontSize: 12 }}>
             {people.length === 0 ? (
@@ -273,7 +315,9 @@ export default function PaymentsTable({ payments, people, periodName, onManagePe
                 No one to pay yet.{' '}
                 <button className="btn-ghost" style={{ fontSize: 11, padding: '5px 12px', marginLeft: 6 }} onClick={onManagePeople}>Add a person first</button>
               </>
-            ) : `No payments in ${periodName}. Widen the period, adjust filters, or add a payment.`}
+            ) : focus
+              ? 'Nothing matches your search in this list. Clear it to see the rest.'
+              : `No payments in ${periodName}. Widen the period, adjust filters, or add a payment.`}
           </div>
         ) : (
           <>
@@ -286,6 +330,7 @@ export default function PaymentsTable({ payments, people, periodName, onManagePe
                       <th>Type</th>
                       <th className="st-center">Amount</th>
                       <th className="st-center">Due Date</th>
+                      <th className="st-center">Paid Date</th>
                       <th>Status</th>
                       <th>Invoice</th>
                       <th></th>
@@ -331,6 +376,17 @@ export default function PaymentsTable({ payments, people, periodName, onManagePe
                               <InlineDate display="chip" value={p.due_date || undefined} onCommit={d => patch(p.id, { due_date: d || null })} highlight={overdue} />
                               {overdue && <span className="st-overdue">OVERDUE</span>}
                             </div>
+                          </td>
+                          <td className="st-center">
+                            {/* Only a paid row can carry one, so only a paid row
+                                offers the picker; everything else rests as a
+                                plain dash rather than an editable blank that
+                                writes a date the stat cards would never read. */}
+                            {status === 'paid' ? (
+                              <InlineDate display="text" value={p.paid_date || undefined} onCommit={d => patch(p.id, { paid_date: d || null })} />
+                            ) : (
+                              <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>—</span>
+                            )}
                           </td>
                           <td>
                             <EditPillSelect
@@ -426,11 +482,22 @@ export default function PaymentsTable({ payments, people, periodName, onManagePe
                 />
               </DraftField>
               <DraftField label="Status">
-                <EditPillSelect field="finance_payment_status" value={draft.status} options={PAYMENT_STATUSES} colors={PAYMENT_STATUS_COLORS} labels={PAYMENT_STATUS_LABELS} onChange={s => setDraft(d => ({ ...d, status: s }))} allowAdd={false} />
+                <EditPillSelect field="finance_payment_status" value={draft.status} options={PAYMENT_STATUSES} colors={PAYMENT_STATUS_COLORS} labels={PAYMENT_STATUS_LABELS} onChange={s => setDraft(d => ({ ...d, status: s, paid_date: paidDateForStatus(s, d.paid_date) }))} allowAdd={false} />
               </DraftField>
               <DraftField label="Due Date">
                 <input className="form-input" type="date" value={draft.due_date} onChange={e => setDraft(d => ({ ...d, due_date: e.target.value }))} onClick={openDatePicker} style={{ width: 160, fontSize: 12 }} />
               </DraftField>
+              {/* Revealed by Status alone — see paidDateForStatus. Prefilled with
+                  today because that's right most of the time, and left editable
+                  because when it isn't, the whole point is to backdate it. */}
+              {draft.status === 'paid' && (
+                <DraftField label="Paid Date">
+                  <input className="form-input" type="date" value={draft.paid_date} onChange={e => setDraft(d => ({ ...d, paid_date: e.target.value }))} onClick={openDatePicker} style={{ width: 160, fontSize: 12 }} />
+                  <div style={{ fontSize: 10, color: 'var(--text-faint)', marginTop: 5, lineHeight: 1.4 }}>
+                    Which month this lands in on the Paid card. Backdate it if the money moved earlier.
+                  </div>
+                </DraftField>
+              )}
               <DraftField label="Invoice">
                 <input className="form-input" value={draft.invoice_url} onChange={e => setDraft(d => ({ ...d, invoice_url: e.target.value }))} placeholder="https://…" style={{ width: '100%', fontSize: 12 }} />
               </DraftField>

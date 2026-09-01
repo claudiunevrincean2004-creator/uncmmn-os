@@ -1,11 +1,11 @@
 'use client';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { FinancePerson, FinancePayment, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { formatUSD } from '@/lib/utils';
 import {
   PERIOD_OPTIONS, DEFAULT_PERIOD, type PeriodKey,
-  periodRange, periodLabel, periodRangeLabel, inPeriod,
+  periodRange, periodLabel, periodRangeLabel, inPeriod, isPaidIn, missingPaidDate,
 } from '@/lib/finance';
 import Icon, { type IconName } from '@/components/Icon';
 import { ChoiceMenu } from './studio/FilterMenu';
@@ -47,6 +47,10 @@ interface StatCard {
   /** A rule worth being able to look up, but not worth permanent screen space —
    *  rendered as the small ⓘ beside the label. */
   note?: string;
+  /** Rows this card had to leave out because their data is incomplete. Rendered
+   *  as a small amber pill under the figure that filters the table down to
+   *  exactly those rows — visible and fixable, rather than silently dropped. */
+  warn?: { text: string; title: string; onClick: () => void };
 }
 
 interface Props {
@@ -72,15 +76,27 @@ export default function FinanceTab({ people, payments, profiles, onReload }: Pro
   // "Paid · Last month" and "Outstanding · Last month" coherent side by side.
   const scoped = useMemo(() => payments.filter(p => inPeriod(p, range)), [payments, range]);
 
+  // Rows marked paid that carry no paid_date. Drawn from EVERY payment, not the
+  // scoped set: with no date they belong to no window, so a period-scoped count
+  // would hide the exact rows this warning exists to get fixed.
+  const undated = useMemo(() => payments.filter(missingPaidDate), [payments]);
+  const [showUndated, setShowUndated] = useState(false);
+  // Fixing the last one empties the list, which drops the table straight back to
+  // the period — no stale "0 rows" view to dismiss by hand.
+  const undatedOpen = showUndated && undated.length > 0;
+
   const stats: StatCard[] = useMemo(() => {
     const name = periodLabel(period);
-    // The scoped set is already anchored, so the cards are a plain partition of
-    // it — no second date rule lives here to drift out of step with the table.
+    // Outstanding is a plain partition of the anchored set, unchanged.
     const outstanding = scoped
       .filter(p => p.status !== 'paid')
       .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+    // Paid is NOT. It re-asks the question strictly, against paid_date alone
+    // (isPaidIn), so a row can only land in a month the money actually moved in.
+    // A paid row with no paid_date fails that test in every period — including
+    // All time — and is surfaced by the warning below rather than dropped.
     const paid = scoped
-      .filter(p => p.status === 'paid')
+      .filter(p => isPaidIn(p, range))
       .reduce((s, p) => s + (Number(p.amount) || 0), 0);
     const awaiting = scoped.filter(p => p.status === 'ready_to_pay').length;
     return [
@@ -89,10 +105,21 @@ export default function FinanceTab({ people, payments, profiles, onReload }: Pro
         hint: `Not yet paid, by due date — ${name}`, money: true,
         note: 'Unpaid payments with no due date always count as outstanding, in every period.',
       },
-      { label: `Paid · ${name}`, value: formatUSD(paid), color: '#10b981', icon: 'check', hint: `Paid, by paid date — ${name}`, money: true },
+      {
+        label: `Paid · ${name}`, value: formatUSD(paid), color: '#10b981', icon: 'check',
+        hint: `Paid, by paid date — ${name}`, money: true,
+        note: 'Counts paid_date only. A payment marked paid with no paid date is counted in no period at all.',
+        warn: undated.length ? {
+          text: `${undated.length} paid payment${undated.length === 1 ? '' : 's'} missing a paid date`,
+          title: undatedOpen
+            ? 'Showing them — click to go back to the period'
+            : 'Excluded from this total. Click to list them and fill the dates in.',
+          onClick: () => setShowUndated(v => !v),
+        } : undefined,
+      },
       { label: `Awaiting Action · ${name}`, value: String(awaiting), color: '#eab308', icon: 'clock', hint: `Sitting at Ready to Pay — ${name}` },
     ];
-  }, [scoped, period]);
+  }, [scoped, period, range, undated, undatedOpen]);
 
   return (
     <div style={{ position: 'relative' }}>
@@ -111,6 +138,18 @@ export default function FinanceTab({ people, payments, profiles, onReload }: Pro
                 )}
               </div>
               <div className={item.money ? 'studio-stat-num is-money' : 'studio-stat-num'} title={item.value}>{item.value}</div>
+              {item.warn && (
+                <button
+                  type="button"
+                  className={`stat-warn${undatedOpen ? ' is-on' : ''}`}
+                  aria-pressed={undatedOpen}
+                  title={item.warn.title}
+                  onClick={item.warn.onClick}
+                >
+                  <span aria-hidden="true">⚠</span>
+                  <span>{item.warn.text}</span>
+                </button>
+              )}
             </div>
           </div>
         ))}
@@ -150,7 +189,16 @@ export default function FinanceTab({ people, payments, profiles, onReload }: Pro
 
       {sub === 'payments' && (
         <PaymentsTable
-          payments={scoped}
+          // Clicking the Paid card's warning swaps the period's rows for exactly
+          // the undated ones, so they can be fixed where they are — and `focus`
+          // tells the table to suspend its own filters while that's showing,
+          // since a persisted "Status: Pending" would otherwise hide all of them.
+          payments={undatedOpen ? undated : scoped}
+          focus={undatedOpen ? {
+            label: `${undated.length} paid payment${undated.length === 1 ? '' : 's'} missing a paid date`,
+            hint: 'Not counted in any Paid total until each has a date. Set one below and it drops off this list.',
+            onClear: () => setShowUndated(false),
+          } : null}
           people={people}
           periodName={periodLabel(period)}
           onManagePeople={() => setSub('people')}

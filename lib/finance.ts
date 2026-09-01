@@ -178,3 +178,31 @@ export function inPeriod(p: FinancePayment, range: DateRange | null): boolean {
   if (!d) return p.status !== 'paid';
   return d >= range.from && d <= range.to;
 }
+
+/**
+ * Is this payment PAID inside the period, strictly by paid_date?
+ *
+ * This is the Paid card's one rule, and it deliberately has no due_date
+ * fallback: a payment due 2026-08-01 that nobody has stamped with a paid date
+ * is not September's paid money — it isn't any month's paid money. It has no
+ * settlement date on record, so it is counted nowhere (see missingPaidDate,
+ * which is how those rows get surfaced rather than silently dropped) — not even
+ * under All time, where `range` is null and every other rule waves rows through.
+ */
+export function isPaidIn(p: FinancePayment, range: DateRange | null): boolean {
+  if (p.status !== 'paid') return false;
+  const d = p.paid_date ? p.paid_date.slice(0, 10) : null;
+  if (!d) return false;
+  if (!range) return true;
+  return d >= range.from && d <= range.to;
+}
+
+/**
+ * A row marked paid with nothing in paid_date — the one shape isPaidIn refuses
+ * to count. Period-independent on purpose: a row with no date belongs to no
+ * window, so scoping the warning to the picker would hide the very rows it
+ * exists to get fixed.
+ */
+export function missingPaidDate(p: FinancePayment): boolean {
+  return p.status === 'paid' && !p.paid_date;
+}
