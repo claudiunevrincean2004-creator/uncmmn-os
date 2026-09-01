@@ -171,6 +171,9 @@ export function UserPicker({
       {open && pos && typeof document !== 'undefined' && createPortal(
         <div
           ref={popRef}
+          // Portalled to <body> — see lib/use-dismiss.ts. Without this, picking
+          // an assignee inside a detail panel dismisses the panel.
+          data-dismiss-safe=""
           style={{
             position: 'fixed', left: pos.left, top: pos.top, bottom: pos.bottom, zIndex: 3000,
             width: DROPDOWN_W, background: 'var(--surface)', border: '1px solid var(--border)',

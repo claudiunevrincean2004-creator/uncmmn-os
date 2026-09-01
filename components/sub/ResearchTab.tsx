@@ -637,6 +637,7 @@ function ReasonPicker({
         <div
           ref={popRef}
           className="idea-reason-menu"
+          data-dismiss-safe=""
           style={{ left: pos.left, top: pos.top }}
           onClick={stop}
           onMouseDown={stop}

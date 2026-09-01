@@ -17,6 +17,24 @@ interface Opts {
  *
  * Before closing, the focused element is blurred so any pending field edit is
  * committed exactly the way clicking the ✕ button already does (blur-to-save).
+ *
+ * ── Why the outside test runs in the CAPTURE phase ─────────────────────────
+ * `node.contains(target)` only answers truthfully while the target is still in
+ * the document. Plenty of in-panel controls remove themselves in their own
+ * handler — a Cancel button that leaves edit mode, a two-step confirm, a menu
+ * option that closes its menu. React flushes that re-render before the event
+ * finishes bubbling to document, so a bubble-phase listener would ask
+ * `contains()` about a node that had already been unmounted, get `false`, and
+ * dismiss the whole panel because you clicked something inside it.
+ *
+ * Capture runs before the target's own handlers, so the DOM is still intact and
+ * the answer is the real one.
+ *
+ * ── Why `[data-dismiss-safe]` ─────────────────────────────────────────────
+ * Some in-panel controls render their popup through a portal on <body> (the
+ * shared Dropdown, the assignee UserPicker). Those nodes are genuinely outside
+ * `ref`, so containment alone can't save them — the marker is what re-associates
+ * a portalled subtree with the panel that owns it.
  */
 export function useDismiss(
   ref: React.RefObject<HTMLElement | null> | null,
@@ -37,9 +55,11 @@ export function useDismiss(
     const onMouseDown = (e: MouseEvent) => {
       if (!outside) return;
       const target = e.target as Element | null;
-      if (!target) return;
+      if (!target || typeof target.closest !== 'function') return;
       // A modal layered above the panel should handle its own clicks.
-      if (target.closest && target.closest('.modal-overlay')) return;
+      if (target.closest('.modal-overlay')) return;
+      // A portalled popup that belongs to something inside the panel.
+      if (target.closest('[data-dismiss-safe]')) return;
       const node = ref?.current;
       if (node && !node.contains(target)) flushClose();
     };
@@ -51,10 +71,12 @@ export function useDismiss(
       flushClose();
     };
 
-    document.addEventListener('mousedown', onMouseDown);
+    // capture: true — see the note above. The target must still be attached when
+    // we ask whether it was inside.
+    document.addEventListener('mousedown', onMouseDown, true);
     document.addEventListener('keydown', onKeyDown);
     return () => {
-      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('mousedown', onMouseDown, true);
       document.removeEventListener('keydown', onKeyDown);
     };
   }, [ref, onClose, active, outside]);

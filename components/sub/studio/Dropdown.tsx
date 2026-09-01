@@ -233,6 +233,9 @@ export default function Dropdown({
         <div
           ref={panelRef}
           className="fs-pop dd-pop"
+          // Portalled to <body>, so a panel's outside-click test can't see this
+          // as "inside" by containment. See lib/use-dismiss.ts.
+          data-dismiss-safe=""
           role="listbox"
           aria-label={ariaLabel}
           style={{ top: pos.top, left: pos.left, width: pos.width, maxHeight: pos.maxH }}
