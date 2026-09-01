@@ -324,7 +324,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
           <MiniSelect size="md" allLabel="All status" value={fStatus} options={statusPresent} onChange={setFStatus} />
           <MiniSelect size="md" allLabel="All formats" value={fFormat} options={formatPresent} onChange={setFFormat} />
           <SortControl size="md" options={sortOptions} sortKey={sortKey} sortDir={sortDir} onKeyChange={setSortKey} onDirChange={setSortDir} />
-          <FilterField label="Date"><DateRangePicker size="md" from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
+          <FilterField label="Date"><DateRangePicker size="md" label="Date" from={dateFrom} to={dateTo} dates={adCreatives.map(a => a.date_added)} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
           <CustomFilterControls props={cprops} optionsByProp={optsByProp} filters={custFilters} setFilters={setCustFilters} />
         </TableToolbar>
 

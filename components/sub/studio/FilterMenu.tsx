@@ -47,6 +47,10 @@ export interface DateFilterDef {
   label: string;
   from: string;
   to: string;
+  /** Values of the column this narrows, so the picker can offer the specific
+   *  calendar months actually present. Pass the UNFILTERED list — a month list
+   *  that shrinks as you filter is a trap. */
+  dates?: (string | null | undefined)[];
   onChange: (from: string, to: string) => void;
 }
 
@@ -200,7 +204,7 @@ export function FilterMenu({ defs, noun = 'videos' }: {
                     </select>
                   ) : (
                     <div className="fs-val">
-                      <DateRangePicker size="md" from={d.from} to={d.to} onChange={d.onChange} />
+                      <DateRangePicker size="md" from={d.from} to={d.to} dates={d.dates} onChange={d.onChange} />
                     </div>
                   )}
 

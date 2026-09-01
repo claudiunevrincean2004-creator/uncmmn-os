@@ -3,12 +3,10 @@ import { useMemo, useState } from 'react';
 import { FinancePerson, FinancePayment, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { formatUSD } from '@/lib/utils';
-import {
-  PERIOD_OPTIONS, DEFAULT_PERIOD, type PeriodKey,
-  periodRange, periodLabel, periodRangeLabel, inPeriod, isPaidIn, missingPaidDate,
-} from '@/lib/finance';
+import { anchorDate, inPeriod, isPaidIn, missingPaidDate } from '@/lib/finance';
+import { describeRange, presetRange } from '@/lib/date-range';
 import Icon, { type IconName } from '@/components/Icon';
-import { ChoiceMenu } from './studio/FilterMenu';
+import DateRangePicker from './studio/DateRangePicker';
 import PaymentsTable from './finance/PaymentsTable';
 import PeopleManager from './finance/PeopleManager';
 
@@ -66,12 +64,31 @@ interface Props {
 
 export default function FinanceTab({ people, payments, profiles, onReload }: Props) {
   const [sub, setSub] = usePersistedState<SubTab>('finance_subtab', 'payments');
-  const [storedPeriod, setPeriod] = usePersistedState<PeriodKey>('finance_period', DEFAULT_PERIOD);
-  // A value persisted by an older build (or hand-edited) falls back rather than
-  // leaving the trigger naming a period that no longer exists.
-  const period = PERIOD_OPTIONS.some(o => o.key === storedPeriod) ? storedPeriod : DEFAULT_PERIOD;
+  // The same from/to ISO pair every other date filter in the app stores, so the
+  // shared picker drops straight in. Seeded to this calendar month, which is
+  // what the old bespoke period key defaulted to.
+  const thisMonth = presetRange('this_month');
+  const [dateFrom, setDateFrom] = usePersistedState<string>('finance_from', thisMonth.from);
+  const [dateTo, setDateTo] = usePersistedState<string>('finance_to', thisMonth.to);
 
-  const range = useMemo(() => periodRange(period), [period]);
+  // null = All time, which is what inPeriod() has always taken for "no bounds".
+  const range = useMemo(
+    () => (dateFrom || dateTo ? { from: dateFrom, to: dateTo } : null),
+    [dateFrom, dateTo],
+  );
+  // The window in words — "This month", "July 2026", "12 Jun – 4 Jul" — from the
+  // same function the picker's own trigger uses, so a card label and the trigger
+  // above it can never disagree.
+  const periodName = describeRange(dateFrom, dateTo);
+  // The picker's answer resolved to actual dates. "This month" on its own never
+  // says which month — this line is what makes a figure checkable.
+  const resolvedWindow = useMemo(() => {
+    if (!range) return 'all payments on record';
+    const day = (iso: string) =>
+      new Date(`${iso}T00:00:00`).toLocaleDateString('default', { day: 'numeric', month: 'short', year: 'numeric' });
+    if (range.from && range.to) return `${day(range.from)} – ${day(range.to)}`;
+    return range.from ? `${day(range.from)} onwards` : `up to ${day(range.to)}`;
+  }, [range]);
 
   // ONE scoped list feeds both the cards and the table, so a figure and the rows
   // under it can never disagree. inPeriod() files each payment under its anchor
@@ -89,7 +106,7 @@ export default function FinanceTab({ people, payments, profiles, onReload }: Pro
   const undatedOpen = showUndated && undated.length > 0;
 
   const stats: StatCard[] = useMemo(() => {
-    const name = periodLabel(period);
+    const name = periodName;
     // Outstanding is a plain partition of the anchored set, unchanged.
     const outstanding = scoped
       .filter(p => p.status !== 'paid')
@@ -130,7 +147,7 @@ export default function FinanceTab({ people, payments, profiles, onReload }: Pro
             // and only then narrows to the list. Clearing the banner afterwards
             // then lands on a view the rows are actually in, instead of back on
             // a month that hides them again.
-            if (!undatedOpen) setPeriod('all');
+            if (!undatedOpen) { setDateFrom(''); setDateTo(''); }
             setShowUndated(v => !v);
           },
         } : undefined,
@@ -141,7 +158,7 @@ export default function FinanceTab({ people, payments, profiles, onReload }: Pro
         sub: `${awaitingRows.length} payment${awaitingRows.length === 1 ? '' : 's'}`,
       },
     ];
-  }, [scoped, period, range, undated, undatedOpen, setPeriod]);
+  }, [scoped, periodName, range, undated, undatedOpen, setDateFrom, setDateTo]);
 
   return (
     <div style={{ position: 'relative' }}>
@@ -182,7 +199,7 @@ export default function FinanceTab({ people, payments, profiles, onReload }: Pro
           without it there's no telling whether "Paid · Last month" means billed
           last month or settled last month. */}
       <div style={{ fontSize: 11, color: 'var(--text-faint)', margin: '0 0 14px', lineHeight: 1.45 }}>
-        <strong style={{ color: 'var(--text-dim)', fontWeight: 600 }}>{periodRangeLabel(period)}</strong>
+        <strong style={{ color: 'var(--text-dim)', fontWeight: 600 }}>{resolvedWindow}</strong>
         {' · '}paid by payment date, outstanding by due date
       </div>
 
@@ -196,16 +213,17 @@ export default function FinanceTab({ people, payments, profiles, onReload }: Pro
           </button>
         ))}
         <div className="subtab-aside">
-          <ChoiceMenu
-            label="Period"
-            icon="clock"
-            heading="Show"
-            ariaLabel="Reporting period"
-            options={PERIOD_OPTIONS}
-            value={period}
-            onChange={k => setPeriod(k as PeriodKey)}
-            defaultKey={DEFAULT_PERIOD}
+          <DateRangePicker
+            size="md"
             align="right"
+            label="Period"
+            from={dateFrom}
+            to={dateTo}
+            // Both anchor columns, so the month list offers every month this tab
+            // can actually file a payment under — paid rows by paid_date,
+            // everything else by due_date, matching anchorDate().
+            dates={payments.map(anchorDate)}
+            onChange={(f, t) => { setDateFrom(f); setDateTo(t); }}
           />
         </div>
       </div>
@@ -223,7 +241,7 @@ export default function FinanceTab({ people, payments, profiles, onReload }: Pro
             onClear: () => setShowUndated(false),
           } : null}
           people={people}
-          periodName={periodLabel(period)}
+          periodName={periodName}
           onManagePeople={() => setSub('people')}
           onReload={onReload}
         />
@@ -237,7 +255,7 @@ export default function FinanceTab({ people, payments, profiles, onReload }: Pro
           // `on delete restrict`, so offering a delete based only on the current
           // window would hand the user a button the database then refuses.
           allPayments={payments}
-          periodName={periodLabel(period)}
+          periodName={periodName}
           profiles={profiles}
           onReload={onReload}
         />

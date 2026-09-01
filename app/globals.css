@@ -1733,19 +1733,153 @@ html, body {
   .fs-row .fs-val { flex-basis: 100%; }
 }
 
-/* The nested date-range calendar stacks its presets above the grid on phones so
-   the two-column popover can't push past the screen edge. */
+/* ===== Date-range picker ====================================================
+   The trigger borrows .fs-btn's shape so a date filter sits in a toolbar as an
+   equal of the Filter and Sort buttons; the panel is a plain .fs-pop. Only the
+   parts .fs-* has no equivalent for live here. */
+.drp-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-dim);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+
+/* The roomier form the Studio filter bars use, so every control in that row is
+   the same height and weight. */
+.drp-trigger.is-md {
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 7px;
+}
+
+.drp-trigger:hover { color: var(--text); border-color: var(--text-faint); }
+
+.drp-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Narrowing, so it lights up exactly like an applied filter button. */
+.drp-trigger.is-on {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--accent);
+}
+
+.drp-trigger-label { font-weight: 600; }
+
+/* The range itself may be long ("12 Jun 2025 – 4 Jul 2026") — it truncates
+   rather than stretching a toolbar row. */
+.drp-trigger-val {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.drp-pop2 {
+  min-width: 232px;
+  max-width: min(300px, calc(100vw - 24px));
+  padding: 8px;
+}
+
+/* Twelve-plus months would run off a short viewport, so the option list scrolls
+   while the custom range stays pinned beneath it. */
+.drp-scroll {
+  max-height: min(320px, 52vh);
+  overflow-y: auto;
+  /* Keeps a focus ring clear of the scrollbar. */
+  padding-right: 4px;
+  margin-right: -4px;
+}
+
+.drp-note {
+  padding: 4px 10px 2px;
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--text-faint);
+}
+
+.drp-custom {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 0.5px solid var(--border);
+}
+
+.drp-inputs {
+  display: flex;
+  gap: 8px;
+  padding: 0 2px;
+}
+
+.drp-input {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+}
+
+.drp-input .form-input {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 11px;
+  border-radius: 8px;
+}
+
+.drp-custom .form-error {
+  padding: 0 2px;
+  font-size: 10px;
+}
+
+.drp-custom-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.drp-apply {
+  font-size: 11px;
+  padding: 6px 14px;
+  border-radius: 8px;
+}
+
+.drp-apply:disabled,
+.fs-clear:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* On a phone the panel spans the viewport rather than hanging off its trigger,
+   and the two date inputs stack so neither is squeezed to unusable width. */
 @media (max-width: 560px) {
-  .drp-pop {
-    flex-direction: column;
-    max-width: calc(100vw - 28px);
+  .drp-pop2 {
+    max-width: calc(100vw - 24px);
+    min-width: 0;
+    width: max-content;
   }
-  .drp-presets {
-    flex-direction: row !important;
-    flex-wrap: wrap;
-    border-right: none !important;
-    border-bottom: 0.5px solid var(--border);
-  }
+  .drp-inputs { flex-direction: column; }
+  .drp-scroll { max-height: 44vh; }
 }
 
 /* ===== Research — the swipe file =========================================== */

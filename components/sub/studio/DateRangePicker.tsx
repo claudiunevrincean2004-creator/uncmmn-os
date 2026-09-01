@@ -1,221 +1,243 @@
 'use client';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDismiss } from '@/lib/use-dismiss';
+import {
+  PRESETS, type PresetKey, presetRange, monthRange, monthLabel, monthsFromData,
+  describeRange, activeSelection,
+} from '@/lib/date-range';
 
-// Shared date-range filter used across every table that filters by date. Renders a
-// single button showing the active range ("All time" / "Last 30 days" / "Jun 1 –
-// Jun 30"); clicking it opens an aurora/midnight popover with quick presets and a
-// click-start-then-end calendar. Emits ISO yyyy-mm-dd strings ('' = open bound),
-// so callers keep filtering with the existing inDateRange(from, to) helper.
+// ============================================================================
+// THE date-range filter. One component, used by every surface in the app that
+// filters by date — the Studio tables, Clip Library, Trial Reels and the
+// Finance period picker — so the options can't drift apart tab to tab.
+//
+// It emits the same inclusive [from, to] pair of ISO yyyy-mm-dd strings it
+// always did ('' = open bound), so a caller keeps filtering on whatever column
+// it already filtered on. This component decides WHICH ranges are selectable,
+// never which column they apply to.
+//
+// Built on the same .fs-* popover language as FilterMenu/SortMenu/ChoiceMenu —
+// deliberately not a native <select>, which renders as an OS menu that ignores
+// every theme token and reads as foreign beside the buttons next to it.
+//
+// The ranges themselves live in lib/date-range.ts, shared with the callers that
+// need to reason about a period outside this component (Finance).
+// ============================================================================
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const MONTHS_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-
-// Local-time yyyy-mm-dd (native <input type=date> and our data both use local dates).
-function fmtISO(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-function parseISO(s: string): Date | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
-  if (!m) return null;
-  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-}
-function addDays(d: Date, n: number): Date { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
-function startOfMonth(d: Date): Date { return new Date(d.getFullYear(), d.getMonth(), 1); }
-function endOfMonth(d: Date): Date { return new Date(d.getFullYear(), d.getMonth() + 1, 0); }
-function sameDay(a: Date, b: Date): boolean { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
-
-interface Preset { key: string; label: string; from: string; to: string }
-
-// Presets are recomputed from "today" on every open so rolling windows stay correct.
-function buildPresets(): Preset[] {
-  const today = new Date();
-  const t = fmtISO(today);
-  const thisM0 = startOfMonth(today), thisM1 = endOfMonth(today);
-  const lastMonthRef = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-  return [
-    { key: 'all', label: 'All time', from: '', to: '' },
-    { key: '7d', label: 'Last 7 days', from: fmtISO(addDays(today, -6)), to: t },
-    { key: '30d', label: 'Last 30 days', from: fmtISO(addDays(today, -29)), to: t },
-    { key: 'month', label: 'This month', from: fmtISO(thisM0), to: fmtISO(thisM1) },
-    { key: 'lastmonth', label: 'Last month', from: fmtISO(startOfMonth(lastMonthRef)), to: fmtISO(endOfMonth(lastMonthRef)) },
-  ];
-}
-
-function labelFor(from: string, to: string, presets: Preset[]): string {
-  if (!from && !to) return 'All time';
-  const preset = presets.find(p => p.from === from && p.to === to && p.key !== 'all');
-  if (preset) return preset.label;
-  const fd = parseISO(from), td = parseISO(to);
-  const thisYear = new Date().getFullYear();
-  const withYear = (fd?.getFullYear() ?? thisYear) !== thisYear || (td?.getFullYear() ?? thisYear) !== thisYear || (fd && td && fd.getFullYear() !== td.getFullYear());
-  const one = (d: Date) => `${MONTHS[d.getMonth()]} ${d.getDate()}${withYear ? `, ${d.getFullYear()}` : ''}`;
-  if (fd && td) return `${one(fd)} – ${one(td)}`;
-  if (fd) return `From ${one(fd)}`;
-  if (td) return `Until ${one(td)}`;
-  return 'All time';
-}
-
-// The active range as human text ("All time" / "Last 30 days" / "Jun 1 – Jun 30").
-// Exported so the Studio filter bars can label a date condition's chip with the
-// exact same words the picker's own trigger shows.
+/** Exported so a filter chip can read exactly what the trigger reads. */
 export function rangeLabel(from: string, to: string): string {
-  return labelFor(from, to, buildPresets());
+  return describeRange(from, to);
 }
 
-// `size` is presentation only, matching MiniSelect: 'sm' is the dense legacy
-// trigger, 'md' the roomier one the Studio filter bars use so every control in
-// that row is the same height and weight.
-export default function DateRangePicker({ from, to, onChange, align = 'left', size = 'sm' }: {
+export default function DateRangePicker({
+  from,
+  to,
+  onChange,
+  align = 'left',
+  size = 'sm',
+  dates,
+  label,
+  monthCap = 18,
+}: {
   from: string;
   to: string;
   onChange: (from: string, to: string) => void;
   align?: 'left' | 'right';
+  /** Presentation only, matching MiniSelect: 'sm' dense, 'md' for filter bars. */
   size?: 'sm' | 'md';
+  /**
+   * The values of the column this filter narrows — deadlines, due dates, posted
+   * dates. The specific-month list is built from these, so it only ever offers
+   * months that actually contain something and stays right as time passes.
+   * Omit and the month section simply doesn't render.
+   */
+  dates?: (string | null | undefined)[];
+  /** Fixed word on the trigger — "Deadline · July 2026". */
+  label?: string;
+  /** How many months to list before older ones become custom-range-only. */
+  monthCap?: number;
 }) {
   const md = size === 'md';
   const [open, setOpen] = useState(false);
-  const [selecting, setSelecting] = useState<Date | null>(null); // pending start click
-  const [hover, setHover] = useState<Date | null>(null);
-  const [view, setView] = useState<Date>(() => parseISO(from) || parseISO(to) || new Date());
+  // Custom-range drafts. Seeded from the applied range each time the popover
+  // opens, so the inputs start where the current filter is rather than blank.
+  const [draftFrom, setDraftFrom] = useState(from);
+  const [draftTo, setDraftTo] = useState(to);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [activeIdx, setActiveIdx] = useState(-1);
 
-  const presets = buildPresets(); // cheap; recomputed each render so rolling windows track "today"
-  const fromD = parseISO(from), toD = parseISO(to);
+  useDismiss(wrapRef, () => setOpen(false), { active: open });
 
-  useDismiss(wrapRef, () => { setOpen(false); setSelecting(null); setHover(null); }, { active: open });
+  const months = useMemo(() => (dates ? monthsFromData(dates, monthCap) : []), [dates, monthCap]);
+  const selected = activeSelection(from, to);
+
+  // Every option button, in visual order — the list the arrow keys walk. The
+  // custom inputs sit outside it and are reached with Tab, since typing a date
+  // and roving a menu want the same keys.
+  const options = useMemo(() => {
+    const dated = PRESETS.filter(p => p.key !== 'all');
+    return [
+      ...dated.map(p => ({ kind: 'preset' as const, key: p.key, label: p.label })),
+      ...months.map(m => ({ kind: 'month' as const, key: m, label: monthLabel(m) })),
+      { kind: 'preset' as const, key: 'all' as PresetKey, label: 'All time' },
+    ];
+  }, [months]);
+
+  function openMenu() {
+    setDraftFrom(from);
+    setDraftTo(to);
+    setActiveIdx(-1);
+    setOpen(true);
+  }
+  function close(focusTrigger: boolean) {
+    setOpen(false);
+    setActiveIdx(-1);
+    if (focusTrigger) btnRef.current?.focus();
+  }
+
+  useEffect(() => {
+    if (open && activeIdx >= 0) itemRefs.current[activeIdx]?.focus();
+  }, [open, activeIdx]);
 
   function apply(f: string, t: string) {
     onChange(f, t);
-    setOpen(false);
-    setSelecting(null);
-    setHover(null);
+    close(true);
   }
 
-  function pickPreset(p: Preset) {
-    apply(p.from, p.to);
+  function pick(o: { kind: 'preset' | 'month'; key: string }) {
+    const r = o.kind === 'month' ? monthRange(o.key) : presetRange(o.key as PresetKey);
+    apply(r.from, r.to);
   }
 
-  function pickDay(d: Date) {
-    if (!selecting) { setSelecting(d); setHover(d); return; }
-    const [a, b] = d < selecting ? [d, selecting] : [selecting, d];
-    apply(fmtISO(a), fmtISO(b));
+  // A backwards pair would filter to nothing and read as a broken table, so it
+  // is refused here rather than applied. One-sided ranges stay legal.
+  const customInvalid = Boolean(draftFrom && draftTo && draftFrom > draftTo);
+  const customUnchanged = draftFrom === from && draftTo === to;
+
+  function onListKeyDown(e: React.KeyboardEvent) {
+    const last = options.length - 1;
+    switch (e.key) {
+      case 'ArrowDown': e.preventDefault(); setActiveIdx(i => (i >= last ? 0 : i + 1)); break;
+      case 'ArrowUp': e.preventDefault(); setActiveIdx(i => (i <= 0 ? last : i - 1)); break;
+      case 'Home': e.preventDefault(); setActiveIdx(0); break;
+      case 'End': e.preventDefault(); setActiveIdx(last); break;
+      case 'Escape':
+        // Handled here, not by useDismiss, so focus lands back on the trigger;
+        // stopPropagation keeps the hook's Escape from also firing.
+        e.preventDefault();
+        e.stopPropagation();
+        close(true);
+        break;
+    }
   }
 
-  // The range currently painted on the calendar: the pending selection while the
-  // user is mid-pick, otherwise the applied range.
-  const paint = selecting
-    ? (() => { const h = hover || selecting; return h < selecting ? { a: h, b: selecting } : { a: selecting, b: h }; })()
-    : (fromD && toD ? { a: fromD, b: toD } : fromD ? { a: fromD, b: fromD } : null);
-
-  const grid = useMemo(() => {
-    const first = startOfMonth(view);
-    const start = addDays(first, -first.getDay()); // back to the Sunday of the first week
-    return Array.from({ length: 42 }, (_, i) => addDays(start, i));
-  }, [view]);
-
-  const activePresetKey = presets.find(p => p.from === from && p.to === to)?.key ?? (from || to ? 'custom' : 'all');
-  const today = new Date();
+  const isDefault = !from && !to;
+  const text = describeRange(from, to);
 
   return (
-    <div ref={wrapRef} style={{ position: 'relative', display: 'inline-block' }}>
+    <div className="fs-wrap" ref={wrapRef}>
       <button
-        onClick={() => setOpen(o => !o)}
-        className="form-input"
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: md ? 8 : 6,
-          fontSize: md ? 12 : 11,
-          padding: md ? '8px 12px' : '4px 9px',
-          borderRadius: md ? 10 : undefined,
-          minWidth: md ? 120 : undefined,
-          width: 'auto',
-          background: md ? 'var(--surface)' : undefined,
-          cursor: 'pointer',
-          whiteSpace: 'nowrap',
-          color: from || to ? 'var(--text)' : 'var(--text-dim)',
+        ref={btnRef}
+        type="button"
+        className={`drp-trigger${md ? ' is-md' : ''}${isDefault ? '' : ' is-on'}`}
+        onClick={() => (open ? close(false) : openMenu())}
+        onKeyDown={e => {
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); openMenu(); setActiveIdx(0); }
         }}
-        title="Filter by date range"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title={label ? `${label}: ${text}` : `Filter by date range — ${text}`}
       >
-        <span>{labelFor(from, to, presets)}</span>
-        <span style={{ color: 'var(--text-faint)', fontSize: 9 }}>▾</span>
+        {label && <span className="drp-trigger-label">{label}</span>}
+        <span className="drp-trigger-val">{label ? `· ${text}` : text}</span>
+        <span className="fs-caret" aria-hidden>▾</span>
       </button>
 
       {open && (
         <div
-          className="drp-pop"
-          style={{
-            position: 'absolute', top: 'calc(100% + 6px)', left: align === 'left' ? 0 : undefined, right: align === 'right' ? 0 : undefined, zIndex: 1500,
-            display: 'flex', background: 'var(--surface)', border: '0.5px solid var(--border)',
-            borderRadius: 12, boxShadow: '0 16px 48px rgba(0,0,0,0.32)', overflow: 'hidden',
-          }}
+          className={`fs-pop drp-pop2${align === 'right' ? ' fs-pop-right' : ''}`}
+          role="menu"
+          aria-label={label ? `${label} range` : 'Date range'}
+          onKeyDown={onListKeyDown}
         >
-          {/* Presets */}
-          <div className="drp-presets" style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: 8, borderRight: '0.5px solid var(--border)', minWidth: 132 }}>
-            {presets.map(p => {
-              const on = activePresetKey === p.key;
+          <div className="fs-menu drp-scroll">
+            <div className="fs-menu-head">Period</div>
+            {options.map((o, i) => {
+              const on = o.kind === 'month'
+                ? selected.kind === 'month' && selected.key === o.key
+                : selected.kind === 'preset' && selected.key === o.key;
+              // The month list gets its own heading, printed before the first
+              // month rather than as a separate array pass.
+              const heading = o.kind === 'month' && options[i - 1]?.kind !== 'month'
+                ? <div key={`h-${o.key}`} className="fs-menu-head">Month</div>
+                : null;
+              const isLastMonth = o.kind === 'month' && options[i + 1]?.kind !== 'month';
               return (
-                <button
-                  key={p.key}
-                  onClick={() => pickPreset(p)}
-                  style={{
-                    textAlign: 'left', fontSize: 12, padding: '7px 10px', borderRadius: 8, cursor: 'pointer',
-                    border: 'none', fontFamily: 'inherit',
-                    background: on ? 'var(--accent-soft)' : 'transparent',
-                    color: on ? 'var(--accent)' : 'var(--text-dim)',
-                    fontWeight: on ? 600 : 400,
-                  }}
-                  onMouseEnter={e => { if (!on) e.currentTarget.style.background = 'var(--surface-2)'; }}
-                  onMouseLeave={e => { if (!on) e.currentTarget.style.background = 'transparent'; }}
-                >{p.label}</button>
+                <div key={`${o.kind}-${o.key}`}>
+                  {heading}
+                  <button
+                    ref={el => { itemRefs.current[i] = el; }}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={on}
+                    className={on ? 'fs-menu-item is-on' : 'fs-menu-item'}
+                    onClick={() => pick(o)}
+                  >
+                    <span>{o.label}</span>
+                    {on && <span className="fs-tick" aria-hidden>✓</span>}
+                  </button>
+                  {isLastMonth && months.length >= monthCap && (
+                    <div className="drp-note">Older months: use the custom range below.</div>
+                  )}
+                </div>
               );
             })}
           </div>
 
-          {/* Calendar */}
-          <div style={{ padding: 12, width: 246 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <button onClick={() => setView(v => new Date(v.getFullYear(), v.getMonth() - 1, 1))} style={navBtn} title="Previous month">‹</button>
-              <div className="font-head" style={{ fontSize: 12, fontWeight: 600 }}>{MONTHS_FULL[view.getMonth()]} {view.getFullYear()}</div>
-              <button onClick={() => setView(v => new Date(v.getFullYear(), v.getMonth() + 1, 1))} style={navBtn} title="Next month">›</button>
+          <div className="drp-custom">
+            <div className="fs-menu-head">Custom range</div>
+            <div className="drp-inputs">
+              <label className="drp-input">
+                <span>From</span>
+                <input
+                  className={`form-input${customInvalid ? ' is-invalid' : ''}`}
+                  type="date"
+                  value={draftFrom}
+                  max={draftTo || undefined}
+                  aria-label="Range start"
+                  onChange={e => setDraftFrom(e.target.value)}
+                />
+              </label>
+              <label className="drp-input">
+                <span>To</span>
+                <input
+                  className={`form-input${customInvalid ? ' is-invalid' : ''}`}
+                  type="date"
+                  value={draftTo}
+                  min={draftFrom || undefined}
+                  aria-label="Range end"
+                  onChange={e => setDraftTo(e.target.value)}
+                />
+              </label>
             </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 4 }}>
-              {WEEKDAYS.map((w, i) => <div key={i} style={{ textAlign: 'center', fontSize: 9, color: 'var(--text-faint)', fontWeight: 600 }}>{w}</div>)}
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }} onMouseLeave={() => selecting && setHover(selecting)}>
-              {grid.map((d, i) => {
-                const inMonth = d.getMonth() === view.getMonth();
-                const isEnd = paint && (sameDay(d, paint.a) || sameDay(d, paint.b));
-                const inRange = paint && d >= paint.a && d <= paint.b;
-                const isToday = sameDay(d, today);
-                return (
-                  <button
-                    key={i}
-                    onClick={() => pickDay(d)}
-                    onMouseEnter={() => selecting && setHover(d)}
-                    style={{
-                      height: 28, borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit',
-                      background: isEnd ? 'var(--accent)' : inRange ? 'var(--accent-soft)' : 'transparent',
-                      color: isEnd ? '#fff' : inMonth ? 'var(--text)' : 'var(--text-faint)',
-                      fontWeight: isEnd ? 700 : isToday ? 700 : 400,
-                      boxShadow: isToday && !isEnd ? 'inset 0 0 0 1px var(--border)' : undefined,
-                      transition: 'background 0.1s',
-                    }}
-                  >{d.getDate()}</button>
-                );
-              })}
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, paddingTop: 8, borderTop: '0.5px solid var(--border)' }}>
-              <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>
-                {selecting ? 'Pick an end date…' : 'Click a start & end date'}
-              </span>
-              <button onClick={() => apply('', '')} style={{ fontSize: 11, color: 'var(--text-dim)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '2px 4px' }}>Clear</button>
+            {customInvalid && (
+              <div className="form-error" role="alert">Start date is after the end date.</div>
+            )}
+            <div className="drp-custom-actions">
+              <button
+                type="button"
+                className="fs-clear"
+                onClick={() => apply('', '')}
+                disabled={isDefault}
+              >Clear</button>
+              <button
+                type="button"
+                className="btn-primary drp-apply"
+                onClick={() => apply(draftFrom, draftTo)}
+                disabled={customInvalid || customUnchanged || (!draftFrom && !draftTo)}
+              >Apply</button>
             </div>
           </div>
         </div>
@@ -223,8 +245,3 @@ export default function DateRangePicker({ from, to, onChange, align = 'left', si
     </div>
   );
 }
-
-const navBtn: React.CSSProperties = {
-  width: 24, height: 24, borderRadius: 6, border: '0.5px solid var(--border)', background: 'var(--surface-2)',
-  color: 'var(--text-dim)', cursor: 'pointer', fontSize: 13, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-};

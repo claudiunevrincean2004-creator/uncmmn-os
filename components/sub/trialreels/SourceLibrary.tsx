@@ -247,7 +247,7 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
           placeholder="Search description or link…"
           style={{ fontSize: 12, padding: '6px 10px', width: 260 }}
         />
-        <FilterField label="Posted"><DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
+        <FilterField label="Posted"><DateRangePicker label="Posted" from={dateFrom} to={dateTo} dates={sources.map(s => s.posted_date)} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} /></FilterField>
         <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{sources.length} in library · {eligibleCount} eligible</div>
         <div style={{ flex: 1 }} />
         <input ref={fileRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={onFilePicked} />

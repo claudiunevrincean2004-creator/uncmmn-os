@@ -52,7 +52,7 @@ export default function OverviewList({ sources, snippets, onDrill }: Props) {
           placeholder="Search long-form pieces…"
           style={{ fontSize: 12, padding: '6px 10px', width: 260 }}
         />
-        <DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} />
+        <DateRangePicker label="Added" from={dateFrom} to={dateTo} dates={sources.map(s => s.date_added)} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} />
         <FormatFilter value={formatFilter} options={formats} onChange={setFormatFilter} />
         <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{rows.length} of {sources.length} pieces</div>
       </div>
