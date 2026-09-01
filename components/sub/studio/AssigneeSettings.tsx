@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useDialogs } from '@/components/DialogProvider';
 import Dropdown from './Dropdown';
 import { supabase } from '@/lib/supabase';
 import { Profile, ClipperAccount } from '@/lib/types';
@@ -18,6 +19,7 @@ export default function AssigneeSettings({
   onClose: () => void;
   onReload: () => void;
 }) {
+  const { toastError, confirm: askConfirm } = useDialogs();
   const [busy, setBusy] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -61,7 +63,7 @@ export default function AssigneeSettings({
     setBusy(null);
     if (error) {
       console.error('[AssigneeSettings] failed to save user', error);
-      alert(`Couldn't save changes: ${error.message || 'Unknown error'}`);
+      toastError(`Couldn't save changes: ${error.message || 'Unknown error'}`);
       return;
     }
     setEditingId(null);
@@ -70,7 +72,7 @@ export default function AssigneeSettings({
 
   async function removeUser(p: Profile) {
     if (busy) return;
-    if (!confirm(`Are you sure you want to remove ${profileName(p)}? This can't be undone.`)) return;
+    if (!(await askConfirm(`Are you sure you want to remove ${profileName(p)}? This can't be undone.`))) return;
     setBusy(p.id);
     // Deletes auth user + profile (cascade); the function enforces admin-only and
     // blocks self-deletion server-side too.
@@ -78,7 +80,7 @@ export default function AssigneeSettings({
     setBusy(null);
     if (error) {
       console.error('[AssigneeSettings] failed to remove user', error);
-      alert(`Couldn't remove user: ${error.message || 'Unknown error'}`);
+      toastError(`Couldn't remove user: ${error.message || 'Unknown error'}`);
       return;
     }
     onReload();

@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useDialogs } from '@/components/DialogProvider';
 import { supabase } from '@/lib/supabase';
 import { StudioDropdownOption } from '@/lib/types';
 import { useDismiss } from '@/lib/use-dismiss';
@@ -18,6 +19,7 @@ export default function FieldOptionsManager({
   onClose: () => void;
   onReload: () => void;
 }) {
+  const { toastError, confirm: askConfirm } = useDialogs();
   const [newLabel, setNewLabel] = useState('');
   const [busy, setBusy] = useState(false);
   useDismiss(null, onClose, { outside: false });
@@ -54,8 +56,8 @@ export default function FieldOptionsManager({
     await supabase.from('studio_dropdown_options').update({ color }).eq('id', o.id);
   });
 
-  const remove = (o: StudioDropdownOption) => {
-    if (!confirm(`Remove the "${o.value}" option? Rows already using it keep their value; it just won't be offered for new selections.`)) return;
+  const remove = async (o: StudioDropdownOption) => {
+    if (!(await askConfirm(`Remove the "${o.value}" option? Rows already using it keep their value; it just won't be offered for new selections.`))) return;
     run(async () => { await supabase.from('studio_dropdown_options').delete().eq('id', o.id); });
   };
 

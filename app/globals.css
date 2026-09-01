@@ -1755,6 +1755,138 @@ html, body {
 
 .panel-notify-btn:disabled { opacity: 0.55; cursor: default; }
 
+/* ===== App dialogs — the replacement for alert() / confirm() ================
+   Native dialogs are OS chrome: unstyleable, tab-blocking, and inconsistent
+   about Escape. These are the in-app equivalents (components/DialogProvider).
+
+   Toasts stack from the bottom-right so several can land without overlapping;
+   .idea-toast keeps its own look, this only owns the stacking. */
+.toast-stack {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 4000;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+  max-width: min(420px, calc(100vw - 32px));
+}
+
+.toast-stack .idea-toast {
+  position: static;
+  right: auto;
+  bottom: auto;
+  pointer-events: auto;
+  line-height: 1.45;
+  animation: toast-in 160ms ease;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast-stack .idea-toast { animation: none; }
+}
+
+@media (max-width: 640px) {
+  .toast-stack {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    max-width: none;
+    align-items: stretch;
+  }
+}
+
+/* --- Confirmation --- */
+/* Above the panels and the dropdown portals: it is always the topmost thing on
+   screen while it's up. */
+.confirm-overlay { z-index: 4100; }
+
+.confirm-box {
+  width: 400px;
+  padding: 24px;
+}
+
+.confirm-title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.confirm-message {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.confirm-btn {
+  font-size: 12px;
+  padding: 8px 16px;
+}
+
+.confirm-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* --- Inline "+ Add new…" input, inside a dropdown ------------------------- */
+.dd-add-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  padding: 6px 6px 2px;
+  border-top: 0.5px solid var(--border);
+}
+
+.dd-add-input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: 12px;
+  border-radius: 7px;
+}
+
+.dd-add-ok {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.dd-add-ok:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.dd-add-ok:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* ===== Finance payment details =============================================
    How a person gets paid: a method chip, the value itself, and one-click copy.
    Rendered ONLY inside the admin-gated Finance tab — never exported, never

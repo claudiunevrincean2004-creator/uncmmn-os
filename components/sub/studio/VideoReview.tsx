@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useDialogs } from '@/components/DialogProvider';
 import { supabase } from '@/lib/supabase';
 import { StudioVideo, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
@@ -84,6 +85,7 @@ interface Props {
 }
 
 export default function VideoReview({ videos, comments, activity, quickLinks, dropdownOptions, profiles, isAdmin, openItemId, onOpened, onReload }: Props) {
+  const { toastError, confirm: askConfirm } = useDialogs();
   const [view, setView] = usePersistedState<StudioView>('studio_v_view', 'table');
   const [fStatus, setFStatus] = usePersistedState<string>('studio_v_status', 'All');
   const [fAssigned, setFAssigned] = usePersistedState<string>('studio_v_assigned', 'All');
@@ -166,7 +168,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
       // (e.g. tiktok_final_url before studio_videos_tiktok_final.sql has been run
       // — run it, including `notify pgrst, 'reload schema';`).
       console.error('[VideoReview] failed to update video', { id, patch: p, error });
-      alert(`Couldn't save changes: ${error.message}`);
+      toastError(`Couldn't save changes: ${error.message}`);
     }
     onReload();
   }
@@ -223,7 +225,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
     setCreating(false);
     if (error) {
       console.error('[VideoReview] failed to create video', { row, error });
-      alert(`Couldn't create video: ${error.message}`);
+      toastError(`Couldn't create video: ${error.message}`);
       return;
     }
     // A video created directly at a pinging status fires that ping once on
@@ -251,7 +253,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   }
 
   async function deleteVideo(id: string) {
-    if (!confirm('Delete this video?')) return;
+    if (!(await askConfirm('Delete this video?'))) return;
     await supabase.from('studio_videos').delete().eq('id', id);
     if (selectedId === id) setSelectedId(null);
     onReload();
@@ -362,7 +364,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
       });
       setBulkBusy(false);
       console.error('[VideoReview] bulk status update failed', { ids: targetIds, status, error });
-      alert(`Couldn't update ${targets.length} video${targets.length === 1 ? '' : 's'}: ${error.message}`);
+      toastError(`Couldn't update ${targets.length} video${targets.length === 1 ? '' : 's'}: ${error.message}`);
       onReload();
       return;
     }

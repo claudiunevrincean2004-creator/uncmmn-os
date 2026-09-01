@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useDialogs } from '@/components/DialogProvider';
 import { supabase } from '@/lib/supabase';
 import { StudioSequence, StudioComment, StudioActivity, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
@@ -65,6 +66,7 @@ interface Props {
 }
 
 export default function StorySequences({ sequences, comments, activity, dropdownOptions, properties, customOptions, profiles, isAdmin, openItemId, onOpened, onReload }: Props) {
+  const { toastError, confirm: askConfirm } = useDialogs();
   const [view, setView] = usePersistedState<StudioView>('studio_s_view', 'table');
   const [fStatus, setFStatus] = usePersistedState<string>('studio_s_status', 'All');
   const [search, setSearch] = useState('');
@@ -109,7 +111,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
     if (error) {
       // Surface write failures instead of silently reverting on the next reload.
       console.error('[StorySequences] failed to update sequence', { id, patch: p, error });
-      alert(`Couldn't save change: ${error.message}`);
+      toastError(`Couldn't save change: ${error.message}`);
     }
     onReload();
 
@@ -154,7 +156,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
     setCreating(false);
     if (error) {
       console.error('[StorySequences] failed to create sequence', { row, error });
-      alert(`Couldn't create sequence: ${error.message}`);
+      toastError(`Couldn't create sequence: ${error.message}`);
       return;
     }
     closeAdd();
@@ -167,7 +169,7 @@ export default function StorySequences({ sequences, comments, activity, dropdown
   }
 
   async function deleteSequence(id: string) {
-    if (!confirm('Delete this sequence?')) return;
+    if (!(await askConfirm('Delete this sequence?'))) return;
     await supabase.from('studio_sequences').delete().eq('id', id);
     if (selectedId === id) setSelectedId(null);
     onReload();

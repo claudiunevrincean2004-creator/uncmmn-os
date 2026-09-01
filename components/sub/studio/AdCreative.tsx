@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useDialogs } from '@/components/DialogProvider';
 import { supabase } from '@/lib/supabase';
 import { StudioAdCreative, StudioComment, StudioActivity, StudioQuickLink, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
@@ -73,6 +74,7 @@ interface Props {
 }
 
 export default function AdCreative({ adCreatives, comments, activity, quickLinks, dropdownOptions, properties, customOptions, profiles, isAdmin, openItemId, onOpened, onReload, showToast }: Props) {
+  const { toastError, confirm: askConfirm } = useDialogs();
   const [view, setView] = usePersistedState<StudioView>('studio_ad_view', 'table');
   const [fStatus, setFStatus] = usePersistedState<string>('studio_ad_status', 'All');
   const [fFormat, setFFormat] = usePersistedState<string>('studio_ad_format', 'All');
@@ -121,7 +123,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
     if (error) {
       // Surface write failures instead of silently reverting on the next reload.
       console.error('[AdCreative] failed to update ad creative', { id, patch: p, error });
-      alert(`Couldn't save change: ${error.message}`);
+      toastError(`Couldn't save change: ${error.message}`);
     }
     onReload();
 
@@ -173,7 +175,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
     setCreating(false);
     if (error) {
       console.error('[AdCreative] failed to create ad creative', { row, error });
-      alert(`Couldn't create ad creative: ${error.message}`);
+      toastError(`Couldn't create ad creative: ${error.message}`);
       return;
     }
     // A row created directly at a notify status pings the pipeline too, so a new
@@ -198,7 +200,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   }
 
   async function deleteAd(id: string) {
-    if (!confirm('Delete this ad creative?')) return;
+    if (!(await askConfirm('Delete this ad creative?'))) return;
     await supabase.from('studio_ad_creatives').delete().eq('id', id);
     if (selectedId === id) setSelectedId(null);
     onReload();
@@ -241,7 +243,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
     const { error } = await supabase.from('studio_ad_creatives').insert([row]);
     if (error) {
       console.error('[AdCreative] failed to create variation', { row, error });
-      alert(`Couldn't create variation: ${error.message}`);
+      toastError(`Couldn't create variation: ${error.message}`);
       return;
     }
     notifyIterate({ originalName: rawName, variationName });

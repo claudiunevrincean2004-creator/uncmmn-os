@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useDialogs } from '@/components/DialogProvider';
 import { supabase } from '@/lib/supabase';
 import { Profile } from '@/lib/types';
 import { useDismiss } from '@/lib/use-dismiss';
@@ -22,6 +23,7 @@ export default function AccountPanel({
   onSaved: () => void;
   onManageUsers: () => void;
 }) {
+  const { toastError, confirm: askConfirm } = useDialogs();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(profile.display_name ?? '');
   const [jobTitle, setJobTitle] = useState(profile.job_title ?? '');
@@ -63,7 +65,7 @@ export default function AccountPanel({
       // PostgrestError is a plain object with `.message` — read it so the user
       // sees a real reason (e.g. a missing function) instead of "[object Object]".
       console.error('[AccountPanel] failed to save profile', error);
-      alert(`Couldn't save your changes: ${error.message || 'Unknown error'}`);
+      toastError(`Couldn't save your changes: ${error.message || 'Unknown error'}`);
       return;
     }
     setEditing(false);

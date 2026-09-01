@@ -1,5 +1,6 @@
 'use client';
 import { useState, useRef, useEffect, type ReactNode } from 'react';
+import { useDialogs } from '@/components/DialogProvider';
 import { supabase } from '@/lib/supabase';
 import { StudioComment, StudioActivity, Profile, CommentReaction } from '@/lib/types';
 import { formatActivityTime } from '@/lib/studio';
@@ -171,6 +172,7 @@ function FieldControl({ field, values, onChangeField, onAddOption, profiles }: {
 }
 
 export default function ItemPanel({ itemType, linkType, itemId, title, commentsLabel = 'Comments', onDelete, fields, values, footer, onChangeField, onAddOption, showComments = true, comments = [], activity = [], profiles = [], isAdmin = false, onReload, onClose }: Props) {
+  const { toastError, confirm: askConfirm } = useDialogs();
   const [newComment, setNewComment] = useState('');
   // Whether the new-comment box is focused — drives whether Add is on screen.
   const [composerActive, setComposerActive] = useState(false);
@@ -331,7 +333,7 @@ export default function ItemPanel({ itemType, linkType, itemId, title, commentsL
       if (error) {
         console.error('[ItemPanel] failed to remove reaction', error);
         setReactions(prev => [...prev, existing]);
-        alert(`Couldn't remove reaction: ${error.message}`);
+        toastError(`Couldn't remove reaction: ${error.message}`);
       }
     } else {
       const temp: CommentReaction = { id: `tmp-${commentId}-${emoji}`, comment_id: commentId, user_id: currentUserId, emoji };
@@ -342,7 +344,7 @@ export default function ItemPanel({ itemType, linkType, itemId, title, commentsL
       if (error) {
         console.error('[ItemPanel] failed to add reaction', error);
         setReactions(prev => prev.filter(r => r.id !== temp.id));
-        alert(`Couldn't add reaction: ${error.message}`);
+        toastError(`Couldn't add reaction: ${error.message}`);
       } else if (data) {
         setReactions(prev => prev.map(r => (r.id === temp.id ? (data as CommentReaction) : r)));
       }
@@ -364,7 +366,7 @@ export default function ItemPanel({ itemType, linkType, itemId, title, commentsL
       // missing author_id/mentions column (run studio_comments_author.sql and
       // comment_inbox.sql) or an RLS denial.
       console.error('[ItemPanel] failed to add comment', error);
-      alert(`Couldn't add comment: ${error.message}`);
+      toastError(`Couldn't add comment: ${error.message}`);
       return;
     }
     setNewComment('');
@@ -400,7 +402,7 @@ export default function ItemPanel({ itemType, linkType, itemId, title, commentsL
     if (error) {
       // Most likely a missing parent_comment_id column — run comment_threads.sql.
       console.error('[ItemPanel] failed to add reply', error);
-      alert(`Couldn't add reply: ${error.message}`);
+      toastError(`Couldn't add reply: ${error.message}`);
       return;
     }
     closeReply();
@@ -423,7 +425,7 @@ export default function ItemPanel({ itemType, linkType, itemId, title, commentsL
     const { error } = await supabase.from('studio_comments').update({ text, mentions: parseMentions(text, profiles) }).eq('id', id);
     if (error) {
       console.error('[ItemPanel] failed to edit comment', error);
-      alert(`Couldn't save comment: ${error.message}`);
+      toastError(`Couldn't save comment: ${error.message}`);
       return;
     }
     cancelEdit();
@@ -436,12 +438,12 @@ export default function ItemPanel({ itemType, linkType, itemId, title, commentsL
     // each). That's destructive enough to be worth confirming — but only when there
     // is actually a thread to lose.
     const replies = repliesFor(id).length;
-    if (replies > 0 && !confirm(`Delete this comment and its ${replies} ${replies === 1 ? 'reply' : 'replies'}? This can't be undone.`)) return;
+    if (replies > 0 && !(await askConfirm(`Delete this comment and its ${replies} ${replies === 1 ? 'reply' : 'replies'}? This can't be undone.`))) return;
     if (replyTo === id) closeReply();
     const { error } = await supabase.from('studio_comments').delete().eq('id', id);
     if (error) {
       console.error('[ItemPanel] failed to delete comment', error);
-      alert(`Couldn't delete comment: ${error.message}`);
+      toastError(`Couldn't delete comment: ${error.message}`);
       return;
     }
     onReload();

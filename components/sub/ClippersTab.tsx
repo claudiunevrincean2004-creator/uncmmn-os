@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
+import { useDialogs } from '@/components/DialogProvider';
 import Dropdown from './studio/Dropdown';
 import { supabase } from '@/lib/supabase';
 import { Profile, ClipperAccount, ClipperContent } from '@/lib/types';
@@ -216,6 +217,7 @@ function ClipperDashboard({ clipper, accounts, content, onBack, onReload }: {
   onBack: () => void;
   onReload: () => void;
 }) {
+  const { toastError, confirm: askConfirm } = useDialogs();
   const [platform, setPlatform] = useState<PlatformChoice>('All');
   const [period, setPeriod] = useState<Period>('30d');
   const [sortKey, setSortKey] = useState<'date' | 'views'>('date');
@@ -292,15 +294,15 @@ function ClipperDashboard({ clipper, accounts, content, onBack, onReload }: {
 
   // ── CRUD ──
   async function removeAccount(id: string) {
-    if (!confirm('Remove this account?')) return;
+    if (!(await askConfirm('Remove this account?'))) return;
     const { error } = await supabase.from('clipper_accounts').delete().eq('id', id);
-    if (error) { alert(`Couldn't remove account: ${error.message}`); return; }
+    if (error) { toastError(`Couldn't remove account: ${error.message}`); return; }
     onReload();
   }
   async function removeContent(id: string) {
-    if (!confirm('Remove this post?')) return;
+    if (!(await askConfirm('Remove this post?'))) return;
     const { error } = await supabase.from('clipper_content').delete().eq('id', id);
-    if (error) { alert(`Couldn't remove post: ${error.message}`); return; }
+    if (error) { toastError(`Couldn't remove post: ${error.message}`); return; }
     onReload();
   }
 
@@ -531,6 +533,7 @@ function AccountEditor({ clipperId, row, onClose, onSaved }: {
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { toastError, confirm: askConfirm } = useDialogs();
   const [platform, setPlatform] = useState(row?.platform ?? 'tiktok');
   const [handle, setHandle] = useState(row?.handle ?? '');
   const [accountUrl, setAccountUrl] = useState(row?.account_url ?? '');
@@ -551,7 +554,7 @@ function AccountEditor({ clipperId, row, onClose, onSaved }: {
       ? await supabase.from('clipper_accounts').update(payload).eq('id', row.id)
       : await supabase.from('clipper_accounts').insert([payload]);
     setSaving(false);
-    if (res.error) { alert(`Couldn't save account: ${res.error.message}`); return; }
+    if (res.error) { toastError(`Couldn't save account: ${res.error.message}`); return; }
     onSaved();
   }
 
@@ -606,6 +609,7 @@ function ContentEditor({ clipperId, accounts, row, onClose, onSaved }: {
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { toastError, confirm: askConfirm } = useDialogs();
   const [title, setTitle] = useState(row?.title ?? '');
   const [accountId, setAccountId] = useState(row?.account_id ?? '');
   const [contentUrl, setContentUrl] = useState(row?.content_url ?? '');
@@ -619,7 +623,7 @@ function ContentEditor({ clipperId, accounts, row, onClose, onSaved }: {
 
   async function save() {
     if (saving) return;
-    if (!selectedAccount) { alert('Pick an account for this post.'); return; }
+    if (!selectedAccount) { toastError('Pick an account for this post.'); return; }
     setSaving(true);
     const payload = {
       clipper_id: clipperId,
@@ -635,7 +639,7 @@ function ContentEditor({ clipperId, accounts, row, onClose, onSaved }: {
       ? await supabase.from('clipper_content').update(payload).eq('id', row.id)
       : await supabase.from('clipper_content').insert([payload]);
     setSaving(false);
-    if (res.error) { alert(`Couldn't save post: ${res.error.message}`); return; }
+    if (res.error) { toastError(`Couldn't save post: ${res.error.message}`); return; }
     onSaved();
   }
 

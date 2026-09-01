@@ -1,5 +1,6 @@
 'use client';
 import { useMemo, useState } from 'react';
+import { useDialogs } from '@/components/DialogProvider';
 import Dropdown from './studio/Dropdown';
 import { supabase } from '@/lib/supabase';
 import { Post, Client, SubscriberSnapshot } from '@/lib/types';
@@ -108,6 +109,7 @@ interface Props {
 }
 
 export default function ContentTab({ client, posts, subscriberSnapshots, onReload }: Props) {
+  const { toastError, confirm: askConfirm } = useDialogs();
   const [showModal, setShowModal] = useState(false);
   const [editPost, setEditPost] = useState<Post | null>(null);
   const [visibleCount, setVisibleCount] = useState(5);
@@ -252,7 +254,7 @@ export default function ContentTab({ client, posts, subscriberSnapshots, onReloa
   }
 
   async function deletePost(id: string) {
-    if (!confirm('Delete this post?')) return;
+    if (!(await askConfirm('Delete this post?'))) return;
     await supabase.from('posts').delete().eq('id', id);
     onReload();
   }

@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useDialogs } from '@/components/DialogProvider';
 import { supabase } from '@/lib/supabase';
 import { StudioSession, StudioComment, StudioActivity, StudioDropdownOption, CustomProperty, CustomPropertyOption, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
@@ -63,6 +64,7 @@ interface Props {
 }
 
 export default function FilmingSessions({ sessions, comments, activity, dropdownOptions, properties, customOptions, profiles, isAdmin, openItemId, onOpened, onReload }: Props) {
+  const { toastError, confirm: askConfirm } = useDialogs();
   const [view, setView] = usePersistedState<StudioView>('studio_f_view', 'table');
   const [fStatus, setFStatus] = usePersistedState<string>('studio_f_status', 'All');
   const [fType, setFType] = usePersistedState<string>('studio_f_type', 'All');
@@ -115,7 +117,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
       // Surface write failures (e.g. a missing column or RLS denial) instead of
       // silently reverting the cell to its previous value on the next reload.
       console.error('[FilmingSessions] failed to update session', { id, patch: p, error });
-      alert(`Couldn't save change: ${error.message}`);
+      toastError(`Couldn't save change: ${error.message}`);
     }
     onReload();
 
@@ -174,7 +176,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
     setCreating(false);
     if (error) {
       console.error('[FilmingSessions] failed to create session', { row, error });
-      alert(`Couldn't create session: ${error.message}`);
+      toastError(`Couldn't create session: ${error.message}`);
       return;
     }
     closeAdd();
@@ -187,7 +189,7 @@ export default function FilmingSessions({ sessions, comments, activity, dropdown
   }
 
   async function deleteSession(id: string) {
-    if (!confirm('Delete this session?')) return;
+    if (!(await askConfirm('Delete this session?'))) return;
     await supabase.from('studio_sessions').delete().eq('id', id);
     if (selectedId === id) setSelectedId(null);
     onReload();

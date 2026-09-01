@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useDialogs } from '@/components/DialogProvider';
 import { supabase } from '@/lib/supabase';
 
 // First-login, one-time prompt shown whenever the signed-in user has no
@@ -7,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 // only way out, and once saved the parent stops rendering it. Applies to any
 // user (admin or editor); writes via the self-service RPC.
 export default function DisplayNamePrompt({ onSaved }: { onSaved: () => void }) {
+  const { toastError, confirm: askConfirm } = useDialogs();
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -18,7 +20,7 @@ export default function DisplayNamePrompt({ onSaved }: { onSaved: () => void }) 
     setSaving(false);
     if (error) {
       console.error('[DisplayNamePrompt] failed to set display name', error);
-      alert(`Couldn't save your name: ${error.message}`);
+      toastError(`Couldn't save your name: ${error.message}`);
       return;
     }
     onSaved();

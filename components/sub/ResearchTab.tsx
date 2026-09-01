@@ -1,5 +1,6 @@
 'use client';
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { useDialogs } from '@/components/DialogProvider';
 import Dropdown from './studio/Dropdown';
 import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabase';
@@ -150,6 +151,7 @@ function SourceChip({ url }: { url: string }) {
 }
 
 export default function ResearchTab({ client, items, comments, activity, profiles, isAdmin = false, onReload }: Props) {
+  const { toast: pushToast, toastError, confirm: askConfirm } = useDialogs();
   // Ideas deleted in this session but still present in `items` until the reload
   // lands — or until a failed write puts them back.
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
@@ -175,7 +177,6 @@ export default function ResearchTab({ client, items, comments, activity, profile
   const [statusFilter, setStatusFilter] = usePersistedState<string>('research_status', 'All');
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ msg: string; isError: boolean } | null>(null);
   // Reasons changed from a card, held until the reloaded row agrees.
   const [reasonOverride, setReasonOverride] = useState<Record<string, string>>({});
 
@@ -238,8 +239,7 @@ export default function ResearchTab({ client, items, comments, activity, profile
   const totalIdeas = clientItems.length;
 
   function showToast(msg: string, isError = false) {
-    setToast({ msg, isError });
-    setTimeout(() => setToast(null), isError ? 4000 : 1800);
+    pushToast(msg, isError);
   }
 
   function openAddForm() {
@@ -279,7 +279,7 @@ export default function ResearchTab({ client, items, comments, activity, profile
     const { error } = await supabase.from('research_items').update(p).eq('id', id);
     if (error) {
       console.error('[ResearchTab] failed to update idea', { id, patch: p, error });
-      alert(`Couldn't save change: ${error.message}`);
+      toastError(`Couldn't save change: ${error.message}`);
     }
     onReload();
   }
@@ -300,7 +300,7 @@ export default function ResearchTab({ client, items, comments, activity, profile
         return copy;
       });
       console.error('[ResearchTab] failed to change reason', { id: item.id, next, error });
-      alert(`Couldn't change reason: ${error.message}`);
+      toastError(`Couldn't change reason: ${error.message}`);
       return;
     }
     onReload();
@@ -557,7 +557,6 @@ export default function ResearchTab({ client, items, comments, activity, profile
         />
       )}
 
-      {toast && <div className={toast.isError ? 'idea-toast is-error' : 'idea-toast'} role="status">{toast.msg}</div>}
     </div>
   );
 }

@@ -46,6 +46,7 @@ export default function Dropdown({
   disabled,
   style,
   className,
+  add,
 }: {
   /** '' means nothing chosen — pairs with an option whose value is ''. */
   value: string;
@@ -64,10 +65,27 @@ export default function Dropdown({
   disabled?: boolean;
   style?: React.CSSProperties;
   className?: string;
+  /**
+   * Lets this field create its own options. The row it adds turns into a text
+   * input IN PLACE when picked — Notion's gesture — rather than handing a
+   * one-field question to the browser's native prompt, which is unstyleable OS
+   * chrome. Omit entirely and the field stays select-only; nothing here can
+   * grant creation to a field that didn't ask for it.
+   */
+  add?: {
+    label?: string;
+    placeholder?: string;
+    /** Persist the new option. The value is trimmed and known non-empty. */
+    onAdd: (value: string) => void;
+  };
 }) {
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
   const [pos, setPos] = useState<{ top: number; left: number; width: number; maxH: number } | null>(null);
+  // The "+ Add new…" row, swapped for a text input.
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState('');
+  const addRef = useRef<HTMLInputElement>(null);
 
   const btnRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -146,17 +164,40 @@ export default function Dropdown({
   }, [open]);
 
   useEffect(() => {
-    if (open && activeIdx >= 0) itemRefs.current[activeIdx]?.focus();
-  }, [open, activeIdx]);
+    if (open && activeIdx >= 0 && !adding) itemRefs.current[activeIdx]?.focus();
+  }, [open, activeIdx, adding]);
+
+  useEffect(() => { if (adding) addRef.current?.focus(); }, [adding]);
 
   function openMenu(idx = selectedIdx) {
     setActiveIdx(idx >= 0 ? idx : 0);
+    setAdding(false);
+    setDraft('');
     setOpen(true);
   }
   function close(focusTrigger = true) {
     setOpen(false);
     setActiveIdx(-1);
+    setAdding(false);
+    setDraft('');
     if (focusTrigger) btnRef.current?.focus();
+  }
+
+  /**
+   * Commit the typed option.
+   *
+   * An existing value — matched case-insensitively against what's already on the
+   * list — SELECTS that option instead of creating a second one that only
+   * differs by capitalisation. Empty input does nothing and leaves the box open.
+   */
+  function commitAdd() {
+    const value = draft.trim();
+    if (!value) return;
+    const existing = options.find(o => !o.isAction && o.label.toLowerCase() === value.toLowerCase());
+    if (existing) { choose(existing); return; }
+    add?.onAdd(value);
+    close();
+    onChange(value);
   }
   function choose(o: DropdownOption) {
     close();
@@ -262,6 +303,42 @@ export default function Dropdown({
                 </button>
               );
             })}
+
+            {add && (adding ? (
+              <div className="dd-add-row">
+                <input
+                  ref={addRef}
+                  className="form-input dd-add-input"
+                  value={draft}
+                  placeholder={add.placeholder ?? 'New option'}
+                  aria-label={add.placeholder ?? 'New option'}
+                  onChange={e => setDraft(e.target.value)}
+                  onKeyDown={e => {
+                    // Handled here so the menu's own arrow/type-to-jump keys
+                    // don't fight the text being typed.
+                    e.stopPropagation();
+                    if (e.key === 'Enter') { e.preventDefault(); commitAdd(); }
+                    else if (e.key === 'Escape') { e.preventDefault(); setAdding(false); setDraft(''); }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="dd-add-ok"
+                  onClick={commitAdd}
+                  disabled={!draft.trim()}
+                  title="Add option"
+                  aria-label="Add option"
+                >✓</button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="fs-menu-item dd-action"
+                onClick={() => { setDraft(''); setAdding(true); }}
+              >
+                {add.label ?? '+ Add new…'}
+              </button>
+            ))}
           </div>
         </div>,
         document.body,

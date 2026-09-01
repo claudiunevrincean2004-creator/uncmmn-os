@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useDialogs } from '@/components/DialogProvider';
 import { supabase } from '@/lib/supabase';
 import { StudioQuickLink } from '@/lib/types';
 
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function QuickLinks({ context, links, onReload }: Props) {
+  const { toastError, confirm: askConfirm } = useDialogs();
   const items = links.filter(l => l.context === context);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [label, setLabel] = useState('');
@@ -35,7 +37,7 @@ export default function QuickLinks({ context, links, onReload }: Props) {
   }
 
   async function del(id: string) {
-    if (!confirm('Delete this quick link?')) return;
+    if (!(await askConfirm('Delete this quick link?'))) return;
     await supabase.from('studio_quick_links').delete().eq('id', id);
     if (editingId === id) setEditingId(null);
     onReload();

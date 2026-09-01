@@ -134,22 +134,24 @@ export function EditableText({
 // native <select> underneath them is gone. Every existing call site is therefore
 // untouched, and no field gains or loses the ability to create options.
 
-const ADD_NEW = '__add_new__';
-
-/** The shared "+ Add new…" flow, identical to the one the selects ran. */
-function makeAddHandler(
+/**
+ * The `add` config for a field that can create its own options.
+ *
+ * The typing happens INSIDE the dropdown (see Dropdown's `add` prop) — the old
+ * window.prompt is gone. Returns undefined when the field is select-only, which
+ * is what keeps Dropdown from rendering the row at all.
+ */
+function addConfig(
   field: string,
-  onChange: (v: string) => void,
+  allowAdd: boolean,
   onAddOption?: (field: string, value: string) => void,
 ) {
-  return (v: string) => {
-    if (v === ADD_NEW) {
-      const entered = window.prompt(`Add new ${field.replace(/_/g, ' ')} option:`);
-      const t = entered?.trim();
-      if (t) { onAddOption?.(field, t); onChange(t); }
-      return;
-    }
-    onChange(v);
+  if (!allowAdd) return undefined;
+  const noun = field.replace(/_/g, ' ');
+  return {
+    label: '+ Add new…',
+    placeholder: `New ${noun}`,
+    onAdd: (value: string) => onAddOption?.(field, value),
   };
 }
 
@@ -258,14 +260,14 @@ export function EditSelect({
   const rows: DropdownOption[] = [
     ...(placeholder ? [{ value: '', label: placeholder }] : []),
     ...opts.map(o => ({ value: o, label: o })),
-    ...(allowAdd ? [{ value: ADD_NEW, label: '+ Add new…', isAction: true }] : []),
   ];
   return (
     <Dropdown
       variant="input"
       value={value ?? ''}
       options={rows}
-      onChange={makeAddHandler(field, onChange, onAddOption)}
+      onChange={onChange}
+      add={addConfig(field, allowAdd, onAddOption)}
       width={width}
       placeholder={placeholder ?? '—'}
     />
@@ -306,7 +308,6 @@ export function EditPillSelect({
   const rows: DropdownOption[] = [
     ...(allowEmpty ? [{ value: '', label: '—' }] : []),
     ...toOptions(opts, labels, colors),
-    ...(allowAdd ? [{ value: ADD_NEW, label: '+ Add new…', isAction: true }] : []),
   ];
   return (
     <Dropdown
@@ -314,7 +315,8 @@ export function EditPillSelect({
       size={size}
       value={value}
       options={rows}
-      onChange={makeAddHandler(field, onChange, onAddOption)}
+      onChange={onChange}
+      add={addConfig(field, allowAdd, onAddOption)}
       maxWidth={size === 'md' ? 190 : undefined}
     />
   );

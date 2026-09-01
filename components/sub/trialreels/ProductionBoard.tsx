@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
+import { useDialogs } from '@/components/DialogProvider';
 import { supabase } from '@/lib/supabase';
 import { TrialReelSource, TrialReelProduction, StudioComment, StudioActivity, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
@@ -31,6 +32,7 @@ interface Props {
 const dash = <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>—</span>;
 
 export default function ProductionBoard({ productions, sources, comments, activity, profiles, isAdmin, currentUserId, openItemId, onOpened, onReload }: Props) {
+  const { toastError, confirm: askConfirm } = useDialogs();
   const [fStatus, setFStatus] = usePersistedState<string>('trialreel_p_status', 'All');
   const [fAssigned, setFAssigned] = usePersistedState<string>('trialreel_p_assigned', 'All');
   const [sortKey, setSortKey] = usePersistedState<string>('trialreel_p_sortkey', 'queued_date');
@@ -132,7 +134,7 @@ export default function ProductionBoard({ productions, sources, comments, activi
   }
 
   async function deleteRow(id: string) {
-    if (!confirm('Remove this reel from the production board?')) return;
+    if (!(await askConfirm('Remove this reel from the production board?'))) return;
     await supabase.from('trial_reel_production').delete().eq('id', id);
     if (selectedId === id) setSelectedId(null);
     onReload();

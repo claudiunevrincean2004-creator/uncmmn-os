@@ -1,5 +1,6 @@
 'use client';
 import { useMemo, useState } from 'react';
+import { useDialogs } from '@/components/DialogProvider';
 import Dropdown from './studio/Dropdown';
 import { supabase } from '@/lib/supabase';
 import { DriveFolder, Client } from '@/lib/types';
@@ -65,6 +66,7 @@ function timeAgo(iso?: string): string | null {
 }
 
 export default function DriveTab({ client, driveFolders, onReload }: Props) {
+  const { toastError, confirm: askConfirm } = useDialogs();
   const [showModal, setShowModal] = useState(false);
   const [editFolder, setEditFolder] = useState<DriveFolder | null>(null);
   const [view, setView] = usePersistedState<AssetView>('assets_view', 'grid');
@@ -72,7 +74,7 @@ export default function DriveTab({ client, driveFolders, onReload }: Props) {
   const [fCategory, setFCategory] = usePersistedState<string>('assets_category', 'All');
 
   async function deleteFolder(id: string) {
-    if (!confirm('Delete this folder link?')) return;
+    if (!(await askConfirm('Delete this folder link?'))) return;
     await supabase.from('drive_folders').delete().eq('id', id);
     onReload();
   }

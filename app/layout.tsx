@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import DialogProvider from "@/components/DialogProvider";
 
 export const metadata: Metadata = {
   title: "Content OS",
@@ -46,7 +47,11 @@ export default function RootLayout({
         />
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {/* App-wide toasts and confirmations, replacing window.alert /
+            window.confirm — see components/DialogProvider.tsx. */}
+        <DialogProvider>{children}</DialogProvider>
+      </body>
     </html>
   );
 }

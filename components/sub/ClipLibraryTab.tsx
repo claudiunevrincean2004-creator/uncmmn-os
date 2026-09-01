@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useDialogs } from '@/components/DialogProvider';
 import { supabase } from '@/lib/supabase';
 import { ClipSource, ClipSnippet } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
@@ -21,10 +22,9 @@ interface Props {
 }
 
 export default function ClipLibraryTab({ sources, snippets, openItemId, onDeepLinkConsumed, onReload }: Props) {
+  const { toast: pushToast, toastError, confirm: askConfirm } = useDialogs();
   const [sub, setSub] = usePersistedState<SubTab>('cliplib_subtab', 'overview');
   const [focusSource, setFocusSource] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [importingOverview, setImportingOverview] = useState(false);
   const [importingSnippets, setImportingSnippets] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
@@ -33,11 +33,8 @@ export default function ClipLibraryTab({ sources, snippets, openItemId, onDeepLi
   const snippetFileRef = useRef<HTMLInputElement>(null);
 
   function showToast(msg: string) {
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast(msg);
-    toastTimer.current = setTimeout(() => setToast(null), 4000);
+    pushToast(msg);
   }
-  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
   const overview = useMemo(() => {
     const linked = snippets.filter(s => s.source_id).length;
@@ -78,7 +75,7 @@ export default function ClipLibraryTab({ sources, snippets, openItemId, onDeepLi
     setImportingOverview(true);
     try {
       const parsed = parseOverviewCSV(await file.text());
-      if (!parsed.headersFound) { alert('Could not find a "Video name" column. Expected: Video name, Row number in Snippet database, RAW full version file, Shortcut to row in Snippet Database.'); return; }
+      if (!parsed.headersFound) { toastError('Could not find a "Video name" column. Expected: Video name, Row number in Snippet database, RAW full version file, Shortcut to row in Snippet Database.'); return; }
       if (parsed.rows.length === 0) { showToast('No long-form pieces found in that CSV.'); return; }
       const { inserted, updated } = await importClipSources(parsed.rows);
       // Newly-added sources may now match previously-orphaned clips.
@@ -87,7 +84,7 @@ export default function ClipLibraryTab({ sources, snippets, openItemId, onDeepLi
       onReload();
     } catch (err) {
       console.error('[ClipLibrary] overview import failed', err);
-      alert(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
+      toastError(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setImportingOverview(false);
     }
@@ -97,14 +94,14 @@ export default function ClipLibraryTab({ sources, snippets, openItemId, onDeepLi
     setImportingSnippets(true);
     try {
       const parsed = parseSnippetsCSV(await file.text());
-      if (!parsed.headersFound) { alert('Could not find a "Description" column header. The Snippet database sheet needs a header row naming Description / FULL version file / Timestamp / Snippet download link.'); return; }
+      if (!parsed.headersFound) { toastError('Could not find a "Description" column header. The Snippet database sheet needs a header row naming Description / FULL version file / Timestamp / Snippet download link.'); return; }
       if (parsed.rows.length === 0) { showToast('No clips found in that CSV.'); return; }
       const { inserted, linked } = await importClipSnippets(parsed.rows);
       showToast(`Snippets: ${inserted} imported · ${linked} linked to a source · ${parsed.sourceCount} source sections`);
       onReload();
     } catch (err) {
       console.error('[ClipLibrary] snippet import failed', err);
-      alert(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
+      toastError(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setImportingSnippets(false);
     }
@@ -120,7 +117,7 @@ export default function ClipLibraryTab({ sources, snippets, openItemId, onDeepLi
     setClearing(false);
     if (snipErr || srcErr) {
       console.error('[ClipLibrary] clear failed', snipErr || srcErr);
-      alert(`Couldn't clear library: ${(snipErr || srcErr)!.message}`);
+      toastError(`Couldn't clear library: ${(snipErr || srcErr)!.message}`);
       return;
     }
     setClearOpen(false);
@@ -192,12 +189,6 @@ export default function ClipLibraryTab({ sources, snippets, openItemId, onDeepLi
         </div>
       )}
 
-      {toast && (
-        <div style={{ position: 'fixed', bottom: 24, right: 24, background: 'var(--surface)', border: '0.5px solid #ec4899', borderRadius: 8, padding: '10px 16px', fontSize: 12, color: 'var(--text)', boxShadow: '0 8px 24px rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', gap: 8, animation: 'slideInRight 0.2s ease' }}>
-          <span style={{ color: '#ec4899' }}>✦</span>
-          {toast}
-        </div>
-      )}
     </div>
   );
 }

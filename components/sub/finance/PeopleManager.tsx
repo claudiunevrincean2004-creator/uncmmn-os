@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useDialogs } from '@/components/DialogProvider';
 import { supabase } from '@/lib/supabase';
 import { FinancePerson, FinancePayment, Profile } from '@/lib/types';
 import { formatUSD } from '@/lib/utils';
@@ -74,6 +75,7 @@ interface Props {
 }
 
 export default function PeopleManager({ people, payments, allPayments, periodName, profiles, openPersonId, onOpened, onOpenPayment, onViewPayments, onReload }: Props) {
+  const { toastError, confirm: askConfirm } = useDialogs();
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -110,7 +112,7 @@ export default function PeopleManager({ people, payments, allPayments, periodNam
       // Log which FIELDS failed, never their values — a patch here can carry
       // bank details, and a console line is a view like any other.
       console.error('[Finance] failed to update person', { id, fields: Object.keys(p), error });
-      alert(`Couldn't save changes: ${error.message}`);
+      toastError(`Couldn't save changes: ${error.message}`);
     }
     onReload();
   }
@@ -118,7 +120,7 @@ export default function PeopleManager({ people, payments, allPayments, periodNam
   async function createPerson() {
     if (creating) return;
     const name = draft.name.trim();
-    if (!name) { alert('A name is required.'); return; }
+    if (!name) { toastError('A name is required.'); return; }
     setCreating(true);
     const row = {
       name,
@@ -139,7 +141,7 @@ export default function PeopleManager({ people, payments, allPayments, periodNam
       // Fields, never values: `row` carries bank details, and a console line is
       // a view like any other. Same rule as patch() above.
       console.error('[Finance] failed to create person', { fields: Object.keys(row), error });
-      alert(`Couldn't add person: ${error.message}`);
+      toastError(`Couldn't add person: ${error.message}`);
       return;
     }
     closeAdd();
@@ -157,19 +159,19 @@ export default function PeopleManager({ people, payments, allPayments, periodNam
   async function deletePerson(id: string) {
     const n = everCount[id] || 0;
     if (n > 0) {
-      alert(`This person has ${n} payment${n === 1 ? '' : 's'} on record, so they can't be deleted — that history would be lost. Set their status to Inactive instead.`);
+      toastError(`This person has ${n} payment${n === 1 ? '' : 's'} on record, so they can't be deleted — that history would be lost. Set their status to Inactive instead.`);
       return;
     }
     const { error } = await supabase.from('finance_people').delete().eq('id', id);
-    if (error) { alert(`Couldn't delete person: ${error.message}`); return; }
+    if (error) { toastError(`Couldn't delete person: ${error.message}`); return; }
     if (selectedId === id) setSelectedId(null);
     onReload();
   }
 
   // The row button asks first; the panel's Delete already has ConfirmDelete's
   // own two-step, so it calls deletePerson directly.
-  function confirmDeletePerson(id: string) {
-    if (!confirm('Delete this person?')) return;
+  async function confirmDeletePerson(id: string) {
+    if (!(await askConfirm('Delete this person?'))) return;
     deletePerson(id);
   }
 

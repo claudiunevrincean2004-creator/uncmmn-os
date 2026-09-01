@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useDialogs } from '@/components/DialogProvider';
 import { supabase } from '@/lib/supabase';
 import { TrialReelSource, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
@@ -48,6 +49,7 @@ function NumCell({ value, onCommit, width = 78 }: { value: number | null | undef
 }
 
 export default function SourceLibrary({ sources, profiles, onReload, showToast, onQueued }: Props) {
+  const { toastError, confirm: askConfirm } = useDialogs();
   const [search, setSearch] = useState('');
   const [dateFrom, setDateFrom] = usePersistedState<string>('trialreel_src_from', '');
   const [dateTo, setDateTo] = usePersistedState<string>('trialreel_src_to', '');
@@ -75,7 +77,7 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
   }
 
   async function deleteRow(id: string) {
-    if (!confirm('Delete this source reel from the library?')) return;
+    if (!(await askConfirm('Delete this source reel from the library?'))) return;
     await supabase.from('trial_reel_source').delete().eq('id', id);
     onReload();
   }
@@ -94,7 +96,7 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
     setClearing(false);
     if (error) {
       console.error('[SourceLibrary] failed to clear library', error);
-      alert(`Couldn't clear library: ${error.message}`);
+      toastError(`Couldn't clear library: ${error.message}`);
       return;
     }
     setClearOpen(false);
@@ -115,7 +117,7 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
       const text = await file.text();
       const parsed = parseSourceCSV(text);
       if (!parsed.headersFound) {
-        alert('Could not find a "Link to posted video" column. Expected columns: Date, Description, Google Drive Link, Link to posted video, Views, Follows, Follows/ 1k views, Contains talking?');
+        toastError('Could not find a "Link to posted video" column. Expected columns: Date, Description, Google Drive Link, Link to posted video, Views, Follows, Follows/ 1k views, Contains talking?');
         return;
       }
       if (parsed.rows.length === 0) {
@@ -128,7 +130,7 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
       onReload();
     } catch (err) {
       console.error('[SourceLibrary] CSV import failed', err);
-      alert(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
+      toastError(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setImporting(false);
     }
@@ -178,8 +180,8 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
 
   async function confirmQueue() {
     if (generating) return;
-    if (proposed.length === 0) { alert('Add at least one reel to the queue.'); return; }
-    if (!editorId) { alert('Choose an editor to assign the batch to.'); return; }
+    if (proposed.length === 0) { toastError('Add at least one reel to the queue.'); return; }
+    if (!editorId) { toastError('Choose an editor to assign the batch to.'); return; }
     setGenerating(true);
     const today = todayISO();
     const nowIso = new Date().toISOString();
@@ -188,7 +190,7 @@ export default function SourceLibrary({ sources, profiles, onReload, showToast, 
     if (error) {
       setGenerating(false);
       console.error('[SourceLibrary] failed to create production rows', error);
-      alert(`Couldn't create the queue: ${error.message}`);
+      toastError(`Couldn't create the queue: ${error.message}`);
       return;
     }
     // Round-robin bookkeeping: stamp last_assigned_at=now and bump times_recreated

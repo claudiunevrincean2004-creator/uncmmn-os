@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useDialogs } from '@/components/DialogProvider';
 import Dropdown from './Dropdown';
 import { supabase } from '@/lib/supabase';
 import { CustomProperty, CustomPropertyOption } from '@/lib/types';
@@ -140,6 +141,7 @@ export function CustomFilterControls({
 export function PropertyManagerModal({
   tableKey, properties, options, onClose, onReload,
 }: { tableKey: string; properties: CustomProperty[]; options: CustomPropertyOption[]; onClose: () => void; onReload: () => void }) {
+  const { toastError, confirm: askConfirm } = useDialogs();
   const props = sortProps(properties, tableKey);
   const optionsByProp = groupOptions(options);
   const [newName, setNewName] = useState('');
@@ -168,8 +170,8 @@ export function PropertyManagerModal({
     await supabase.from('custom_properties').update({ name: name.trim() || 'Untitled' }).eq('id', id);
   });
 
-  const deleteProperty = (p: CustomProperty) => {
-    if (!confirm(`Delete the "${p.name}" column? This removes its values from every row.`)) return;
+  const deleteProperty = async (p: CustomProperty) => {
+    if (!(await askConfirm(`Delete the "${p.name}" column? This removes its values from every row.`))) return;
     run(async () => { await supabase.from('custom_properties').delete().eq('id', p.id); });
   };
 

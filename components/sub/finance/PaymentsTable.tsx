@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useDialogs } from '@/components/DialogProvider';
 import { supabase } from '@/lib/supabase';
 import { FinancePayment, FinancePerson, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
@@ -112,6 +113,7 @@ interface Props {
 }
 
 export default function PaymentsTable({ payments, people, profiles, focus, periodName, onManagePeople, onOpenPerson, openPaymentId, personFilter, resetFilters, onNavConsumed, onReload }: Props) {
+  const { toast: pushToast, toastError, confirm: askConfirm } = useDialogs();
   const [fPerson, setFPerson] = usePersistedState<string>('finance_p_person', 'All');
   const [fType, setFType] = usePersistedState<string>('finance_p_type', 'All');
   const [fStatus, setFStatus] = usePersistedState<string>('finance_p_status', 'All');
@@ -125,10 +127,9 @@ export default function PaymentsTable({ payments, people, profiles, focus, perio
   const [draft, setDraft] = useState<PaymentDraft>(EMPTY_DRAFT);
   const [draftError, setDraftError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  // Quiet, non-blocking feedback — the same .idea-toast the Research and Clip
-  // Library tabs use. A Slack failure never gets an alert(), because the payment
-  // itself saved fine and a modal would imply otherwise.
-  const [toast, setToast] = useState<{ msg: string; isError: boolean } | null>(null);
+  // Quiet, non-blocking feedback through the app-wide toast stack. A Slack
+  // failure never gets a blocking dialog — the payment itself saved fine, and a
+  // modal would imply otherwise.
   const [resending, setResending] = useState(false);
 
   // Arriving from a person's panel: open one payment, and/or narrow to that
@@ -152,8 +153,7 @@ export default function PaymentsTable({ payments, people, profiles, focus, perio
       setFPerson, setFType, setFStatus, setDateFrom, setDateTo]);
 
   function showToast(msg: string, isError = false) {
-    setToast({ msg, isError });
-    setTimeout(() => setToast(null), isError ? 5000 : 2200);
+    pushToast(msg, isError);
   }
 
   // Person id → name, and the reverse. Filtering is by NAME (what the user reads
@@ -179,7 +179,7 @@ export default function PaymentsTable({ payments, people, profiles, focus, perio
       // PostgREST schema cache (run supabase/finance.sql, including
       // `notify pgrst, 'reload schema';`) or an RLS denial on a non-admin session.
       console.error('[Finance] failed to update payment', { id, patch: p, error });
-      alert(`Couldn't save changes: ${error.message}`);
+      toastError(`Couldn't save changes: ${error.message}`);
     }
     onReload();
   }
@@ -294,7 +294,7 @@ export default function PaymentsTable({ payments, people, profiles, focus, perio
     setCreating(false);
     if (error) {
       console.error('[Finance] failed to create payment', { row, error });
-      alert(`Couldn't create payment: ${error.message}`);
+      toastError(`Couldn't create payment: ${error.message}`);
       return;
     }
     closeAdd();
@@ -335,15 +335,15 @@ export default function PaymentsTable({ payments, people, profiles, focus, perio
 
   async function deletePayment(id: string) {
     const { error } = await supabase.from('finance_payments').delete().eq('id', id);
-    if (error) { alert(`Couldn't delete payment: ${error.message}`); return; }
+    if (error) { toastError(`Couldn't delete payment: ${error.message}`); return; }
     if (selectedId === id) setSelectedId(null);
     onReload();
   }
 
   // The table's row button asks first; the panel's Delete does NOT go through
   // here, because ItemPanel already wraps it in ConfirmDelete's own two-step.
-  function confirmDeletePayment(id: string) {
-    if (!confirm('Delete this payment?')) return;
+  async function confirmDeletePayment(id: string) {
+    if (!(await askConfirm('Delete this payment?'))) return;
     deletePayment(id);
   }
 
@@ -567,7 +567,7 @@ export default function PaymentsTable({ payments, people, profiles, focus, perio
                                 // back to the stored date rather than sitting
                                 // there looking empty after a refused edit.
                                 onCommit={d => {
-                                  if (!d) { alert(PAID_NEEDS_DATE); onReload(); return; }
+                                  if (!d) { toastError(PAID_NEEDS_DATE); onReload(); return; }
                                   patch(p.id, { paid_date: d });
                                 }}
                               />
@@ -653,9 +653,6 @@ export default function PaymentsTable({ payments, people, profiles, focus, perio
         />
       )}
 
-      {toast && (
-        <div className={toast.isError ? 'idea-toast is-error' : 'idea-toast'} role="status">{toast.msg}</div>
-      )}
 
       {addOpen && (
         <div className="modal-overlay" onClick={closeAdd}>
