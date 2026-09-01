@@ -368,5 +368,7 @@ export interface FinancePayment {
   invoice_url?: string | null;
   description?: string | null;
   notes?: string | null;
+  /** When the "ready to pay" Slack ping delivered. Null = never pinged. */
+  notified_at?: string | null;
   created_at?: string;
 }

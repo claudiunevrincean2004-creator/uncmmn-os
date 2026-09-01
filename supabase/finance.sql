@@ -74,6 +74,11 @@ alter table public.finance_payments add column if not exists paid_date date;
 alter table public.finance_payments add column if not exists invoice_url text;
 alter table public.finance_payments add column if not exists description text;
 alter table public.finance_payments add column if not exists notes text;
+-- Slack ping bookkeeping: set the first time a payment reaches Ready to Pay and
+-- the #finance ping actually delivers. Null means "never pinged". Flipping a
+-- payment away from ready_to_pay and back deliberately does NOT clear this — a
+-- re-send is a manual act (the Resend button in the payment panel).
+alter table public.finance_payments add column if not exists notified_at timestamptz;
 
 -- INVARIANT: a paid payment must say WHEN it was paid ------------------------
 -- A null paid_date anchors the row to no month, so every dated period in the UI

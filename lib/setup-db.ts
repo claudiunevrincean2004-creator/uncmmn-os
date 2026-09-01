@@ -521,6 +521,8 @@ create policy "finance_people_admin_all" on finance_people
   invoice_url text,
   description text,
   notes text,
+  -- Set when the "ready to pay" Slack ping delivers; null = never pinged.
+  notified_at timestamptz,
   created_at timestamptz default now(),
   -- A paid payment must say WHEN it was paid: a null paid_date anchors the row
   -- to no month, so every dated period in the UI filters it out and the row

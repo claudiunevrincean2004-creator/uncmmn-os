@@ -230,6 +230,9 @@ create table if not exists finance_payments (
   invoice_url text,
   description text,
   notes text,
+  -- Set when the "ready to pay" Slack ping delivers; null = never pinged. Guards
+  -- against duplicate pings, and is only ever cleared by the panel's Resend.
+  notified_at timestamptz,
   created_at timestamptz default now(),
   -- A paid payment must say WHEN it was paid: a null paid_date anchors the row
   -- to no month, so every dated period in the UI filters it out and the row
@@ -245,6 +248,8 @@ alter table finance_payments
 alter table finance_payments
   add constraint finance_payments_paid_needs_date
   check (status is distinct from 'paid' or paid_date is not null);
+-- Top-up for an install that predates the Slack ping bookkeeping.
+alter table finance_payments add column if not exists notified_at timestamptz;
 create index if not exists finance_payments_person_idx on finance_payments (person_id);
 create index if not exists finance_payments_status_idx on finance_payments (status);
 create index if not exists finance_payments_due_date_idx on finance_payments (due_date);

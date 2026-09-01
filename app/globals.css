@@ -1722,6 +1722,39 @@ html, body {
   .fs-row .fs-val { flex-basis: 100%; }
 }
 
+/* ===== Panel footer — row actions that aren't fields ========================
+   Sits under the properties, above the comment thread. Today: the Finance
+   payment's Slack notification state and its manual re-send. */
+.panel-footer {
+  display: flex;
+  padding-top: 14px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.panel-notify {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.panel-notify-state {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-faint);
+}
+
+.panel-notify-btn {
+  font-size: 11px;
+  padding: 6px 12px;
+  white-space: nowrap;
+}
+
+.panel-notify-btn:disabled { opacity: 0.55; cursor: default; }
+
 /* ===== Dropdown — the app's one option picker ===============================
    Replaces every native <select>. The panel is a plain .fs-pop with .fs-menu-item
    rows, so a dropdown and the Filter/Sort popovers are visibly the same control.

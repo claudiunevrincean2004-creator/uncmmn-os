@@ -133,8 +133,12 @@ export default function Home() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const view = params.get('view');
-    if (view === 'trialreels') {
-      setMainPage('trialreels');
+    // Tab-only deep links. Finance rides the SAME mechanism the Trial Reels
+    // digest uses rather than getting a route of its own — and the admin gate is
+    // unchanged, since the tab renders behind `role === 'admin'` and the editor
+    // bounce below sends anyone else back to Studio.
+    if (view === 'trialreels' || view === 'finance') {
+      setMainPage(view);
       window.history.replaceState(null, '', window.location.pathname);
       return;
     }

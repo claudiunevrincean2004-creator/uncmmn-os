@@ -1,12 +1,13 @@
 'use client';
 import { useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
-import { FinancePayment, FinancePerson } from '@/lib/types';
+import { FinancePayment, FinancePerson, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { usePagedRows } from '@/lib/use-paged-rows';
 import { formatUSD, parseUSD } from '@/lib/utils';
 import { SortOption, SortDir, sortRows } from '@/lib/sort';
 import { inDateRange, isOverdue, todayISO } from '@/lib/studio';
+import { financeApproverMention } from '@/lib/team-slack';
 import {
   PAYMENT_TYPES, PAYMENT_TYPE_LABELS, PAYMENT_TYPE_COLORS,
   PAYMENT_STATUSES, PAYMENT_STATUS_LABELS, PAYMENT_STATUS_COLORS,
@@ -82,6 +83,8 @@ interface Props {
    *  stat cards above and these rows are always the same set of payments. */
   payments: FinancePayment[];
   people: FinancePerson[];
+  /** OS logins — the Ready-to-Pay ping resolves its @-mention from these. */
+  profiles: Profile[];
   /**
    * Set when the parent has swapped the period's rows for one specific problem
    * set (today: paid payments with no paid_date, from the Paid card's warning).
@@ -97,7 +100,7 @@ interface Props {
   onReload: () => void;
 }
 
-export default function PaymentsTable({ payments, people, focus, periodName, onManagePeople, onReload }: Props) {
+export default function PaymentsTable({ payments, people, profiles, focus, periodName, onManagePeople, onReload }: Props) {
   const [fPerson, setFPerson] = usePersistedState<string>('finance_p_person', 'All');
   const [fType, setFType] = usePersistedState<string>('finance_p_type', 'All');
   const [fStatus, setFStatus] = usePersistedState<string>('finance_p_status', 'All');
@@ -111,6 +114,16 @@ export default function PaymentsTable({ payments, people, focus, periodName, onM
   const [draft, setDraft] = useState<PaymentDraft>(EMPTY_DRAFT);
   const [draftError, setDraftError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  // Quiet, non-blocking feedback — the same .idea-toast the Research and Clip
+  // Library tabs use. A Slack failure never gets an alert(), because the payment
+  // itself saved fine and a modal would imply otherwise.
+  const [toast, setToast] = useState<{ msg: string; isError: boolean } | null>(null);
+  const [resending, setResending] = useState(false);
+
+  function showToast(msg: string, isError = false) {
+    setToast({ msg, isError });
+    setTimeout(() => setToast(null), isError ? 5000 : 2200);
+  }
 
   // Person id → name, and the reverse. Filtering is by NAME (what the user reads
   // in the popover); the rows themselves store person_id.
@@ -140,6 +153,69 @@ export default function PaymentsTable({ payments, people, focus, periodName, onM
     onReload();
   }
 
+  /**
+   * Ping the finance channel that a payment is ready to settle.
+   *
+   * Called AFTER the status write has already landed, and it never throws: a
+   * missing webhook or an unreachable Slack must not make a saved payment look
+   * unsaved. Failure is a toast and a console line, nothing more.
+   *
+   * `notified_at` is stamped only on a true success, so a failed ping stays
+   * re-sendable — and a payment that has already been announced is never
+   * announced twice, no matter how many times its status moves.
+   */
+  async function notifyReadyToPay(row: FinancePayment): Promise<boolean> {
+    const person = personFor(row.person_id, people);
+    try {
+      const res = await fetch('/api/finance-notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'ready_to_pay',
+          // Resolved here from profiles.slack_user_id, the same way every
+          // editor ping is built — the route does no database access.
+          mention: financeApproverMention(profiles),
+          personName: person?.name ?? '',
+          amount: formatUSD(row.amount),
+          type: row.type ? (PAYMENT_TYPE_LABELS[row.type] ?? row.type) : '',
+          dueDate: row.due_date ?? '',
+          description: row.description ?? '',
+          invoiceUrl: row.invoice_url ?? '',
+          // Tab link, not a row link — Finance has no per-item route, and the
+          // details are what you go to the OS to read.
+          osUrl: typeof window !== 'undefined' ? `${window.location.origin}/?view=finance` : '',
+          // NOTE: person.payment_link is deliberately NOT sent. See the route.
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body?.ok !== true) {
+        console.warn('[Finance] ready-to-pay ping not delivered', body);
+        return false;
+      }
+    } catch (err) {
+      console.warn('[Finance] ready-to-pay ping failed', err);
+      return false;
+    }
+    // Delivered — record it so nothing re-announces this payment.
+    const { error } = await supabase
+      .from('finance_payments')
+      .update({ notified_at: new Date().toISOString() })
+      .eq('id', row.id);
+    if (error) console.error('[Finance] failed to stamp notified_at', error);
+    return true;
+  }
+
+  /** Fire the ping if this payment has never been announced. */
+  async function maybeNotify(row: FinancePayment) {
+    if (row.notified_at) return;
+    const ok = await notifyReadyToPay(row);
+    showToast(
+      ok ? 'Slack notified' : "Payment saved — Slack notification didn't send",
+      !ok,
+    );
+    onReload();
+  }
+
   // Moving a payment to Paid stamps today's date when there isn't one yet (and
   // clearing Paid drops it), so "Paid this month" is never wrong just because
   // someone forgot the second field.
@@ -149,6 +225,10 @@ export default function PaymentsTable({ payments, people, focus, periodName, onM
     if (status === 'paid' && !row.paid_date) p.paid_date = todayISO();
     if (status !== 'paid' && row.paid_date) p.paid_date = null;
     await patch(row.id, p);
+    // Every status change in this tab comes through here — the table's pill and
+    // the detail panel's both call it — so the ping can't be bypassed by
+    // choosing where to make the edit.
+    if (status === 'ready_to_pay') await maybeNotify({ ...row, ...p });
   }
 
   async function createPayment() {
@@ -175,7 +255,7 @@ export default function PaymentsTable({ payments, people, focus, periodName, onM
       // Currency stays at its 'USD' default — everything here is USD and no UI
       // reads the column.
     };
-    const { error } = await supabase.from('finance_payments').insert([row]);
+    const { data: created, error } = await supabase.from('finance_payments').insert([row]).select().single();
     setCreating(false);
     if (error) {
       console.error('[Finance] failed to create payment', { row, error });
@@ -183,6 +263,32 @@ export default function PaymentsTable({ payments, people, focus, periodName, onM
       return;
     }
     closeAdd();
+    // Created straight at Ready to Pay → announce it once, the same way
+    // changeStatus would have. A payment created as Pending says nothing.
+    if (created && row.status === 'ready_to_pay') await maybeNotify(created as FinancePayment);
+    onReload();
+  }
+
+  /**
+   * Manual re-announce. The only thing that clears notified_at — moving a
+   * payment off ready_to_pay and back deliberately does not, so a status
+   * ping-pong can never spam the channel.
+   */
+  async function resendNotification(row: FinancePayment) {
+    if (resending) return;
+    setResending(true);
+    const { error } = await supabase
+      .from('finance_payments')
+      .update({ notified_at: null })
+      .eq('id', row.id);
+    if (error) {
+      setResending(false);
+      showToast(`Couldn't reset the notification: ${error.message}`, true);
+      return;
+    }
+    const ok = await notifyReadyToPay({ ...row, notified_at: null });
+    setResending(false);
+    showToast(ok ? 'Slack notified' : "Couldn't reach Slack — try again", !ok);
     onReload();
   }
 
@@ -470,6 +576,24 @@ export default function PaymentsTable({ payments, people, focus, periodName, onM
           title={`${personName(selected.person_id, people) ?? 'Unassigned'} · ${formatUSD(selected.amount)}`}
           fields={fields}
           values={panelValues}
+          footer={
+            <div className="panel-notify">
+              <div className="panel-notify-state">
+                {selected.notified_at
+                  ? `Slack notified ${new Date(selected.notified_at).toLocaleDateString('default', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                  : 'Not announced in Slack yet'}
+              </div>
+              <button
+                type="button"
+                className="btn-ghost panel-notify-btn"
+                disabled={resending}
+                onClick={() => resendNotification(selected)}
+                title="Clear the notification stamp and send the Ready to Pay ping again"
+              >
+                {resending ? 'Sending…' : 'Resend notification'}
+              </button>
+            </div>
+          }
           onChangeField={(key, value) => {
             if (key === 'status') changeStatus(selected, value);
             else if (key === 'person_id') patch(selected.id, { person_id: value || null });
@@ -487,6 +611,10 @@ export default function PaymentsTable({ payments, people, focus, periodName, onM
           onReload={onReload}
           onClose={() => setSelectedId(null)}
         />
+      )}
+
+      {toast && (
+        <div className={toast.isError ? 'idea-toast is-error' : 'idea-toast'} role="status">{toast.msg}</div>
       )}
 
       {addOpen && (

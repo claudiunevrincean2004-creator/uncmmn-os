@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StudioComment, StudioActivity, Profile, CommentReaction } from '@/lib/types';
 import { formatActivityTime } from '@/lib/studio';
@@ -76,6 +76,9 @@ interface Props {
   onDelete?: () => void;
   fields: FieldDef[];
   values: Record<string, any>;
+  /** Extra controls rendered under the properties — actions that belong to the
+   *  row but aren't a field of it (Finance's "Resend notification"). */
+  footer?: ReactNode;
   onChangeField: (key: string, value: any) => void;
   onAddOption: (field: string, value: string) => void;
   /**
@@ -159,7 +162,7 @@ function FieldControl({ field, values, onChangeField, onAddOption, profiles }: {
   }
 }
 
-export default function ItemPanel({ itemType, linkType, itemId, title, commentsLabel = 'Comments', onDelete, fields, values, onChangeField, onAddOption, showComments = true, comments = [], activity = [], profiles = [], isAdmin = false, onReload, onClose }: Props) {
+export default function ItemPanel({ itemType, linkType, itemId, title, commentsLabel = 'Comments', onDelete, fields, values, footer, onChangeField, onAddOption, showComments = true, comments = [], activity = [], profiles = [], isAdmin = false, onReload, onClose }: Props) {
   const [newComment, setNewComment] = useState('');
   // Whether the new-comment box is focused — drives whether Add is on screen.
   const [composerActive, setComposerActive] = useState(false);
@@ -638,6 +641,8 @@ export default function ItemPanel({ itemType, linkType, itemId, title, commentsL
           );
         })}
       </div>
+
+      {footer && <div className="panel-footer">{footer}</div>}
 
       {/* Comments + Activity. Both live in shared, authenticated-readable tables,
           so a surface that must not leak (Finance) opts out of the pair. */}

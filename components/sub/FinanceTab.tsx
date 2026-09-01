@@ -231,6 +231,7 @@ export default function FinanceTab({ people, payments, profiles, onReload }: Pro
           // tells the table to suspend its own filters while that's showing,
           // since a persisted "Status: Pending" would otherwise hide all of them.
           payments={undatedOpen ? undated : scoped}
+          profiles={profiles}
           focus={undatedOpen ? {
             label: `${undated.length} paid payment${undated.length === 1 ? '' : 's'} missing a paid date`,
             hint: 'Counted in no Paid total, and hidden by every dated period — so the period is now All time. Set a date below and the row drops off this list.',
