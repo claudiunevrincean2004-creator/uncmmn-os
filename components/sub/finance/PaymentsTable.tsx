@@ -490,13 +490,16 @@ export default function PaymentsTable({ payments, people, focus, periodName, onM
 
       {addOpen && (
         <div className="modal-overlay" onClick={closeAdd}>
-          <div className="modal-box" style={{ width: 520 }} onClick={e => e.stopPropagation()}>
+          {/* is-tall: the field stack scrolls, the title and the Cancel/Create
+              row stay pinned — the form is long enough to outgrow a laptop
+              viewport once Paid Date is showing. */}
+          <div className="modal-box is-tall" style={{ width: 520 }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div className="font-head" style={{ fontSize: 17, fontWeight: 700 }}>New Payment</div>
               <button onClick={closeAdd} style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>✕</button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="modal-body modal-form">
               <DraftField label="Person">
                 <select
                   className="form-input"
@@ -572,11 +575,13 @@ export default function PaymentsTable({ payments, people, focus, periodName, onM
 }
 
 // Label + control row for the Add form, matching the detail panel's layout —
-// the same shape Video Review's New Video modal uses.
+// the same shape Video Review's New Video modal uses. The grid lives in
+// .modal-field now (same 120px label column, more room between rows), so the
+// spacing is one place rather than a number repeated down the form.
 function DraftField({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 10, alignItems: 'start' }}>
-      <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, paddingTop: 6 }}>{label}</div>
+    <div className="modal-field">
+      <div className="modal-field-label">{label}</div>
       <div>{children}</div>
     </div>
   );

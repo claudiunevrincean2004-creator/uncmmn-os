@@ -3192,6 +3192,61 @@ html, body {
   overflow-y: auto;
 }
 
+/* Opt-in: scroll the BODY instead of the whole box, so the title and the
+   Cancel/Create row stay put while a tall field stack moves under them. Plain
+   .modal-box keeps scrolling as one block, which is right for the short ones —
+   this only applies where a form has outgrown the viewport. */
+.modal-box.is-tall {
+  display: flex;
+  flex-direction: column;
+  /* The body owns the scroll now; the box must not also scroll. */
+  overflow: hidden;
+}
+
+/* Header and footer hold their height — without this, flex would compress them
+   to make room for the body, which is the squashing we're avoiding. */
+.modal-box.is-tall > :not(.modal-body) {
+  flex: none;
+}
+
+.modal-box.is-tall > .modal-body {
+  flex: 1;
+  /* Lets the flex item shrink below its content height so overflow engages. */
+  min-height: 0;
+  overflow-y: auto;
+  /* Keeps a field clear of the scrollbar without indenting the resting state. */
+  padding-right: 6px;
+  margin-right: -6px;
+}
+
+/* --- Modal form rows -------------------------------------------------------
+   The 120px label column matches the detail panel's, so a form and the panel it
+   creates rows for read as the same thing. Generous row spacing: these are
+   discrete decisions, not a dense table. */
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.modal-field {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.modal-field-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1.4;
+  color: var(--text-faint);
+  /* Sits the label on the first line of the control beside it. */
+  padding-top: 8px;
+}
+
 /* Native date fields — app-wide, not just the Studio tables.
    The browser's calendar glyph clutters every date field we render, so it's
    hidden everywhere. Clicking the field opens the picker instead: every date
