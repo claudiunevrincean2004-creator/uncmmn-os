@@ -62,30 +62,36 @@ export async function POST(request: Request) {
 
   const greeting = `Hey ${mention || 'there'}, a new payment is ready to be settled!`;
 
-  // Block Kit: a two-column field list, so the details read as a list rather
-  // than one run-on line. The amount is bold — it's the scannable number.
-  const fields = [
-    personName ? `*Person*\n${personName}` : null,
-    amount ? `*Amount*\n*${amount}*` : null,
-    type ? `*Type*\n${type}` : null,
-    dueLabel ? `*Due*\n${dueLabel}` : null,
-  ].filter((f): f is string => f !== null);
+  // ONE stacked line per field — "*Label:* value" — not Block Kit's `fields`
+  // array. That renders as a two-column grid, which is fine on a wide desktop
+  // and wraps badly on a phone; a single mrkdwn section with newlines reads the
+  // same at every width. The amount carries bold on the VALUE as well as the
+  // label, so the number is what your eye lands on.
+  //
+  // Every line is conditional: an absent field is omitted outright rather than
+  // printed as a blank or a dash.
+  const details = [
+    personName ? `*Person:* ${personName}` : null,
+    amount ? `*Amount:* *${amount}*` : null,
+    type ? `*Type:* ${type}` : null,
+    dueLabel ? `*Due:* ${dueLabel}` : null,
+    description ? `*For:* ${description}` : null,
+  ].filter((l): l is string => l !== null);
 
   const blocks: Record<string, unknown>[] = [
     { type: 'section', text: { type: 'mrkdwn', text: `💸 ${greeting}` } },
   ];
-  if (fields.length) {
-    blocks.push({ type: 'section', fields: fields.map(text => ({ type: 'mrkdwn', text })) });
+  if (details.length) {
+    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: details.join('\n') } });
   }
-  if (description) {
-    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `*For*\n${description}` } });
-  }
+  // One link per line too: joining them on a single line is the other thing that
+  // wraps unpredictably on a narrow screen.
   const tail = [
     invoiceUrl ? `<${invoiceUrl}|📄 Invoice>` : null,
     osUrl ? `<${osUrl}|🔗 Open this payment in the OS>` : null,
   ].filter((l): l is string => l !== null);
   if (tail.length) {
-    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: tail.join('   ·   ') } });
+    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: tail.join('\n') } });
   }
   blocks.push({
     type: 'context',
