@@ -18,6 +18,7 @@ import { type StudioView } from './ViewToggle';
 import { FilterMenu, FilterChips, SortMenu, type FilterDef } from './FilterMenu';
 import { SortOption, SortDir, sortRows } from '@/lib/sort';
 import ItemPanel, { FieldDef } from './ItemPanel';
+import { useRowSelection, RowCheckbox, SelectCell, SelectionBar } from './RowSelection';
 import QuickLinks from './QuickLinks';
 import { UserPicker, resolveAssignee, buildPipelineMentions } from './UserPicker';
 import FieldOptionsManager from './FieldOptionsManager';
@@ -97,11 +98,45 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState<VideoDraft>(EMPTY_DRAFT);
   const [creating, setCreating] = useState(false);
+  // Bulk status change, painted before the write lands. id → the status we told
+  // the user we were writing; see `rows` and the retirement effect below.
+  const [pendingStatus, setPendingStatus] = useState<Record<string, string>>({});
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   // Open a row's panel when arriving via a deep link (Slack "Open in UNCMMN OS").
   // Signal onOpened so the parent clears the one-shot deep link (returning to this
   // tab later must not re-open the panel).
   useEffect(() => { if (openItemId) { setSelectedId(openItemId); onOpened?.(); } }, [openItemId, onOpened]);
+
+  // EVERYTHING below reads `rows`, never `videos` — the parent's list with any
+  // in-flight bulk status change already painted on. One substitution, so the
+  // table, the filter option lists, the board and the detail panel can't
+  // disagree about what a row's status is mid-write.
+  const rows = useMemo(() => {
+    if (Object.keys(pendingStatus).length === 0) return videos;
+    return videos.map(v => (pendingStatus[v.id] ? { ...v, status: pendingStatus[v.id] } : v));
+  }, [videos, pendingStatus]);
+
+  // Retire each optimistic entry the moment the reload carrying its write
+  // arrives. Dropping the whole overlay on success instead would flash the old
+  // status for as long as the refetch takes; this way the painted value is
+  // handed over to the real one with no gap.
+  useEffect(() => {
+    setPendingStatus(prev => {
+      const keys = Object.keys(prev);
+      if (keys.length === 0) return prev;
+      const next: Record<string, string> = {};
+      for (const id of keys) {
+        const v = videos.find(x => x.id === id);
+        // Still waiting: the row is here and hasn't caught up yet. A row that
+        // has caught up — or has been deleted — needs no overlay.
+        if (v && v.status !== prev[id]) next[id] = prev[id];
+      }
+      // Same length can only mean same contents (this loop never adds keys), so
+      // returning `prev` there keeps this effect from re-triggering itself.
+      return Object.keys(next).length === keys.length ? prev : next;
+    });
+  }, [videos]);
 
   // Built-in Format & Status options are DB-backed (admin-managed) with defaults
   const statusFieldOpts = getFieldOptions(dropdownOptions, 'video_status', VIDEO_STATUSES, VIDEO_STATUS_COLORS);
@@ -114,8 +149,8 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
 
   async function addOption(field: string, value: string) {
     const fb = FIELD_FALLBACKS[field] ?? { values: [] };
-    const rows = buildAddOptionRows(field, value, fb.values, fb.colors, dropdownOptions);
-    if (rows.length) await supabase.from('studio_dropdown_options').insert(rows);
+    const optionRows = buildAddOptionRows(field, value, fb.values, fb.colors, dropdownOptions);
+    if (optionRows.length) await supabase.from('studio_dropdown_options').insert(optionRows);
     onReload();
   }
 
@@ -227,10 +262,10 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   // present in the current rows), unioned with any stray statuses on existing rows
   // so nothing becomes unreachable. Selecting a no-match status falls through to
   // the empty state below.
-  const statusPresent = ['All', ...Array.from(new Set([...statusValues, ...videos.map(v => v.status).filter(Boolean) as string[]]))];
-  const assignedPresent = present(videos.map(v => resolveAssignee(v.assigned_to_user_id, profiles) || undefined));
-  const formatPresent = present(videos.map(v => v.format));
-  const priorityPresent = present(videos.map(v => v.priority || 'Normal'));
+  const statusPresent = ['All', ...Array.from(new Set([...statusValues, ...rows.map(v => v.status).filter(Boolean) as string[]]))];
+  const assignedPresent = present(rows.map(v => resolveAssignee(v.assigned_to_user_id, profiles) || undefined));
+  const formatPresent = present(rows.map(v => v.format));
+  const priorityPresent = present(rows.map(v => v.priority || 'Normal'));
 
   // The conditions the Filter popover offers, in menu order. Each one is a view
   // onto the state this component already owns — same 'All' sentinel, same
@@ -256,7 +291,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   ], [statusValues, priorityOpts, profiles]);
 
   const filtered = useMemo(() => {
-    let r = videos;
+    let r = rows;
     const q = search.trim().toLowerCase();
     if (q) r = r.filter(v => (v.title || '').toLowerCase().includes(q));
     if (fStatus !== 'All') r = r.filter(v => v.status === fStatus);
@@ -265,7 +300,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
     if (fPriority !== 'All') r = r.filter(v => (v.priority || 'Normal') === fPriority);
     if (dateFrom || dateTo) r = r.filter(v => inDateRange(v.deadline, dateFrom, dateTo));
     return sortRows(r, sortOptions, sortKey, sortDir);
-  }, [videos, search, fStatus, fAssigned, fFormat, fPriority, sortKey, sortDir, dateFrom, dateTo, profiles, sortOptions]);
+  }, [rows, search, fStatus, fAssigned, fFormat, fPriority, sortKey, sortDir, dateFrom, dateTo, profiles, sortOptions]);
 
   // "Load more" pagination — resets to the first page when filters/sort change,
   // not on data refresh (so editing a cell doesn't collapse the list).
@@ -273,6 +308,84 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
     filtered,
     [search, fStatus, fAssigned, fFormat, fPriority, sortKey, sortDir, dateFrom, dateTo].join('|'),
   );
+
+  // Row selection, over the FILTERED set — so "select all" means "everything
+  // these filters admit", which can run past the rows loaded so far (the bar
+  // says as much). Sort is deliberately absent from the reset key: reordering
+  // rows doesn't change which ones are on screen, so it has no business
+  // throwing a selection away. Switching to the Board does, since the Board has
+  // no selection to come back to.
+  const filteredIds = useMemo(() => filtered.map(v => v.id), [filtered]);
+  const sel = useRowSelection(
+    filteredIds,
+    [view, search, fStatus, fAssigned, fFormat, fPriority, dateFrom, dateTo].join('|'),
+    // Escape belongs to whichever modal is open, if one is.
+    !addOpen && !optsField,
+  );
+  // Selected rows past the last one rendered — only reachable via "select all"
+  // plus pagination, and worth naming in the bar when it happens.
+  const selectedOffscreen = sel.count - visible.reduce((n, v) => n + (sel.isSelected(v.id) ? 1 : 0), 0);
+
+  /**
+   * Apply one status to every selected row.
+   *
+   * Optimistic: the new status is painted immediately, then either handed over
+   * to the reloaded row or rolled straight back. The status write is a SINGLE
+   * statement over all the ids, so there is no half-applied middle state to
+   * reconcile — it took for all of them or for none.
+   */
+  async function bulkStatus(status: string) {
+    if (bulkBusy || !status) return;
+    const ids = sel.selected;
+    const targets = filtered.filter(v => ids.has(v.id) && v.status !== status);
+    if (targets.length === 0) return;
+    const targetIds = targets.map(v => v.id);
+
+    setBulkBusy(true);
+    setPendingStatus(prev => {
+      const next = { ...prev };
+      targetIds.forEach(id => { next[id] = status; });
+      return next;
+    });
+
+    const { error } = await supabase.from('studio_videos').update({ status }).in('id', targetIds);
+
+    if (error) {
+      // Roll back to exactly what was on screen before, then re-read, so a
+      // failure can never leave the table showing something the database
+      // doesn't hold.
+      setPendingStatus(prev => {
+        const next = { ...prev };
+        targetIds.forEach(id => { delete next[id]; });
+        return next;
+      });
+      setBulkBusy(false);
+      console.error('[VideoReview] bulk status update failed', { ids: targetIds, status, error });
+      alert(`Couldn't update ${targets.length} video${targets.length === 1 ? '' : 's'}: ${error.message}`);
+      onReload();
+      return;
+    }
+
+    // Revisions Needed bumps a per-row counter, so it can't ride the single
+    // statement above — same rule the Status pill applies, one row at a time.
+    if (status === 'Revisions Needed') {
+      await Promise.all(targets
+        .filter(v => v.status !== 'Revisions Needed')
+        .map(v => supabase.from('studio_videos')
+          .update({ revision_count: (v.revision_count || 0) + 1 })
+          .eq('id', v.id)));
+    }
+
+    // Same audit trail a single-row status change writes. Deliberately NO Slack
+    // ping, which is the one place bulk parts company with changeStatus: one
+    // gesture must not fire twenty notifications into #main-ig-updates.
+    await Promise.all(targets.map(v => logActivity('video', v.id, 'Status changed', v.status, status)));
+
+    setBulkBusy(false);
+    // The selection stays, so a second action can follow. Rows that the active
+    // filter no longer admits drop out of it on their own.
+    onReload();
+  }
 
   const fields: FieldDef[] = useMemo(() => [
     { key: 'title', label: 'Title / Desc', type: 'textarea', placeholder: 'Title / description' },
@@ -291,7 +404,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
     { key: 'revision_count', label: 'Revisions', type: 'readonly' },
   ], [formatValues, formatColors, statusValues, statusColors, priorityOpts, isAdmin]);
 
-  const selected = selectedId ? videos.find(v => v.id === selectedId) : null;
+  const selected = selectedId ? rows.find(v => v.id === selectedId) : null;
 
   // Board cards. Same filtered set the table shows (a board doesn't paginate),
   // mapped to the shared card shape.
@@ -338,7 +451,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
             // Dropping a card into another column runs the SAME changeStatus the
             // Status pill runs — activity log + Slack ping included.
             onStatusChange={(id, status) => {
-              const v = videos.find(x => x.id === id);
+              const v = rows.find(x => x.id === id);
               if (v) changeStatus(v, status);
             }}
             onOpen={setSelectedId}
@@ -359,9 +472,20 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
           <>
           <div className="studio-panel">
           <div className="studio-scroll">
-            <table className="studio-table">
+            <table className={`studio-table${sel.count ? ' has-selection' : ''}`}>
               <thead>
                 <tr>
+                  <SelectCell header onToggle={sel.toggleAll}>
+                    <RowCheckbox
+                      checked={sel.allSelected}
+                      indeterminate={sel.someSelected}
+                      // Names the real scope: the filtered set, not the table.
+                      label={sel.allSelected
+                        ? `Deselect all ${filtered.length} filtered videos`
+                        : `Select all ${filtered.length} filtered videos`}
+                      onToggle={sel.toggleAll}
+                    />
+                  </SelectCell>
                   <th style={{ minWidth: 240 }}>Title</th>
                   <th onClick={isAdmin ? () => setOptsField({ field: 'video_format', title: 'Format' }) : undefined} style={{ cursor: isAdmin ? 'pointer' : undefined, userSelect: 'none' }}>Format{isAdmin && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>✎</span>}</th>
                   <th>Assigned</th>
@@ -387,6 +511,15 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
                       style={{ ...rowAccent(overdue ? 'var(--neg)' : statusColors[v.status]), cursor: 'pointer' }}
                       onClick={openOnRowClick(() => setSelectedId(v.id))}
                     >
+                      {/* First cell, so the row's accent rail — drawn on
+                          td:first-child — stays exactly where it was. */}
+                      <SelectCell onToggle={shift => sel.toggle(v.id, shift)}>
+                        <RowCheckbox
+                          checked={sel.isSelected(v.id)}
+                          label={`Select ${v.title || 'Untitled'}`}
+                          onToggle={shift => sel.toggle(v.id, shift)}
+                        />
+                      </SelectCell>
                       <td style={{ minWidth: 240 }}>
                         <TitleCell title={v.title} onOpen={() => setSelectedId(v.id)}>
                           <CopyLinkButton type="video" id={v.id} />
@@ -424,6 +557,28 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
           </>
         )}
       </div>
+
+      {/* Table view only — the Board's bulk gesture is dragging a card between
+          columns, and a second selection model on top of it would fight it. */}
+      {view === 'table' && sel.count > 0 && (
+        <SelectionBar count={sel.count} offscreen={selectedOffscreen} busy={bulkBusy} onClear={sel.clear}>
+          <label className="sel-bar-field">
+            <span className="sel-bar-field-label">Status</span>
+            <select
+              className="sel-bar-select"
+              // An action, not a current value: it never holds a selection, so
+              // picking the same status twice in a row still fires twice.
+              value=""
+              disabled={bulkBusy}
+              aria-label={`Set status on ${sel.count} selected video${sel.count === 1 ? '' : 's'}`}
+              onChange={e => { const next = e.target.value; e.target.value = ''; bulkStatus(next); }}
+            >
+              <option value="">{bulkBusy ? 'Updating…' : 'Set status…'}</option>
+              {statusValues.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </label>
+        </SelectionBar>
+      )}
 
       {selected && (
         <ItemPanel

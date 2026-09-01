@@ -744,6 +744,258 @@ html, body {
   .link-field { border-color: var(--border); }
 }
 
+/* ===== Row selection — the checkbox column and its floating action bar ======
+   Quiet by default: a checkbox appears on its own row's hover, the header's on
+   the table's, and every one of them stays put once anything is ticked (the
+   .has-selection modifier) so the column can't flicker while you work down it.
+   Drawn rather than native: no `color-scheme` is set anywhere in this app, so a
+   native checkbox would render its light-mode chrome in midnight. */
+/* Scoped to beat `.studio-table td`'s own padding. padding-left is deliberately
+   NOT set here — it comes from the :first-child rule that insets the row's
+   accent rail, which this cell now carries. */
+.studio-table .st-selcell {
+  width: 1%;
+  white-space: nowrap;
+  padding-right: 0;
+}
+
+.st-check {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  display: block;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  border-radius: 4px;
+  border: 1.5px solid color-mix(in srgb, var(--text-faint) 75%, transparent);
+  background: var(--surface);
+  cursor: pointer;
+  flex: none;
+  opacity: 0;
+  transition: opacity 140ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.st-check:hover { border-color: var(--accent); }
+
+.st-check:checked,
+.st-check:indeterminate {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Tick and dash are drawn, so no icon font or SVG is pulled in for them. White
+   reads on --accent in both themes. */
+.st-check:checked::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(43deg);
+}
+
+.st-check:indeterminate::after {
+  content: '';
+  position: absolute;
+  left: 2.5px;
+  top: 5.5px;
+  width: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background: #fff;
+}
+
+.st-check:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Reveal rules. A row's own hover brings up its box; the table's hover brings
+   up the header's, so "select all" is discoverable without putting a permanent
+   checkbox above every table. */
+.studio-table tbody tr:hover .st-check,
+.studio-table:hover thead .st-check,
+.st-check:checked,
+.st-check:indeterminate,
+.studio-table.has-selection .st-check {
+  opacity: 1;
+}
+
+/* No hover on touch, so the column simply stays visible. */
+@media (hover: none) {
+  .st-check { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .st-check { transition: none; }
+}
+
+/* --- The floating bar ------------------------------------------------------
+   Centred near the bottom of the viewport, Notion-style. Below .modal-overlay
+   (1000) on purpose: with the Add form open, the form is what you're acting on.
+*/
+.sel-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: calc(100vw - 32px);
+  padding: 9px 10px 9px 18px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  animation: sel-bar-in 160ms ease;
+}
+
+@keyframes sel-bar-in {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@keyframes sel-bar-in-wide {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sel-bar { animation: none; }
+}
+
+.sel-bar-count {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.sel-bar-num {
+  font-family: var(--font-head);
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.sel-bar-note {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text-dim);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  cursor: help;
+}
+
+.sel-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  padding-left: 14px;
+  border-left: 1px solid var(--border);
+}
+
+.sel-bar-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.sel-bar-field-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+
+.sel-bar-select {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.sel-bar-select:hover:not(:disabled) { border-color: var(--accent); }
+
+.sel-bar-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sel-bar-select:disabled { cursor: progress; opacity: 0.65; }
+
+/* Native option lists inherit the page surface rather than the control's. */
+.sel-bar-select option { background: var(--surface-2); color: var(--text); }
+
+.sel-bar-clear {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
+  color: var(--text-dim);
+  background: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease;
+}
+
+.sel-bar-clear:hover:not(:disabled) { color: var(--text); background: var(--surface-2); }
+
+.sel-bar-clear:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sel-bar-clear:disabled { opacity: 0.5; cursor: default; }
+
+@media (max-width: 640px) {
+  .sel-bar {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    max-width: none;
+    transform: none;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+  /* Its own name, not a redefinition of sel-bar-in — the desktop bar's
+     keyframes translate on X to stay centred, which would fight the full-width
+     bar here. */
+  .sel-bar { animation-name: sel-bar-in-wide; }
+  .sel-bar-actions {
+    width: 100%;
+    margin-left: 0;
+    padding-left: 0;
+    padding-top: 10px;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    justify-content: space-between;
+  }
+}
+
 @media (max-width: 640px) {
   .studio-table td { padding: 13px 12px; }
   .studio-table thead th { padding: 11px 12px; }
