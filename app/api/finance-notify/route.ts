@@ -82,7 +82,7 @@ export async function POST(request: Request) {
   }
   const tail = [
     invoiceUrl ? `<${invoiceUrl}|📄 Invoice>` : null,
-    osUrl ? `<${osUrl}|🔗 Open the Finance tab>` : null,
+    osUrl ? `<${osUrl}|🔗 Open this payment in the OS>` : null,
   ].filter((l): l is string => l !== null);
   if (tail.length) {
     blocks.push({ type: 'section', text: { type: 'mrkdwn', text: tail.join('   ·   ') } });

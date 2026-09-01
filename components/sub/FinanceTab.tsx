@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FinancePerson, FinancePayment, Profile } from '@/lib/types';
 import { usePersistedState } from '@/lib/use-persisted-state';
 import { formatUSD } from '@/lib/utils';
@@ -55,6 +55,9 @@ interface StatCard {
 }
 
 interface Props {
+  /** One-shot payment id from a Slack "Open this payment" link. */
+  openPaymentId?: string;
+  onDeepLinkConsumed?: () => void;
   people: FinancePerson[];
   payments: FinancePayment[];
   /** OS logins, for the optional finance_people.profile_id link. */
@@ -62,7 +65,7 @@ interface Props {
   onReload: () => void;
 }
 
-export default function FinanceTab({ people, payments, profiles, onReload }: Props) {
+export default function FinanceTab({ openPaymentId: deepLinkId, onDeepLinkConsumed, people, payments, profiles, onReload }: Props) {
   const [sub, setSub] = usePersistedState<SubTab>('finance_subtab', 'payments');
   // The same from/to ISO pair every other date filter in the app stores, so the
   // shared picker drops straight in. Seeded to this calendar month, which is
@@ -108,6 +111,39 @@ export default function FinanceTab({ people, payments, profiles, onReload }: Pro
   const [openPersonId, setOpenPersonId] = useState<string | null>(null);
   const [openPaymentId, setOpenPaymentId] = useState<string | null>(null);
   const [personFilter, setPersonFilter] = useState<string | null>(null);
+  // Set to true when a deep link names a payment that no longer exists.
+  const [linkMissed, setLinkMissed] = useState(false);
+  // Tells the payments table to drop its own saved filters for this one arrival,
+  // so the row is genuinely on screen behind the panel and not hidden by a
+  // "Status: Paid" someone left set weeks ago.
+  const [resetFilters, setResetFilters] = useState(false);
+
+  /**
+   * Resolve an incoming deep link.
+   *
+   * The period is cleared to All time whenever the id resolves — a payment
+   * announced in one month and opened in another must not land on a table that
+   * filters it out. A link that opens nothing is worse than no link, so an id
+   * that matches nothing says so instead of showing an empty panel.
+   *
+   * `payments` is the parent's full, already-loaded list: this tab only mounts
+   * after loadData has run (it renders behind `client`), so an empty result here
+   * means genuinely absent, not "not fetched yet".
+   */
+  useEffect(() => {
+    if (!deepLinkId) return;
+    if (payments.some(p => p.id === deepLinkId)) {
+      setDateFrom('');
+      setDateTo('');
+      setResetFilters(true);
+      setOpenPaymentId(deepLinkId);
+      setSub('payments');
+      setLinkMissed(false);
+    } else {
+      setLinkMissed(true);
+    }
+    onDeepLinkConsumed?.();
+  }, [deepLinkId, payments, onDeepLinkConsumed, setDateFrom, setDateTo, setSub]);
   // Fixing the last one empties the list, which drops the table straight back to
   // the period — no stale "0 rows" view to dismiss by hand.
   const undatedOpen = showUndated && undated.length > 0;
@@ -169,6 +205,20 @@ export default function FinanceTab({ people, payments, profiles, onReload }: Pro
 
   return (
     <div style={{ position: 'relative' }}>
+      {linkMissed && (
+        // Quiet and dismissible: the link was followed in good faith, the row is
+        // simply gone. No empty panel, no crash — just the Finance tab and a
+        // sentence saying why nothing opened.
+        <div className="table-notice">
+          <span className="table-notice-icon" aria-hidden="true">⚠</span>
+          <div className="table-notice-body">
+            <div className="table-notice-label">That payment couldn&rsquo;t be found</div>
+            <div className="table-notice-hint">It may have been deleted since the link was sent. Everything else on this tab is unaffected.</div>
+          </div>
+          <button type="button" className="table-notice-clear" onClick={() => setLinkMissed(false)}>Dismiss</button>
+        </div>
+      )}
+
       {/* Summary row — same markup and tokens as the Studio stat cards, so the
           card's colour rides down as --stat-color and tints the icon tile in
           both aurora and midnight without a second copy. */}
@@ -250,7 +300,8 @@ export default function FinanceTab({ people, payments, profiles, onReload }: Pro
           onOpenPerson={id => { setOpenPersonId(id); setSub('people'); }}
           openPaymentId={openPaymentId}
           personFilter={personFilter}
-          onNavConsumed={() => { setOpenPaymentId(null); setPersonFilter(null); }}
+          resetFilters={resetFilters}
+          onNavConsumed={() => { setOpenPaymentId(null); setPersonFilter(null); setResetFilters(false); }}
           onReload={onReload}
         />
       )}

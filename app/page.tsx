@@ -86,6 +86,9 @@ export default function Home() {
   const [clipSnippets, setClipSnippets] = useState<ClipSnippet[]>([]);
   // Finance (admin-only). On a non-admin session RLS returns nothing, so these
   // simply stay empty — the tab is never mounted for them anyway.
+  // One-shot payment id from a Slack "Open this payment" link. Cleared by
+  // FinanceTab once consumed, so returning to the tab later doesn't re-open it.
+  const [financePaymentId, setFinancePaymentId] = useState<string | undefined>(undefined);
   const [financePeople, setFinancePeople] = useState<FinancePerson[]>([]);
   const [financePayments, setFinancePayments] = useState<FinancePayment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -139,6 +142,14 @@ export default function Home() {
     // bounce below sends anyone else back to Studio.
     if (view === 'trialreels' || view === 'finance') {
       setMainPage(view);
+      // "?view=finance&payment=<id>" — the Ready-to-Pay Slack ping. Same
+      // mechanism, one optional extra param, rather than a route of its own.
+      // FinanceTab resolves the id (and says so if it no longer exists); this
+      // only carries it across.
+      if (view === 'finance') {
+        const paymentId = params.get('payment');
+        if (paymentId) setFinancePaymentId(paymentId);
+      }
       window.history.replaceState(null, '', window.location.pathname);
       return;
     }
@@ -735,6 +746,8 @@ export default function Home() {
             // air between the page title and the first card.
             <div style={{ padding: '8px 24px 16px' }}>
               <FinanceTab
+                openPaymentId={financePaymentId}
+                onDeepLinkConsumed={() => setFinancePaymentId(undefined)}
                 people={financePeople}
                 payments={financePayments}
                 profiles={studioProfiles}

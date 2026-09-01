@@ -104,11 +104,14 @@ interface Props {
   openPaymentId?: string | null;
   /** Apply this person NAME to the person filter once, then clear it. */
   personFilter?: string | null;
+  /** Drop the saved filters for this one arrival, so a deep-linked payment is
+   *  actually on screen behind its panel rather than hidden by a stale filter. */
+  resetFilters?: boolean;
   onNavConsumed?: () => void;
   onReload: () => void;
 }
 
-export default function PaymentsTable({ payments, people, profiles, focus, periodName, onManagePeople, onOpenPerson, openPaymentId, personFilter, onNavConsumed, onReload }: Props) {
+export default function PaymentsTable({ payments, people, profiles, focus, periodName, onManagePeople, onOpenPerson, openPaymentId, personFilter, resetFilters, onNavConsumed, onReload }: Props) {
   const [fPerson, setFPerson] = usePersistedState<string>('finance_p_person', 'All');
   const [fType, setFType] = usePersistedState<string>('finance_p_type', 'All');
   const [fStatus, setFStatus] = usePersistedState<string>('finance_p_status', 'All');
@@ -132,11 +135,21 @@ export default function PaymentsTable({ payments, people, profiles, focus, perio
   // person. One-shot, cleared through onNavConsumed so a later visit to the tab
   // doesn't re-apply it.
   useEffect(() => {
-    if (!openPaymentId && !personFilter) return;
+    if (!openPaymentId && !personFilter && !resetFilters) return;
+    if (resetFilters) {
+      setFPerson('All');
+      setFType('All');
+      setFStatus('All');
+      setDateFrom('');
+      setDateTo('');
+      setSearch('');
+    }
     if (openPaymentId) setSelectedId(openPaymentId);
+    // Applied after the reset above, so a person jump still narrows to them.
     if (personFilter) setFPerson(personFilter);
     onNavConsumed?.();
-  }, [openPaymentId, personFilter, onNavConsumed, setFPerson]);
+  }, [openPaymentId, personFilter, resetFilters, onNavConsumed,
+      setFPerson, setFType, setFStatus, setDateFrom, setDateTo]);
 
   function showToast(msg: string, isError = false) {
     setToast({ msg, isError });
@@ -199,9 +212,13 @@ export default function PaymentsTable({ payments, people, profiles, focus, perio
           dueDate: row.due_date ?? '',
           description: row.description ?? '',
           invoiceUrl: row.invoice_url ?? '',
-          // Tab link, not a row link — Finance has no per-item route, and the
-          // details are what you go to the OS to read.
-          osUrl: typeof window !== 'undefined' ? `${window.location.origin}/?view=finance` : '',
+          // Opens THIS payment: the tab deep-link handler in app/page.tsx takes
+          // an optional payment id and hands it to FinanceTab, which widens the
+          // period to All time so the row is reachable whatever the picker was
+          // left on. Still no per-item route — same ?view= mechanism.
+          osUrl: typeof window !== 'undefined'
+            ? `${window.location.origin}/?view=finance&payment=${encodeURIComponent(row.id)}`
+            : '',
           // NOTE: person.payment_link is deliberately NOT sent. See the route.
         }),
       });
