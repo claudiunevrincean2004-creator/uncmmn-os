@@ -122,7 +122,7 @@ export default function Sidebar({ activeMP, collapsed, role, userName, unreadCou
           icons below (8px list padding + 12px item padding); collapsed, it
           centres. The header keeps its original height either way. */}
       <div style={{ padding: collapsed ? '18px 8px 14px' : '18px 20px 14px', borderBottom: '0.5px solid var(--border)', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-        <div className="logo-lockup" style={{ justifyContent: collapsed ? 'center' : 'flex-start' }} title="uncmmn OS">
+        <div className="logo-lockup" style={{ justifyContent: collapsed ? 'center' : 'flex-start' }} title="Content OS">
           <StarLogo size={collapsed ? 26 : 24} />
         </div>
       </div>

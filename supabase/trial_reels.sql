@@ -1,13 +1,17 @@
 -- ============================================================================
--- UNCMMN OS — Trial Reels (production department for recreating high
+-- Content OS — Trial Reels (production department for recreating high
 -- follower-conversion Instagram reels from scratch).
 --
 -- Two tables:
 --   trial_reel_source     — the backlog library, imported (upserted) from CSV
 --   trial_reel_production  — one row per recreated reel in production
 --
--- Both use the "Allow all for anon" RLS pattern (same as clipper_* tables).
--- Safe to re-run (idempotent). Run in the Supabase SQL Editor.
+-- RLS: trial_reel_source is authenticated-read / admin-write, and
+-- trial_reel_production is open to any authenticated user — Trial Reels is an
+-- editor-reachable tab. Both previously used the "Allow all for anon" pattern,
+-- which omitted the `to` clause and so defaulted to TO PUBLIC (including anon).
+-- Run AFTER auth_setup.sql — the policies below call public.is_admin(), which
+-- that file defines. Safe to re-run (idempotent). Run in the Supabase SQL Editor.
 -- ============================================================================
 
 -- 1) trial_reel_source — the backlog library. posted_url is the UNIQUE upsert key
@@ -52,9 +56,21 @@ alter table public.trial_reel_source add column if not exists final_product text
 create unique index if not exists trial_reel_source_posted_url_key
   on public.trial_reel_source (posted_url);
 
+-- Authenticated READ, admin WRITE. Trial Reels IS editor-reachable
+-- (EDITOR_ALLOWED in lib/auth-config.ts) and the production board joins the
+-- source row for each reel's brief and original URL — so editors must read it.
+-- The source library, CSV import and queue generation are admin-only surfaces
+-- inside that tab, so writes stay admin-only. Previously "Allow all for anon"
+-- with no `to` clause — TO PUBLIC, therefore anon.
 alter table public.trial_reel_source enable row level security;
 drop policy if exists "Allow all for anon" on public.trial_reel_source;
-create policy "Allow all for anon" on public.trial_reel_source for all using (true) with check (true);
+drop policy if exists "trial_reel_source_select_auth" on public.trial_reel_source;
+drop policy if exists "trial_reel_source_write_admin" on public.trial_reel_source;
+create policy "trial_reel_source_select_auth" on public.trial_reel_source
+  for select to authenticated using (true);
+create policy "trial_reel_source_write_admin" on public.trial_reel_source
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
 
 -- 2) trial_reel_production — one row per recreated reel in production.
 --    Status flow: Assigned → Editing → In Review → Revisions Needed → Posted
@@ -74,9 +90,14 @@ create table if not exists public.trial_reel_production (
 -- when the queue is confirmed, then editable on the production board independent of the source.
 alter table public.trial_reel_production add column if not exists clip_brief text;
 
+-- Any authenticated user: editors update status and final_url on the reels
+-- assigned to them, which the app scopes per row. `to authenticated` is the only
+-- change — same access for real users, none for anon.
 alter table public.trial_reel_production enable row level security;
 drop policy if exists "Allow all for anon" on public.trial_reel_production;
-create policy "Allow all for anon" on public.trial_reel_production for all using (true) with check (true);
+drop policy if exists "auth_all_trial_reel_production" on public.trial_reel_production;
+create policy "auth_all_trial_reel_production" on public.trial_reel_production
+  for all to authenticated using (true) with check (true);
 
 -- Refresh PostgREST's schema cache so writes to the new tables/columns don't fail
 -- with PGRST205/PGRST204 until the next automatic reload.

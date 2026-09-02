@@ -1,5 +1,5 @@
 -- ============================================================================
--- NATHAN OS — Job title (self-service)
+-- Content OS — Job title (self-service)
 -- Adds a free-text job title to profiles (e.g. "Media Buyer", "Editor") and a
 -- self-service setter mirroring set_my_display_name: any authenticated user can
 -- set their OWN job title without widening the admin-only profiles UPDATE policy.

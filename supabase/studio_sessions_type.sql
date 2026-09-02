@@ -1,5 +1,5 @@
 -- ============================================================================
--- NATHAN OS — Type property for Filming Sessions
+-- Content OS — Type property for Filming Sessions
 -- Adds an admin-editable select "Type" to Filming Sessions, stored the same way
 -- as Status: the chosen value lives in studio_sessions.type, while the options
 -- (label + color + order) live in studio_dropdown_options under the

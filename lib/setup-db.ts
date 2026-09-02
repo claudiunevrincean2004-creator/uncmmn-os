@@ -2,8 +2,8 @@ import { supabase } from './supabase';
 
 export async function checkSchema(): Promise<{ missing: string[]; postColumnsMissing: string[]; researchColumnsMissing: string[]; adColumnsMissing: string[]; sessionColumnsMissing: string[]; commentColumnsMissing: string[]; dropdownColsMissing: boolean }> {
   const requiredTables = [
-    'clients', 'posts', 'goals', 'drive_folders',
-    'subscriber_snapshots', 'research_items', 'revenue_entries',
+    'clients', 'posts', 'drive_folders',
+    'subscriber_snapshots', 'research_items',
     'studio_videos', 'studio_sequences', 'studio_sessions',
     'studio_ad_creatives', 'studio_comments', 'studio_activity',
     'studio_quick_links', 'studio_dropdown_options',
@@ -107,7 +107,11 @@ export function getMigrationSQL(missing: string[], postColumnsMissing: string[] 
   platforms text[] default '{}',
   created_at timestamptz default now()
 );
-alter table clients disable row level security;`);
+alter table clients enable row level security;
+drop policy if exists "clients_select_auth" on clients;
+create policy "clients_select_auth" on clients for select to authenticated using (true);
+drop policy if exists "clients_write_admin" on clients;
+create policy "clients_write_admin" on clients for all to authenticated using (public.is_admin()) with check (public.is_admin());`);
   }
 
   if (missing.includes('posts')) {
@@ -127,22 +131,17 @@ alter table clients disable row level security;`);
   follows numeric default 0,
   drive_link text,
   post_url text,
+  -- Native per-platform post ids, written by the external Apps Script that
+  -- syncs analytics. Nothing in the app reads them; they exist in production
+  -- and are declared here so the repo matches the live table.
+  tiktok_id text,
+  youtube_id text,
+  instagram_id text,
   created_at timestamptz default now()
 );
-alter table posts disable row level security;`);
-  }
-
-  if (missing.includes('goals')) {
-    parts.push(`create table if not exists goals (
-  id uuid primary key default gen_random_uuid(),
-  client_id uuid references clients(id) on delete cascade,
-  name text not null,
-  current_val numeric default 0,
-  target_val numeric default 0,
-  platform text default 'All',
-  created_at timestamptz default now()
-);
-alter table goals disable row level security;`);
+alter table posts enable row level security;
+drop policy if exists "admin_all_posts" on posts;
+create policy "admin_all_posts" on posts for all to authenticated using (public.is_admin()) with check (public.is_admin());`);
   }
 
   if (missing.includes('drive_folders')) {
@@ -154,7 +153,9 @@ alter table goals disable row level security;`);
   category text,
   created_at timestamptz default now()
 );
-alter table drive_folders disable row level security;`);
+alter table drive_folders enable row level security;
+drop policy if exists "auth_all_drive_folders" on drive_folders;
+create policy "auth_all_drive_folders" on drive_folders for all to authenticated using (true) with check (true);`);
   }
 
   if (missing.includes('subscriber_snapshots')) {
@@ -166,7 +167,9 @@ alter table drive_folders disable row level security;`);
   date date not null,
   created_at timestamptz default now()
 );
-alter table subscriber_snapshots disable row level security;`);
+alter table subscriber_snapshots enable row level security;
+drop policy if exists "admin_all_subscriber_snapshots" on subscriber_snapshots;
+create policy "admin_all_subscriber_snapshots" on subscriber_snapshots for all to authenticated using (public.is_admin()) with check (public.is_admin());`);
   }
 
   if (missing.includes('research_items')) {
@@ -181,19 +184,9 @@ alter table subscriber_snapshots disable row level security;`);
   status text default 'unused',
   created_at timestamptz default now()
 );
-alter table research_items disable row level security;`);
-  }
-
-  if (missing.includes('revenue_entries')) {
-    parts.push(`create table if not exists revenue_entries (
-  id uuid primary key default gen_random_uuid(),
-  date date not null,
-  amount numeric default 0,
-  source text,
-  notes text,
-  created_at timestamptz default now()
-);
-alter table revenue_entries disable row level security;`);
+alter table research_items enable row level security;
+drop policy if exists "admin_all_research_items" on research_items;
+create policy "admin_all_research_items" on research_items for all to authenticated using (public.is_admin()) with check (public.is_admin());`);
   }
 
   if (missing.includes('studio_videos')) {
@@ -216,7 +209,9 @@ alter table revenue_entries disable row level security;`);
 );
 alter table studio_videos enable row level security;
 drop policy if exists "anon_all_studio_videos" on studio_videos;
-create policy "anon_all_studio_videos" on studio_videos for all to anon using (true) with check (true);`);
+drop policy if exists "all_studio_videos" on studio_videos;
+drop policy if exists "auth_all_studio_videos" on studio_videos;
+create policy "auth_all_studio_videos" on studio_videos for all to authenticated using (true) with check (true);`);
   }
 
   if (missing.includes('studio_sequences')) {
@@ -232,7 +227,9 @@ create policy "anon_all_studio_videos" on studio_videos for all to anon using (t
 );
 alter table studio_sequences enable row level security;
 drop policy if exists "anon_all_studio_sequences" on studio_sequences;
-create policy "anon_all_studio_sequences" on studio_sequences for all to anon using (true) with check (true);`);
+drop policy if exists "all_studio_sequences" on studio_sequences;
+drop policy if exists "auth_all_studio_sequences" on studio_sequences;
+create policy "auth_all_studio_sequences" on studio_sequences for all to authenticated using (true) with check (true);`);
   }
 
   if (missing.includes('studio_sessions')) {
@@ -252,7 +249,9 @@ create policy "anon_all_studio_sequences" on studio_sequences for all to anon us
 );
 alter table studio_sessions enable row level security;
 drop policy if exists "anon_all_studio_sessions" on studio_sessions;
-create policy "anon_all_studio_sessions" on studio_sessions for all to anon using (true) with check (true);`);
+drop policy if exists "all_studio_sessions" on studio_sessions;
+drop policy if exists "auth_all_studio_sessions" on studio_sessions;
+create policy "auth_all_studio_sessions" on studio_sessions for all to authenticated using (true) with check (true);`);
   }
 
   if (missing.includes('studio_ad_creatives')) {
@@ -279,7 +278,9 @@ create policy "anon_all_studio_sessions" on studio_sessions for all to anon usin
 );
 alter table studio_ad_creatives enable row level security;
 drop policy if exists "anon_all_studio_ad_creatives" on studio_ad_creatives;
-create policy "anon_all_studio_ad_creatives" on studio_ad_creatives for all to anon using (true) with check (true);`);
+drop policy if exists "all_studio_ad_creatives" on studio_ad_creatives;
+drop policy if exists "auth_all_studio_ad_creatives" on studio_ad_creatives;
+create policy "auth_all_studio_ad_creatives" on studio_ad_creatives for all to authenticated using (true) with check (true);`);
   }
 
   if (missing.includes('studio_comments')) {
@@ -295,7 +296,9 @@ create policy "anon_all_studio_ad_creatives" on studio_ad_creatives for all to a
 create index if not exists studio_comments_parent_idx on studio_comments (parent_comment_id);
 alter table studio_comments enable row level security;
 drop policy if exists "anon_all_studio_comments" on studio_comments;
-create policy "anon_all_studio_comments" on studio_comments for all to anon using (true) with check (true);`);
+drop policy if exists "all_studio_comments" on studio_comments;
+drop policy if exists "auth_all_studio_comments" on studio_comments;
+create policy "auth_all_studio_comments" on studio_comments for all to authenticated using (true) with check (true);`);
   }
 
   if (missing.includes('studio_activity')) {
@@ -310,7 +313,9 @@ create policy "anon_all_studio_comments" on studio_comments for all to anon usin
 );
 alter table studio_activity enable row level security;
 drop policy if exists "anon_all_studio_activity" on studio_activity;
-create policy "anon_all_studio_activity" on studio_activity for all to anon using (true) with check (true);`);
+drop policy if exists "all_studio_activity" on studio_activity;
+drop policy if exists "auth_all_studio_activity" on studio_activity;
+create policy "auth_all_studio_activity" on studio_activity for all to authenticated using (true) with check (true);`);
   }
 
   if (missing.includes('studio_quick_links')) {
@@ -323,7 +328,8 @@ create policy "anon_all_studio_activity" on studio_activity for all to anon usin
 );
 alter table studio_quick_links enable row level security;
 drop policy if exists "Allow all for anon" on studio_quick_links;
-create policy "Allow all for anon" on studio_quick_links for all using (true) with check (true);`);
+drop policy if exists "auth_all_studio_quick_links" on studio_quick_links;
+create policy "auth_all_studio_quick_links" on studio_quick_links for all to authenticated using (true) with check (true);`);
   }
 
   if (missing.includes('studio_dropdown_options')) {
@@ -335,7 +341,8 @@ create policy "Allow all for anon" on studio_quick_links for all using (true) wi
 );
 alter table studio_dropdown_options enable row level security;
 drop policy if exists "Allow all for anon" on studio_dropdown_options;
-create policy "Allow all for anon" on studio_dropdown_options for all using (true) with check (true);`);
+drop policy if exists "auth_all_studio_dropdown_options" on studio_dropdown_options;
+create policy "auth_all_studio_dropdown_options" on studio_dropdown_options for all to authenticated using (true) with check (true);`);
   }
 
   // Comment Inbox: mentions on comments + per-user read state.
@@ -354,7 +361,8 @@ create table if not exists comment_reads (
 create index if not exists comment_reads_user_idx on comment_reads (user_id);
 alter table comment_reads enable row level security;
 drop policy if exists "all_comment_reads" on comment_reads;
-create policy "all_comment_reads" on comment_reads for all using (true) with check (true);
+drop policy if exists "comment_reads_own" on comment_reads;
+create policy "comment_reads_own" on comment_reads for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 notify pgrst, 'reload schema';`);
   }
 
@@ -419,7 +427,10 @@ alter table trial_reel_source add column if not exists snippet_download_link tex
 create unique index if not exists trial_reel_source_posted_url_key on trial_reel_source (posted_url);
 alter table trial_reel_source enable row level security;
 drop policy if exists "Allow all for anon" on trial_reel_source;
-create policy "Allow all for anon" on trial_reel_source for all using (true) with check (true);`);
+drop policy if exists "trial_reel_source_select_auth" on trial_reel_source;
+drop policy if exists "trial_reel_source_write_admin" on trial_reel_source;
+create policy "trial_reel_source_select_auth" on trial_reel_source for select to authenticated using (true);
+create policy "trial_reel_source_write_admin" on trial_reel_source for all to authenticated using (public.is_admin()) with check (public.is_admin());`);
   }
 
   if (missing.includes('trial_reel_production')) {
@@ -436,7 +447,8 @@ create table if not exists trial_reel_production (
 );
 alter table trial_reel_production enable row level security;
 drop policy if exists "Allow all for anon" on trial_reel_production;
-create policy "Allow all for anon" on trial_reel_production for all using (true) with check (true);
+drop policy if exists "auth_all_trial_reel_production" on trial_reel_production;
+create policy "auth_all_trial_reel_production" on trial_reel_production for all to authenticated using (true) with check (true);
 notify pgrst, 'reload schema';`);
   }
 
@@ -455,7 +467,8 @@ alter table clip_source add column if not exists date_added date;
 alter table clip_source add column if not exists format text;
 alter table clip_source enable row level security;
 drop policy if exists "Allow all for anon" on clip_source;
-create policy "Allow all for anon" on clip_source for all using (true) with check (true);`);
+drop policy if exists "admin_all_clip_source" on clip_source;
+create policy "admin_all_clip_source" on clip_source for all to authenticated using (public.is_admin()) with check (public.is_admin());`);
   }
 
   if (missing.includes('clip_snippet')) {
@@ -477,7 +490,8 @@ alter table clip_snippet add column if not exists date_added date;
 alter table clip_snippet add column if not exists format text;
 alter table clip_snippet enable row level security;
 drop policy if exists "Allow all for anon" on clip_snippet;
-create policy "Allow all for anon" on clip_snippet for all using (true) with check (true);
+drop policy if exists "admin_all_clip_snippet" on clip_snippet;
+create policy "admin_all_clip_snippet" on clip_snippet for all to authenticated using (public.is_admin()) with check (public.is_admin());
 notify pgrst, 'reload schema';`);
   }
 

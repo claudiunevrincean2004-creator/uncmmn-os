@@ -1,5 +1,5 @@
 -- ============================================================================
--- NATHAN OS — TikTok final link for Video Review
+-- Content OS — TikTok final link for Video Review
 -- The TikTok cut ships with a different CTA from the Instagram one, so a video
 -- carries two finals. studio_videos.final_url stays the Instagram version (it
 -- keeps its main-table column and feeds the Slack pings unchanged); this new

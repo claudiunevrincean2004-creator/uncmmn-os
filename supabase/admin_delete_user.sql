@@ -1,5 +1,5 @@
 -- ============================================================================
--- NATHAN OS — Admin: remove a user
+-- Content OS — Admin: remove a user
 -- Lets an admin delete another user's auth account + profile in one call,
 -- WITHOUT shipping a service-role key to the browser. SECURITY DEFINER runs as
 -- the function owner (postgres), which can delete from auth.users; the profiles

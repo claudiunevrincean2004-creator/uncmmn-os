@@ -2,7 +2,7 @@
 import { useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 
-// Per-item entry point for an Ad Creative row (the target of "Open in UNCMMN OS"
+// Per-item entry point for an Ad Creative row (the target of "Open in Content OS"
 // links in Slack pings). The app itself is a single-page client app, so this thin
 // route hands off to the root with a deep-link param that opens the Studio → Ad
 // Creative tab with this row's side panel (where comments live).

@@ -1,5 +1,5 @@
 -- ============================================================================
--- UNCMMN OS — Threaded replies on comments (single-level threading)
+-- Content OS — Threaded replies on comments (single-level threading)
 --
 -- Adds studio_comments.parent_comment_id, a nullable self-reference:
 --

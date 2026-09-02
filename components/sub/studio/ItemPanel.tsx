@@ -294,7 +294,7 @@ export default function ItemPanel({ itemType, linkType, itemId, title, commentsL
     // open a socket for a table it never reads.
     if (!showComments) return;
     const channel = supabase
-      .channel(nextChannelName(`uncmmn-os-reactions:${itemType}:${itemId}`))
+      .channel(nextChannelName(`content-os-reactions:${itemType}:${itemId}`))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'comment_reactions' }, payload => {
         if (payload.eventType === 'DELETE') {
           // `old` carries only the primary key, so "is this one of ours?" is

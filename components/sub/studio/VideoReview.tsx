@@ -106,7 +106,7 @@ export default function VideoReview({ videos, comments, activity, quickLinks, dr
   const [pendingStatus, setPendingStatus] = useState<Record<string, string>>({});
   const [bulkBusy, setBulkBusy] = useState(false);
 
-  // Open a row's panel when arriving via a deep link (Slack "Open in UNCMMN OS").
+  // Open a row's panel when arriving via a deep link (Slack "Open in Content OS").
   // Signal onOpened so the parent clears the one-shot deep link (returning to this
   // tab later must not re-open the panel).
   useEffect(() => { if (openItemId) { setSelectedId(openItemId); onOpened?.(); } }, [openItemId, onOpened]);

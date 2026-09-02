@@ -1,5 +1,5 @@
 -- ============================================================================
--- UNCMMN OS — "Assigned To" becomes a real user reference
+-- Content OS — "Assigned To" becomes a real user reference
 -- Adds assigned_to_user_id (uuid → profiles.id) to studio_videos and
 -- studio_ad_creatives, keeping the legacy text `assigned_to` column intact as a
 -- migration fallback. Non-destructive: nothing is dropped or overwritten.

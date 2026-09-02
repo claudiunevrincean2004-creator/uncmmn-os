@@ -1,5 +1,5 @@
 -- ============================================================================
--- NATHAN OS — Custom SELECT properties for Studio tables
+-- Content OS — Custom SELECT properties for Studio tables
 -- Adds admin-managed dropdown columns to the customizable Studio tables
 -- (Story Sequences, Filming Sessions, Ad Creative — NOT Video Review).
 -- Run AFTER schema.sql and auth_setup.sql (depends on public.is_admin()).

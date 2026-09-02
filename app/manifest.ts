@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Content OS",
     short_name: "Content OS",
-    description: "Nathan Nazareth — Content Operating System",
+    description: "Content operations — planning, production, review and delivery.",
     start_url: "/",
     display: "standalone",
     theme_color: "#0A0C12",      // midnight

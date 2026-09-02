@@ -1,6 +1,12 @@
--- NATHAN OS — Supabase Schema
+-- Content OS — Supabase Schema
 -- Run this in your Supabase SQL editor
 
+-- Exactly one row (the single creator this install serves). The live table used
+-- to carry 13 further columns from an abandoned agency/CRM model — retainer,
+-- cost, billing_type, client_type, payment_status, project_status,
+-- project_description, renewal_date, start_date, inactive_date, deadline,
+-- status, notes. None were ever read or written by the app or present on the
+-- Client type; they were dropped in the phase 1 cleanup and must not come back.
 create table if not exists clients (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -25,18 +31,18 @@ create table if not exists posts (
   follows numeric default 0,
   drive_link text,
   post_url text,
+  -- Native per-platform post ids, written by the external Apps Script that syncs
+  -- analytics. Nothing in the app reads them; they exist in production and are
+  -- declared here so this file matches the live table.
+  tiktok_id text,
+  youtube_id text,
+  instagram_id text,
   created_at timestamptz default now()
 );
-
-create table if not exists goals (
-  id uuid primary key default gen_random_uuid(),
-  client_id uuid references clients(id) on delete cascade,
-  name text not null,
-  current_val numeric default 0,
-  target_val numeric default 0,
-  platform text default 'All',
-  created_at timestamptz default now()
-);
+-- Top-up for an install that predates the platform-id columns.
+alter table posts add column if not exists tiktok_id text;
+alter table posts add column if not exists youtube_id text;
+alter table posts add column if not exists instagram_id text;
 
 create table if not exists drive_folders (
   id uuid primary key default gen_random_uuid(),
@@ -67,16 +73,6 @@ create table if not exists research_items (
   reason text,
   hot boolean default false,
   status text default 'unused',
-  created_at timestamptz default now()
-);
-
--- Revenue entries for profit share tracking
-create table if not exists revenue_entries (
-  id uuid primary key default gen_random_uuid(),
-  date date not null,
-  amount numeric default 0,
-  source text,
-  notes text,
   created_at timestamptz default now()
 );
 
@@ -266,47 +262,62 @@ create index if not exists finance_payments_person_idx on finance_payments (pers
 create index if not exists finance_payments_status_idx on finance_payments (status);
 create index if not exists finance_payments_due_date_idx on finance_payments (due_date);
 
--- Disable RLS for simplicity (enable and add policies for production)
-alter table clients disable row level security;
-alter table posts disable row level security;
-alter table goals disable row level security;
-alter table drive_folders disable row level security;
-alter table subscriber_snapshots disable row level security;
-alter table research_items disable row level security;
-alter table revenue_entries disable row level security;
+-- ============================================================================
+-- ROW LEVEL SECURITY
+--
+-- ⚠ HISTORY — do not "simplify" this back. This block used to read
+--   `alter table <legacy table> disable row level security;` for the seven
+--   tables below, plus `to anon` policies on the studio tables. Because this
+--   file is re-runnable, every re-run silently undid the correct policies in
+--   auth_setup.sql, and the tables ended up readable by anyone holding the
+--   NEXT_PUBLIC anon key. Enable, never disable.
+--
+-- The legacy tables get RLS turned ON here with no policy attached, which denies
+-- everyone by default. auth_setup.sql (clients / posts / research_items /
+-- subscriber_snapshots / drive_folders) and rls_hardening.sql attach the real
+-- policies — run both after this file.
+--
+-- This list was seven; `goals` and `revenue_entries` were dropped in the phase 1
+-- cleanup (both orphaned — no .from() call anywhere in the app) and removed from
+-- here, because `alter table public.goals ...` errors once the table is gone.
+-- ============================================================================
+do $$
+declare t text;
+begin
+  foreach t in array array[
+    'clients', 'posts', 'drive_folders',
+    'subscriber_snapshots', 'research_items'
+  ] loop
+    execute format('alter table public.%I enable row level security;', t);
+  end loop;
+end $$;
 
--- Studio tables: RLS enabled with anon access policies
-alter table studio_videos enable row level security;
-drop policy if exists "anon_all_studio_videos" on studio_videos;
-create policy "anon_all_studio_videos" on studio_videos for all to anon using (true) with check (true);
-
-alter table studio_sequences enable row level security;
-drop policy if exists "anon_all_studio_sequences" on studio_sequences;
-create policy "anon_all_studio_sequences" on studio_sequences for all to anon using (true) with check (true);
-
-alter table studio_sessions enable row level security;
-drop policy if exists "anon_all_studio_sessions" on studio_sessions;
-create policy "anon_all_studio_sessions" on studio_sessions for all to anon using (true) with check (true);
-
-alter table studio_ad_creatives enable row level security;
-drop policy if exists "anon_all_studio_ad_creatives" on studio_ad_creatives;
-create policy "anon_all_studio_ad_creatives" on studio_ad_creatives for all to anon using (true) with check (true);
-
-alter table studio_comments enable row level security;
-drop policy if exists "anon_all_studio_comments" on studio_comments;
-create policy "anon_all_studio_comments" on studio_comments for all to anon using (true) with check (true);
-
-alter table studio_activity enable row level security;
-drop policy if exists "anon_all_studio_activity" on studio_activity;
-create policy "anon_all_studio_activity" on studio_activity for all to anon using (true) with check (true);
-
-alter table studio_quick_links enable row level security;
-drop policy if exists "Allow all for anon" on studio_quick_links;
-create policy "Allow all for anon" on studio_quick_links for all using (true) with check (true);
-
-alter table studio_dropdown_options enable row level security;
-drop policy if exists "Allow all for anon" on studio_dropdown_options;
-create policy "Allow all for anon" on studio_dropdown_options for all using (true) with check (true);
+-- Studio tables: RLS enabled, open to any AUTHENTICATED user.
+--
+-- `to authenticated`, never `to anon`, and never a bare policy with no `to`
+-- clause — an omitted `to` defaults to TO PUBLIC, and PUBLIC includes anon.
+-- Nothing here is served to a logged-out visitor: middleware.ts redirects every
+-- route except /login.
+do $$
+declare t text;
+begin
+  foreach t in array array[
+    'studio_videos', 'studio_sequences', 'studio_sessions', 'studio_ad_creatives',
+    'studio_comments', 'studio_activity', 'studio_quick_links', 'studio_dropdown_options'
+  ] loop
+    execute format('alter table public.%I enable row level security;', t);
+    -- Clear the historical names before creating the correct policy, so a
+    -- database that predates this change cannot keep an anon policy alongside
+    -- the new one (permissive policies OR together — one leftover re-opens it).
+    execute format('drop policy if exists "anon_all_%s" on public.%I;', t, t);
+    execute format('drop policy if exists "Allow all for anon" on public.%I;', t);
+    execute format('drop policy if exists "auth_all_%s" on public.%I;', t, t);
+    execute format(
+      'create policy "auth_all_%s" on public.%I for all to authenticated using (true) with check (true);',
+      t, t
+    );
+  end loop;
+end $$;
 
 -- Finance: ADMIN ONLY, deliberately stricter than the studio_* tables above.
 -- Editors have logins, so a `to authenticated` policy would expose everyone's

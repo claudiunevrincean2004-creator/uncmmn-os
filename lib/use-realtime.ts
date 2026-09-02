@@ -149,7 +149,7 @@ export function useRealtimeSync(
   useEffect(() => {
     if (!enabled || !subscriptionKey) return;
     const specs = latest.current.map(b => ({ table: b.table, filter: b.filter }));
-    const channel = supabase.channel(nextChannelName('uncmmn-os-live'));
+    const channel = supabase.channel(nextChannelName('content-os-live'));
 
     specs.forEach(({ table, filter }) => {
       channel.on(

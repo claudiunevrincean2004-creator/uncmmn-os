@@ -1,5 +1,5 @@
 -- ============================================================================
--- NATHAN OS — Editable built-in Format/Status options + assignable users
+-- Content OS — Editable built-in Format/Status options + assignable users
 -- Run AFTER schema.sql, auth_setup.sql, custom_properties.sql.
 -- Safe to re-run (idempotent).
 -- ============================================================================

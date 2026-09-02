@@ -1,5 +1,5 @@
 -- ============================================================================
--- UNCMMN OS — Realtime live sync (postgres_changes)
+-- Content OS — Realtime live sync (postgres_changes)
 --
 -- Supabase only streams changes for tables that are MEMBERS OF the
 -- `supabase_realtime` publication. A table that isn't a member emits nothing at

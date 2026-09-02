@@ -42,15 +42,6 @@ export interface DriveFolder {
   created_at?: string;
 }
 
-export interface RevenueEntry {
-  id: string;
-  date: string;
-  amount: number;
-  source?: string;
-  notes?: string;
-  created_at?: string;
-}
-
 export type MainPage = 'dashboard' | 'content' | 'research' | 'drive' | 'studio' | 'clippers' | 'trialreels' | 'cliplibrary' | 'finance';
 
 // A long-form piece in the Clip Library (Overview sheet). name is the unique key.

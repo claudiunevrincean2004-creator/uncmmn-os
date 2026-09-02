@@ -1,5 +1,5 @@
 -- ============================================================================
--- UNCMMN OS — Finance (admin-only): payments to editors & short-form contributors
+-- Content OS — Finance (admin-only): payments to editors & short-form contributors
 --
 -- Run this in the Supabase SQL Editor, AFTER auth_setup.sql (it defines the
 -- public.is_admin() helper these policies depend on) and after profiles exists.

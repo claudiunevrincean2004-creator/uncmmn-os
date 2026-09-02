@@ -1,5 +1,5 @@
 -- ============================================================================
--- NATHAN OS — Auth, profiles, roles & Row Level Security
+-- Content OS — Auth, profiles, roles & Row Level Security
 -- Run this in the Supabase SQL Editor. Safe to re-run (idempotent).
 -- Run AFTER schema.sql (it re-enables RLS on the data tables defined there).
 -- ============================================================================
@@ -106,7 +106,7 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'posts', 'research_items', 'subscriber_snapshots', 'revenue_entries', 'goals'
+    'posts', 'research_items', 'subscriber_snapshots'
   ] loop
     execute format('alter table public.%I enable row level security;', t);
     execute format('drop policy if exists "admin_all_%s" on public.%I;', t, t);

@@ -1,5 +1,5 @@
 -- ============================================================================
--- UNCMMN OS — Comment Inbox (mentions + per-user read state)
+-- Content OS — Comment Inbox (mentions + per-user read state)
 --
 -- Adds the two things the sidebar Inbox needs on top of studio_comments:
 --
@@ -45,9 +45,21 @@ create table if not exists public.comment_reads (
 create index if not exists comment_reads_user_idx
   on public.comment_reads (user_id);
 
--- RLS, matching the loose "app enforces access, not the DB" style already used by
--- studio_comments / studio_quick_links / studio_dropdown_options.
+-- RLS: strictly own-row.
+--
+-- This previously used the loose "app enforces access, not the DB" style — a
+-- policy with no `to` clause, which defaults to TO PUBLIC and so handed 483 rows
+-- of read state to the anon key.
+--
+-- Own-row is not just safer, it is what the client already asks for: the select
+-- filters .eq('user_id', uid) (app/page.tsx:318), the upsert writes
+-- user_id: currentUserId (app/page.tsx:340), and the realtime binding subscribes
+-- with filter user_id=eq.<uid> (app/page.tsx:395). `for all` covers the upsert's
+-- INSERT and UPDATE alongside the SELECT.
 alter table public.comment_reads enable row level security;
 drop policy if exists "all_comment_reads" on public.comment_reads;
-create policy "all_comment_reads" on public.comment_reads
-  for all using (true) with check (true);
+drop policy if exists "comment_reads_own" on public.comment_reads;
+create policy "comment_reads_own" on public.comment_reads
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());

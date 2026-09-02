@@ -1,5 +1,5 @@
 -- ============================================================================
--- NATHAN OS — Self-service display name
+-- Content OS — Self-service display name
 -- Lets ANY authenticated user set their OWN display name (first-login prompt +
 -- account panel) without widening the profiles UPDATE policy, which stays
 -- admin-only. The function is SECURITY DEFINER but only ever writes the

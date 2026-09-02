@@ -1,5 +1,5 @@
 -- ============================================================================
--- UNCMMN OS — Clippers (Phase 1: data model + admin management view)
+-- Content OS — Clippers (Phase 1: data model + admin management view)
 -- Adds the 'clipper' role tier, clipper-specific profile fields, and the two
 -- clipper tables. Existing admin/editor users are unaffected.
 -- Run AFTER auth_setup.sql. Safe to re-run (idempotent).
@@ -26,9 +26,18 @@ create table if not exists public.clipper_accounts (
   status text default 'active',        -- 'active' | 'inactive'
   created_at timestamptz default now()
 );
+-- Admin full access + a clipper reading their OWN rows (Phase 2 portal).
+-- Previously "Allow all for anon" with no `to` clause — TO PUBLIC, so the anon
+-- key could read every clipper's accounts.
 alter table public.clipper_accounts enable row level security;
 drop policy if exists "Allow all for anon" on public.clipper_accounts;
-create policy "Allow all for anon" on public.clipper_accounts for all using (true) with check (true);
+drop policy if exists "admin_all_clipper_accounts" on public.clipper_accounts;
+drop policy if exists "clipper_own_clipper_accounts" on public.clipper_accounts;
+create policy "admin_all_clipper_accounts" on public.clipper_accounts
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+create policy "clipper_own_clipper_accounts" on public.clipper_accounts
+  for select to authenticated using (clipper_id = auth.uid());
 
 -- 3) clipper_content — one row per video/post. views/likes/posted_at/
 --    platform_post_id are automation-ready (platform APIs fill them later).
@@ -45,6 +54,14 @@ create table if not exists public.clipper_content (
   platform_post_id text,
   created_at timestamptz default now()
 );
+-- Same shape as clipper_accounts. The admin Dashboard also reads this table for
+-- its stats, which the admin policy covers.
 alter table public.clipper_content enable row level security;
 drop policy if exists "Allow all for anon" on public.clipper_content;
-create policy "Allow all for anon" on public.clipper_content for all using (true) with check (true);
+drop policy if exists "admin_all_clipper_content" on public.clipper_content;
+drop policy if exists "clipper_own_clipper_content" on public.clipper_content;
+create policy "admin_all_clipper_content" on public.clipper_content
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+create policy "clipper_own_clipper_content" on public.clipper_content
+  for select to authenticated using (clipper_id = auth.uid());

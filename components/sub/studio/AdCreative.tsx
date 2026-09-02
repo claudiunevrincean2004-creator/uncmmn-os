@@ -91,7 +91,7 @@ export default function AdCreative({ adCreatives, comments, activity, quickLinks
   const [draft, setDraft] = useState<AdDraft>(EMPTY_DRAFT);
   const [creating, setCreating] = useState(false);
 
-  // Open a row's panel when arriving via a deep link (Slack "Open in UNCMMN OS").
+  // Open a row's panel when arriving via a deep link (Slack "Open in Content OS").
   useEffect(() => { if (openItemId) { setSelectedId(openItemId); onOpened?.(); } }, [openItemId, onOpened]);
 
   const cprops = useMemo(() => sortProps(properties, TABLE_KEY), [properties]);

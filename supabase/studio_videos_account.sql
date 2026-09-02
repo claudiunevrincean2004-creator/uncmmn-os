@@ -1,5 +1,5 @@
 -- ============================================================================
--- UNCMMN OS — Account property for Video Review
+-- Content OS — Account property for Video Review
 --
 -- A plain nullable text column naming which account a video belongs to
 -- ('Nathan', 'Eden'). Deliberately NOT a foreign key to clients: the accounts

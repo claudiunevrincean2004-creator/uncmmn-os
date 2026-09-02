@@ -1,2 +1,41 @@
+# dependencies
 node_modules
+/.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# next.js build output
+/.next/
+/out/
+/build
+
+# local env files
+#
+# `.env*` catches .env, .env.local, .env.production.local, etc. The negation on
+# the next line is load-bearing: without it `.env*` would also swallow
+# .env.local.example, which is the one env file that MUST stay tracked — it is
+# the only documentation of which variables the app reads.
+.env*
+!.env*.example
+
+# vercel
 .vercel
+
+# typescript / build caches
+*.tsbuildinfo
+
+# supabase cli scratch state
+supabase/.temp/
+
+# testing
+/coverage
+
+# macOS
+.DS_Store
+*.pem
+
+# debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*

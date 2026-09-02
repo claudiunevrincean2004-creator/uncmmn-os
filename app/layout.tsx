@@ -4,7 +4,7 @@ import DialogProvider from "@/components/DialogProvider";
 
 export const metadata: Metadata = {
   title: "Content OS",
-  description: "Nathan Nazareth — Content Operating System",
+  description: "Content operations — planning, production, review and delivery.",
   applicationName: "Content OS",
   manifest: "/manifest.webmanifest",
   icons: {
@@ -29,7 +29,20 @@ export const viewport: Viewport = {
 };
 
 // Set the theme before first paint to avoid a flash. Defaults to light "aurora".
-const themeScript = `(function(){try{var t=localStorage.getItem('nathan_theme');if(t!=='midnight'&&t!=='aurora')t='aurora';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','aurora');}})();`;
+//
+// The key was renamed 'nathan_theme' → 'contentos_theme', so this also migrates
+// anyone still holding the old key. This script runs before hydration on every
+// load, which makes it the right place for the migration: by the time any
+// component reads the theme, the new key is already populated.
+//
+// The read order matters — new key first, legacy only as a fallback — so a
+// migrated user is never dragged back to a stale value. If setItem throws
+// (private mode, quota) the whole block falls to the catch with the OLD key
+// still intact, and the migration simply retries on the next load rather than
+// silently losing the preference. removeItem runs only after a successful set.
+//
+// Keep the key in sync with app/page.tsx, which reads and writes it too.
+const themeScript = `(function(){try{var K='contentos_theme',OLD='nathan_theme';var t=localStorage.getItem(K);if(t===null){var legacy=localStorage.getItem(OLD);if(legacy==='midnight'||legacy==='aurora'){localStorage.setItem(K,legacy);t=legacy;}localStorage.removeItem(OLD);}if(t!=='midnight'&&t!=='aurora')t='aurora';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','aurora');}})();`;
 
 export default function RootLayout({
   children,

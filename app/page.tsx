@@ -27,14 +27,27 @@ import InboxPanel from '@/components/InboxPanel';
 import { profileName } from '@/lib/profile-name';
 import { INBOX_SOURCES, isUnread } from '@/lib/inbox';
 
-async function safeSelect(table: string, orderCol: string, ascending = true) {
+// `ok` distinguishes "the query ran and the table is genuinely empty" from
+// "the query failed and we know nothing". Any caller about to WRITE based on an
+// empty result must check it: a transient failure returning [] is not evidence
+// of absence. (A missing table — PGRST205 — is also `ok: false`; we cannot
+// insert into a table that is not there either.)
+type SelectResult = { rows: unknown[]; ok: boolean };
+
+async function selectChecked(table: string, orderCol: string, ascending = true): Promise<SelectResult> {
   const { data, error } = await supabase.from(table).select('*').order(orderCol, { ascending });
-  if (error && error.code === 'PGRST205') return [];
   if (error) {
-    console.warn(`[safeSelect] Error querying "${table}":`, error.message, error.code);
-    return [];
+    if (error.code !== 'PGRST205') {
+      console.warn(`[selectChecked] Error querying "${table}":`, error.message, error.code);
+    }
+    return { rows: [], ok: false };
   }
-  return data || [];
+  return { rows: data || [], ok: true };
+}
+
+// Read-only callers that only ever render the result keep the plain array shape.
+async function safeSelect(table: string, orderCol: string, ascending = true) {
+  return (await selectChecked(table, orderCol, ascending)).rows;
 }
 
 const PAGE_LABELS: Record<MainPage, string> = {
@@ -177,9 +190,15 @@ export default function Home() {
     }
   }, [setMainPage]);
 
-  // Sync theme from storage on mount (the layout script already applied it pre-paint)
+  // Sync theme from storage on mount (the layout script already applied it pre-paint,
+  // and is also what migrates the legacy 'nathan_theme' key to 'contentos_theme').
+  // The legacy fallback here covers the one case the layout script cannot finish:
+  // a storage write that throws, which leaves the old key in place until it can.
   useEffect(() => {
-    const stored = typeof window !== 'undefined' ? localStorage.getItem('nathan_theme') : null;
+    const stored =
+      typeof window !== 'undefined'
+        ? localStorage.getItem('contentos_theme') ?? localStorage.getItem('nathan_theme')
+        : null;
     const initial = stored === 'midnight' ? 'midnight' : 'aurora';
     setTheme(initial);
     document.documentElement.setAttribute('data-theme', initial);
@@ -188,7 +207,7 @@ export default function Home() {
   // aurora IS the light theme (white surfaces, #F3F4FA page) and midnight the
   // dark one — the segmented control just names them the way people expect.
   function applyTheme(next: 'aurora' | 'midnight') {
-    try { localStorage.setItem('nathan_theme', next); } catch {}
+    try { localStorage.setItem('contentos_theme', next); } catch {}
     document.documentElement.setAttribute('data-theme', next);
     setTheme(next);
   }
@@ -241,7 +260,7 @@ export default function Home() {
 
   const loadData = useCallback(async () => {
     const [c, p, d, ss, ri, sv, sq, sn, ac, cm, av, ql, dr, cp, co, pr] = await Promise.all([
-      safeSelect('clients', 'created_at'),
+      selectChecked('clients', 'created_at'),
       safeSelect('posts', 'date', false),
       safeSelect('drive_folders', 'category'),
       safeSelect('subscriber_snapshots', 'date'),
@@ -272,15 +291,23 @@ export default function Home() {
       safeSelect('finance_payments', 'created_at', false),
     ]);
 
-    let active = (c as Client[])[0] || null;
-    // Auto-provision Nathan if no client exists
-    if (!active && (c as Client[]).length === 0) {
-      const { data: created } = await supabase.from('clients').insert([{
+    const clientRows = c.rows as Client[];
+    let active = clientRows[0] || null;
+    // Auto-provision Nathan ONLY when the query definitively succeeded and came
+    // back empty. A failed query also yields an empty list, and treating that as
+    // "no client exists" is what inserted five duplicate rows over four days —
+    // one per transient failure. On error: do nothing, never insert.
+    if (c.ok && clientRows.length === 0) {
+      const { data: created, error: createError } = await supabase.from('clients').insert([{
         name: 'Nathan Nazareth',
         niche: 'Creator',
         platforms: ['TikTok', 'YouTube'],
       }]).select().single();
-      if (created) active = created as Client;
+      if (createError) {
+        console.warn('[clients] auto-provision failed:', createError.message, createError.code);
+      } else if (created) {
+        active = created as Client;
+      }
     }
 
     setClient(active);
@@ -489,7 +516,7 @@ export default function Home() {
     return (
       <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
         <div style={{ textAlign: 'center', maxWidth: 360, padding: 24 }}>
-          <div className="font-head" style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px', marginBottom: 8 }}>UNCMMN OS</div>
+          <div className="font-head" style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px', marginBottom: 8 }}>Content OS</div>
           <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>Your clipper portal is coming soon ✂</div>
           <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 20 }}>You&apos;re all set up{currentProfile ? `, ${currentName}` : ''}. Hang tight — your dashboard is on the way.</div>
           <button className="btn-ghost" style={{ fontSize: 12, padding: '8px 16px' }} onClick={signOut}>Sign out</button>
